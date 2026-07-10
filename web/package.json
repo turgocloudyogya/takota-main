@@ -1,0 +1,46 @@
+{
+  "name": "attendance-app",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@fontsource/geist-sans": "5.2.5",
+    "@gravity-ui/date-components": "3.4.2",
+    "@gravity-ui/icons": "2.20.0",
+    "@gravity-ui/navigation": "6.1.2",
+    "@gravity-ui/uikit": "7.43.0",
+    "@heroui/checkbox": "2.3.32",
+    "@heroui/react": "^3.2.2",
+    "@heroui/styles": "^3.2.2",
+    "@heroui/system": "2.4.28",
+    "@heroui/theme": "2.4.26",
+    "clsx": "2.1.1",
+    "date-fns": "^4.4.0",
+    "framer-motion": "12.42.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-router-dom": "7.18.1",
+    "recharts": "^3.9.2",
+    "sonner": "2.0.7",
+    "vaul": "1.1.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@tailwindcss/vite": "4.3.0",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "eslint": "10.0.1",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.3",
+    "globals": "17.7.0",
+    "tailwindcss": "4.3.0",
+    "vite": "8.1.1"
+  }
+}

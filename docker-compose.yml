@@ -1,0 +1,139 @@
+#version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: takota-postgres
+    environment:
+      POSTGRES_USER: takota
+      POSTGRES_PASSWORD: takota_password
+      POSTGRES_DB: takota_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U takota -d takota_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - takota-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: takota-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - takota-network
+
+  # MinIO S3 Storage
+  minio:
+    image: minio/minio:latest
+    container_name: takota-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - takota-network
+
+  # Takota API Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: takota-api
+    environment:
+      # Server
+      PORT: 8080
+      APP_ENV: production
+      GIN_MODE: release
+      
+      # JWT
+      JWT_SECRET: change-this-secret-in-production-please
+      JWT_EXPIRY_HOURS: 24
+      
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: takota
+      DB_PASSWORD: takota_password
+      DB_NAME: takota_db
+      DB_SSL_MODE: disable
+      DB_SSL_ENABLE: false
+      DB_MAX_CONNECTIONS: 25
+      DB_MAX_IDLE_CONNECTIONS: 10
+      
+      # Redis
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      
+      # S3/MinIO
+      S3_ENDPOINT: minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET_NAME: takota-bucket
+      S3_USE_SSL: false
+      S3_USE_PATH_STYLE_ENDPOINT: true
+      S3_REGION: us-east-1
+      
+      # CloudFront (disabled by default)
+      S3_USE_CLOUDFRONT: false
+      
+      # App settings
+      ATTENDANCE_RADIUS_METERS: 100
+      OFFICE_LATITUDE: -7.7546612
+      OFFICE_LONGITUDE: 110.3658561
+      MAX_LOGIN_ATTEMPTS: 5
+      LOGIN_LOCK_DURATION_MINUTES: 5
+      
+      # File upload
+      MAX_ATTENDANCE_FILE_SIZE_MB: 10
+      MAX_ABSENCE_FILE_SIZE_MB: 50
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - takota-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  takota-network:
+    driver: bridge
