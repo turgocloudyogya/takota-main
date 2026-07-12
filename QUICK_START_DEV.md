@@ -149,6 +149,83 @@ make docker-down
 
 ---
 
+## 🛑 Cara Stop Semua Services
+
+### Stop Development (make dev)
+
+```bash
+# Di terminal yang menjalankan make dev:
+Ctrl+C
+
+# Ini akan stop:
+# - Backend (go run)
+# - Frontend (npm run dev)
+```
+
+### Stop Docker Services
+
+```bash
+# Stop semua container
+make docker-down
+
+# Atau manual:
+docker compose down
+
+# Stop dan hapus volumes (⚠️ DATA AKAN HILANG)
+docker compose down -v
+```
+
+### Stop Semua (Complete Shutdown)
+
+```bash
+# 1. Stop make dev (Ctrl+C)
+# 2. Stop Docker
+make docker-down
+
+# Verify semua sudah stop
+docker ps
+# Should show empty or no takota containers
+```
+
+---
+
+## ⚠️ Troubleshooting: Network Still in Use
+
+**Problem:**
+```bash
+docker compose down
+# Error: Network takota_takota-network Resource is still in use
+```
+
+**Cause:**
+Container masih running yang menggunakan network tersebut.
+
+**Solution:**
+
+```bash
+# 1. Cek container yang masih running
+docker ps -a | grep takota
+
+# 2. Stop semua container takota
+docker stop takota-api takota-postgres takota-redis takota-minio
+
+# 3. Remove containers
+docker rm takota-api takota-postgres takota-redis takota-minio
+
+# 4. Sekarang bisa docker compose down
+docker compose down
+
+# Atau force remove network:
+docker network rm takota_takota-network
+```
+
+**Prevention:**
+- Selalu gunakan `docker compose` untuk manage containers
+- Jangan manual `docker run` untuk service yang ada di docker-compose.yml
+- Gunakan `make docker-up` dan `make docker-down`
+
+---
+
 ### Opsi 2: Docker Compose (All-in-One)
 
 **Kelebihan:**
@@ -241,18 +318,27 @@ docker compose up -d
 # Stop services
 docker compose down
 
+# Stop dan hapus semua data (⚠️ DESTRUCTIVE)
+docker compose down -v
+
 # View logs
 docker compose logs -f api          # API logs
 docker compose logs -f postgres     # Database logs
 
-# Restart API (after code changes)
+# Restart single service
 docker compose restart api
 
-# Rebuild API (after Go code changes)
+# Rebuild single service
 docker compose up -d --build api
 
-# Stop & remove all data
-docker compose down -v
+# Check status
+docker compose ps
+
+# Stop semua container takota
+docker stop $(docker ps -q --filter "name=takota")
+
+# Remove semua container takota
+docker rm $(docker ps -aq --filter "name=takota")
 ```
 
 ### Development Workflow

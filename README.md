@@ -169,6 +169,13 @@ make dev            # Run backend + frontend (hot reload)
 - Admin: `admin` / `admin123`
 - User: `user001` / `user123`
 
+**Stop services:**
+```bash
+# Stop development (Ctrl+C di terminal make dev)
+# Then stop Docker:
+make docker-down
+```
+
 **Why Make?**
 - ✅ Hot reload (frontend & backend)
 - ✅ Fast iteration
@@ -192,6 +199,9 @@ docker compose up -d --build
 
 # Access
 # http://localhost:8080
+
+# Stop
+docker compose down
 ```
 
 **Chromium untuk PDF sudah ter-bundle di container!**
