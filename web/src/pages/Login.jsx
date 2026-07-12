@@ -4,6 +4,27 @@ import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { At, Key, Eye, EyeSlash, Person } from '@gravity-ui/icons'
 
+// Import API and session utilities from admin
+const API_BASE = localStorage.getItem('api-base-url') || 'http://localhost:8080'
+
+async function loginAPI(username, password) {
+  const response = await fetch(`${API_BASE}/api/auth`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'key-request': 'web-login'
+    },
+    body: JSON.stringify({ username, password })
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.message || 'Login gagal. Periksa username dan password.')
+  }
+
+  return response.json()
+}
+
 export default function Login() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
@@ -11,21 +32,48 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
 
     if (!username.trim() || !password.trim()) {
-      toast.error('Username and password are required.')
+      toast.error('Username dan password wajib diisi.')
       return
     }
 
     setSubmitting(true)
-    // Mock authentication — replace with a real API call.
-    setTimeout(() => {
+    try {
+      const data = await loginAPI(username.trim(), password)
+      
+      // Clear any old session keys first
+      localStorage.removeItem('takota-token')
+      
+      // Save session using the same key as admin (takota_admin_token)
+      localStorage.setItem('takota_admin_token', data.token)
+      localStorage.setItem('takota_token', data.token) // Also save with this key for compatibility
+      localStorage.setItem('takota-username', username.trim())
+      localStorage.setItem('takota-role', data.login_as)
+
+      // Check if password change is required
+      const redirectPath = data.redirect || (data.login_as === 'admin' ? '/dash' : '/main')
+      
+      if (redirectPath === '/chpw') {
+        toast.info('Anda harus mengganti password terlebih dahulu.')
+        navigate('/change-password', { replace: true })
+      } else {
+        toast.success(`Selamat datang, ${username}!`)
+        
+        // Redirect based on backend response or role
+        if (data.login_as === 'admin') {
+          navigate('/admin/dashboard', { replace: true })
+        } else {
+          navigate('/main', { replace: true })
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Login gagal. Periksa koneksi atau alamat API.')
+    } finally {
       setSubmitting(false)
-      toast.success('Logged in successfully.')
-      navigate('/main')
-    }, 400)
+    }
   }
 
   return (
@@ -34,9 +82,9 @@ export default function Login() {
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral/15">
           <Icon data={Person} size={32} className="text-neutral" />
         </div>
-        <h1 className="text-xl font-bold text-neutral-900">Log In</h1>
+        <h1 className="text-xl font-bold text-neutral-900">Takota Login</h1>
         <p className="mt-2 max-w-[260px] text-center text-sm text-neutral">
-          To log in to this app, please enter your username and password
+          Masuk dengan akun Anda. Admin akan diarahkan ke dashboard admin, user ke halaman presensi.
         </p>
       </div>
 

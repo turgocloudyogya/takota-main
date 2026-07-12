@@ -100,7 +100,14 @@ export function normalizeAbsence(raw) {
     raw.timestamp
   )
   const option = firstDefined(raw.option, raw.type, raw.reason_option, 'permit')
-  const sign = firstDefined(raw.sign, raw.status, 'pending')
+  // Check verify.sign_status first, then fallback to raw.sign or raw.status
+  const sign = firstDefined(
+    raw.verify?.sign_status,
+    raw.sign_status,
+    raw.sign,
+    raw.status,
+    'pending'
+  )
   return {
     id: firstDefined(raw.id, raw._id, raw.uuid),
     userId: firstDefined(raw.user_id, raw.userId, raw.user?.id),
@@ -117,7 +124,7 @@ export function normalizeAbsence(raw) {
     reason: firstDefined(raw.reason, raw.description),
     option,
     isSick: SICK_OPTIONS.has(String(option).toLowerCase()),
-    sign: String(sign).toLowerCase(),
+    sign: sign ? String(sign).toLowerCase() : 'pending',
     fileUrl: firstDefined(raw.file, raw.file_url, raw.attachment, raw.photo),
     raw,
   }

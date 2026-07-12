@@ -44,7 +44,7 @@ func GeneratePDFFromHTML(ctx context.Context, htmlContent string) ([]byte, error
 				WithLandscape(true).
 				WithPaperWidth(11.69).  // A4 landscape width in inches
 				WithPaperHeight(8.27).  // A4 landscape height in inches
-				WithMarginTop(0.87).    // 2.2cm in inches
+				WithMarginTop(0.39).    // 1cm in inches (changed from 0.87/2.2cm)
 				WithMarginBottom(0.39). // 1cm in inches
 				WithMarginLeft(0.98).   // 2.5cm in inches
 				WithMarginRight(0.39).  // 1cm in inches

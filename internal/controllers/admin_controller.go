@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,10 +30,13 @@ type AttendanceListResponse struct {
 type AttendanceListItem struct {
 	ID         string `json:"id"`
 	UserID     string `json:"user_id"`
+	Username   string `json:"username"`
+	Nickname   string `json:"nickname"`
 	Photo      string `json:"photo"`
 	GmapsEmbed string `json:"gmaps_embed"`
 	Latitude   string `json:"latitude"`
 	Longitude  string `json:"longitude"`
+	Location   string `json:"location"`
 	Timestamp  string `json:"timestamp"`
 }
 
@@ -43,6 +48,8 @@ type AbsenceListResponse struct {
 type AbsenceListItem struct {
 	ID        string        `json:"id"`
 	UserID    string        `json:"user_id"`
+	Username  string        `json:"username"`
+	Nickname  string        `json:"nickname"`
 	File      string        `json:"file"`
 	Reason    string        `json:"reason"`
 	Option    string        `json:"option"`
@@ -63,6 +70,12 @@ type DeleteRequest struct {
 type SignatureRequest struct {
 	ID   string `json:"id" binding:"required"`
 	Sign string `json:"sign" binding:"required"`
+}
+
+// Helper function to parse float from string
+func parseFloat(s string) float64 {
+	f, _ := strconv.ParseFloat(s, 64)
+	return f
 }
 
 // ListAttendances returns list of all attendances
@@ -91,7 +104,10 @@ func (ctrl *AdminController) ListAttendances(c *gin.Context) {
 	}
 
 	var attendances []models.Attendance
-	query.Order("attendance.created_at DESC").Limit(limit + 1).Find(&attendances)
+	query.Order("attendance.created_at DESC").
+		Preload("User"). // Preload user data
+		Limit(limit + 1).
+		Find(&attendances)
 
 	// Check if there are more results
 	hasMore := len(attendances) > limit
@@ -103,6 +119,10 @@ func (ctrl *AdminController) ListAttendances(c *gin.Context) {
 	ctx := context.Background()
 	items := []AttendanceListItem{}
 	for _, att := range attendances {
+		// Debug: log user info
+		log.Printf("Attendance ID: %s, UserID: %s, User.ID: %s, User.Username: %s, User.Callname: %s", 
+			att.ID.String(), att.UserID.String(), att.User.ID.String(), att.User.Username, att.User.Callname)
+		
 		photoURL := ""
 		if att.Photo != nil {
 			url, _ := s3.GetSignedURL(ctx, *att.Photo, 1*time.Minute)
@@ -124,13 +144,34 @@ func (ctrl *AdminController) ListAttendances(c *gin.Context) {
 			lon = *att.Longitude
 		}
 
+		// Get user info
+		username := ""
+		nickname := ""
+		if att.User.ID != uuid.Nil {
+			username = att.User.Username
+			nickname = att.User.Callname // Use callname as display name
+		}
+
+		// Extract location name from Google Maps embed or coordinates
+		location := ""
+		if att.Latitude != nil && att.Longitude != nil {
+			// For now, just show coordinates formatted nicely
+			// In future, could integrate reverse geocoding API
+			location = fmt.Sprintf("%.4f, %.4f", 
+				parseFloat(*att.Latitude), 
+				parseFloat(*att.Longitude))
+		}
+
 		items = append(items, AttendanceListItem{
 			ID:         att.ID.String(),
 			UserID:     att.UserID.String(),
+			Username:   username,
+			Nickname:   nickname,
 			Photo:      photoURL,
 			GmapsEmbed: gmapsEmbed,
 			Latitude:   lat,
 			Longitude:  lon,
+			Location:   location,
 			Timestamp:  att.CreatedAt.Format(time.RFC3339),
 		})
 	}
@@ -175,6 +216,7 @@ func (ctrl *AdminController) ListAbsences(c *gin.Context) {
 	var absences []models.Attendance
 	query.Order("attendance.created_at DESC").
 		Limit(limit + 1).
+		Preload("User").     // Preload user data untuk menampilkan nama
 		Preload("Verifier").
 		Find(&absences)
 
@@ -213,9 +255,19 @@ func (ctrl *AdminController) ListAbsences(c *gin.Context) {
 			}
 		}
 
+		// Get user info
+		username := ""
+		nickname := ""
+		if abs.User.ID != uuid.Nil {
+			username = abs.User.Username
+			nickname = abs.User.Callname // Use callname as display name
+		}
+
 		items = append(items, AbsenceListItem{
 			ID:        abs.ID.String(),
 			UserID:    abs.UserID.String(),
+			Username:  username,
+			Nickname:  nickname,
 			File:      fileURL,
 			Reason:    reason,
 			Option:    option,
@@ -323,5 +375,51 @@ func (ctrl *AdminController) SignatureAbsence(c *gin.Context) {
 
 	utils.RespondSuccess(c, http.StatusOK, gin.H{
 		"message": "Absence signature updated successfully",
+	})
+}
+
+// DeleteAbsence deletes an absence record (only if already verified)
+func (ctrl *AdminController) DeleteAbsence(c *gin.Context) {
+	id := c.Param("id")
+	
+	absenceID, err := uuid.Parse(id)
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Invalid ID format", utils.ErrDataNotFound)
+		return
+	}
+
+	// Find absence
+	var absence models.Attendance
+	if err := ctrl.DB.Where("id = ?", absenceID).First(&absence).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Data not found", utils.ErrDataNotFound)
+		return
+	}
+
+	// Check if it's an absence
+	if absence.Type != "absence" {
+		utils.RespondError(c, http.StatusBadRequest, "Can only delete absence records", utils.ErrOnlyAbsence)
+		return
+	}
+
+	// Validate that absence has been verified (allow or reject)
+	if absence.SignStatus == nil || *absence.SignStatus == "" {
+		utils.RespondError(c, http.StatusBadRequest, "Cannot delete unverified absence. Please approve or reject first.", "ABSENCE_NOT_VERIFIED")
+		return
+	}
+
+	// Delete file from S3 if exists
+	if absence.File != nil && *absence.File != "" {
+		ctx := context.Background()
+		s3.DeleteFile(ctx, *absence.File)
+	}
+
+	// Delete absence record
+	if err := ctrl.DB.Delete(&absence).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to delete absence", "DB_ERROR")
+		return
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"message": "Absence deleted successfully",
 	})
 }

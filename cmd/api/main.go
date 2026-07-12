@@ -49,6 +49,22 @@ func main() {
 	// Create router
 	router := gin.Default()
 
+	// CORS middleware - allow frontend requests
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, key-request")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
+
 	// Setup routes
 	setupRoutes(router, cfg)
 
@@ -116,7 +132,9 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			admin.GET("/attendances", adminCtrl.ListAttendances)
 			admin.GET("/absences", adminCtrl.ListAbsences)
 			admin.DELETE("/attendance", adminCtrl.DeleteAttendance)
+			admin.DELETE("/absence/:id", adminCtrl.DeleteAbsence)
 			admin.PATCH("/absence", adminCtrl.SignatureAbsence)
+			admin.DELETE("/photo/:id", allCtrl.DeletePhoto)
 
 			// User management
 			admin.GET("/users", adminCtrl.ListUsers)
@@ -127,6 +145,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			// Export
 			admin.GET("/export", adminCtrl.ExportAttendance)
 			admin.GET("/export/pdf", adminCtrl.ExportAttendancePDF)
+			admin.GET("/export/xlsx", adminCtrl.ExportAttendanceXLSX)
 		}
 
 		// All/Global routes (auth required)

@@ -2,21 +2,30 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Button, Card } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
-import { FileArrowDown, ArrowDownToLine } from '@gravity-ui/icons'
+import { FileArrowDown } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { unwrapList, normalizeUser } from '../lib/normalize.js'
-import { getTwoWeekWindow, formatShortDate, toDateKey } from '../lib/dateWindow.js'
-import { downloadBlankTemplate, downloadBlob } from '../lib/csvTemplate.js'
+import { formatShortDate, countWorkingDays, estimatePageCount } from '../lib/dateWindow.js'
+import { downloadBlob } from '../lib/download.js'
 import { TextInput } from '../components/FormField.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
 const STUDENT_FETCH_LIMIT = 100
 const STUDENT_FETCH_MAX_PAGES = 10
 
-function todayIsoDate() {
-  const d = new Date()
+function toIsoDate(date) {
+  const d = new Date(date)
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
   return d.toISOString().slice(0, 10)
+}
+
+function todayIsoDate() {
+  return toIsoDate(new Date())
+}
+
+function startOfMonthIsoDate() {
+  const d = new Date()
+  return toIsoDate(new Date(d.getFullYear(), d.getMonth(), 1))
 }
 
 async function fetchAllStudents() {
@@ -38,9 +47,11 @@ export default function AdminReports() {
   const [studentFilter, setStudentFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState(() => new Set())
 
-  const [anchorDate, setAnchorDate] = useState(todayIsoDate())
+  const [startDate, setStartDate] = useState(startOfMonthIsoDate())
+  const [endDate, setEndDate] = useState(todayIsoDate())
   const [duName, setDuName] = useState('')
   const [duAddress, setDuAddress] = useState('')
+  const [format, setFormat] = useState('pdf') // 'pdf' | 'xlsx'
   const [building, setBuilding] = useState(false)
 
   useEffect(() => {
@@ -65,7 +76,12 @@ export default function AdminReports() {
     }
   }, [])
 
-  const days = useMemo(() => getTwoWeekWindow(new Date(`${anchorDate}T00:00:00`)), [anchorDate])
+  const rangeIsValid = Boolean(startDate) && Boolean(endDate) && startDate <= endDate
+  const workingDays = useMemo(
+    () => (rangeIsValid ? countWorkingDays(startDate, endDate) : 0),
+    [startDate, endDate, rangeIsValid]
+  )
+  const pageEstimate = useMemo(() => estimatePageCount(workingDays), [workingDays])
 
   const filteredStudents = useMemo(() => {
     const term = studentFilter.trim().toLowerCase()
@@ -96,29 +112,29 @@ export default function AdminReports() {
     })
   }
 
-  async function handleBuildPDF() {
+  async function handleBuildRecap() {
     if (selectedIds.size === 0) {
       toast.error('Pilih minimal satu siswa untuk dibuatkan rekap.')
       return
     }
+    if (!startDate || !endDate) {
+      toast.error('Tentukan tanggal mulai dan tanggal akhir rekap.')
+      return
+    }
+    if (startDate > endDate) {
+      toast.error('Tanggal akhir tidak boleh sebelum tanggal mulai.')
+      return
+    }
+
     setBuilding(true)
     try {
-      const start = days[0]
-      const end = days[days.length - 1]
-      const startDate = toDateKey(start)
-      const endDate = toDateKey(end)
-
-      const { blob, filename } = await api.exportAttendancePDF({
-        startDate,
-        endDate,
-        duName,
-        duAddress,
-        studentIds: [...selectedIds],
-      })
+      const payload = { startDate, endDate, duName, duAddress, studentIds: [...selectedIds] }
+      const { blob, filename } =
+        format === 'xlsx' ? await api.exportAttendanceXLSX(payload) : await api.exportAttendancePDF(payload)
       downloadBlob(blob, filename)
-      toast.success('Rekap presensi PDF berhasil dibuat dan diunduh.')
+      toast.success(`Rekap presensi ${format.toUpperCase()} berhasil dibuat dan diunduh.`)
     } catch (err) {
-      toast.error(err.message || 'Gagal membuat rekap presensi PDF.')
+      toast.error(err.message || `Gagal membuat rekap presensi ${format.toUpperCase()}.`)
     } finally {
       setBuilding(false)
     }
@@ -133,51 +149,36 @@ export default function AdminReports() {
         icon={FileArrowDown}
         eyebrow="Laporan"
         title="Rekap & Unduh"
-        description="Unduh formulir Daftar Hadir Peserta Didik — kosong untuk diisi manual, atau terisi otomatis dari data presensi aplikasi."
+        description="Buat rekap Daftar Hadir Peserta Didik dari data presensi & izin aplikasi, untuk rentang tanggal berapa pun."
       />
 
-      {/* Blank template */}
-      <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Icon data={FileArrowDown} size={18} />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-neutral-900">Unduh Formulir Kosong</p>
-            <p className="text-sm text-neutral">
-              Salinan asli format Daftar Hadir Peserta Didik, siap cetak dan diisi manual kapan pun.
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" onPress={() => downloadBlankTemplate()}>
-          <Icon data={ArrowDownToLine} size={15} />
-          Unduh Template
-        </Button>
-      </Card>
-
-      {/* PDF recap builder */}
+      {/* Recap builder */}
       <Card className="flex flex-col gap-4 p-4">
         <div>
-          <p className="text-sm font-semibold text-neutral-900">Buat Rekap Presensi (2 Minggu) — PDF</p>
+          <p className="text-sm font-semibold text-neutral-900">Buat Rekap Presensi</p>
           <p className="text-sm text-neutral">
-            Nama, tanggal, status kehadiran (V/S/I/A), dan total sakit/izin/alpha diisi otomatis dari data
-            presensi &amp; izin siswa. Dihasilkan sebagai file PDF siap cetak.
+            Nama, tanggal, status kehadiran (V/S/I/A), dan total sakit/izin/alpa per siswa diisi otomatis dari
+            data presensi &amp; izin. Rentang tanggal dipilih bebas — jika lebih dari 2 minggu hari kerja,
+            hasil otomatis terbagi ke beberapa halaman dengan format tabel yang sama persis (utuh 2 tabel per
+            halaman), termasuk kalau halaman terakhir cuma berisi data satu hari.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <TextInput
             type="date"
-            label="Periode (pilih tanggal mana saja dalam pekan pertama)"
-            value={anchorDate}
-            onChange={(e) => setAnchorDate(e.target.value)}
+            label="Tanggal mulai rekap"
+            value={startDate}
+            max={endDate || undefined}
+            onChange={(e) => setStartDate(e.target.value)}
           />
-          <div className="flex flex-col justify-end gap-1 rounded-xl bg-neutral-50 px-3.5 py-2.5 text-sm">
-            <span className="text-xs font-medium text-neutral-600">Rentang dua minggu</span>
-            <span className="font-medium text-neutral-900">
-              {formatShortDate(days[0])} – {formatShortDate(days[days.length - 1])}
-            </span>
-          </div>
+          <TextInput
+            type="date"
+            label="Tanggal akhir rekap"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
           <TextInput
             label="Nama DU/DI (opsional)"
             placeholder="cth. PT Sinar Abadi"
@@ -190,6 +191,41 @@ export default function AdminReports() {
             value={duAddress}
             onChange={(e) => setDuAddress(e.target.value)}
           />
+        </div>
+
+        <div className="rounded-xl bg-neutral-50 px-3.5 py-2.5 text-sm">
+          {rangeIsValid ? (
+            <span className="text-neutral-700">
+              <span className="font-medium text-neutral-900">
+                {formatShortDate(new Date(`${startDate}T00:00:00`))} –{' '}
+                {formatShortDate(new Date(`${endDate}T00:00:00`))}
+              </span>{' '}
+              · {workingDays} hari kerja (Senin–Sabtu) · diperkirakan{' '}
+              <span className="font-medium text-neutral-900">{pageEstimate} halaman</span>
+            </span>
+          ) : (
+            <span className="text-danger">Tanggal akhir tidak boleh sebelum tanggal mulai.</span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-neutral-600">Format unduhan</span>
+          <div className="flex gap-2">
+            <Button
+              variant={format === 'pdf' ? 'primary' : 'outline'}
+              onPress={() => setFormat('pdf')}
+              className="min-w-[96px]"
+            >
+              PDF
+            </Button>
+            <Button
+              variant={format === 'xlsx' ? 'primary' : 'outline'}
+              onPress={() => setFormat('xlsx')}
+              className="min-w-[96px]"
+            >
+              XLSX
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2 rounded-xl border border-app-border/15 p-3">
@@ -235,9 +271,14 @@ export default function AdminReports() {
           <p className="text-xs text-neutral">{selectedIds.size} siswa dipilih</p>
         </div>
 
-        <Button variant="primary" onPress={handleBuildPDF} isDisabled={building} className="self-start">
+        <Button
+          variant="primary"
+          onPress={handleBuildRecap}
+          isDisabled={building || !rangeIsValid}
+          className="self-start"
+        >
           <Icon data={FileArrowDown} size={15} />
-          {building ? 'Membuat rekap…' : 'Buat & Unduh PDF'}
+          {building ? 'Membuat rekap…' : `Buat & Unduh ${format.toUpperCase()}`}
         </Button>
       </Card>
     </div>

@@ -1,14 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { Clock } from '@gravity-ui/icons'
-import {
-  currentUser,
-  initialTodayStatus,
-  initialHistoryList,
-} from '../lib/mockData.js'
-import AbsenceRow from '../components/AbsenceRow.jsx'
-import EmptyState from '../components/EmptyState.jsx'
+import { getUserHome } from '../lib/api.js'
+import AbsenceCard from '../components/AbsenceCard.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
 
 function useGreeting() {
@@ -21,23 +17,128 @@ function useGreeting() {
   }, [])
 }
 
+function formatDate(timestamp) {
+  const date = new Date(timestamp)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${day}/${month}`
+}
+
+function formatFullDate(timestamp) {
+  const date = new Date(timestamp)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
 export default function Main() {
   const navigate = useNavigate()
   const greeting = useGreeting()
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  // "Today" is a single status card driven by the same 4-color system
-  // (approved / pending / rejected / alpha) used across the app.
-  // NOTE: Attendance and Absence are now their own pages (/attendance,
-  // /absence) and don't share state with Main, so nothing currently
-  // updates todayStatus/historyList after a submission completes —
-  // wire that up (e.g. via context or persisted storage) once those
-  // pages need to reflect back here.
-  const [todayStatus] = useState(initialTodayStatus)
+  const [loading, setLoading] = useState(true)
+  const [userName, setUserName] = useState('')
+  const [todayStatus, setTodayStatus] = useState(null)
+  const [absenceList, setAbsenceList] = useState([])
 
-  // "Absence" is a history of status: every izin/absence request the
-  // user has submitted, newest first.
-  const [historyList] = useState(initialHistoryList)
+  useEffect(() => {
+    let isInitialLoad = true
+    
+    async function fetchHomeData() {
+      try {
+        // Only show loading skeleton on initial load
+        if (isInitialLoad) {
+          setLoading(true)
+        }
+        
+        const response = await getUserHome()
+        const data = response?.data || response
+        
+        // Set user name from greeting_widget
+        if (data.greeting_widget) {
+          setUserName(data.greeting_widget.name || '')
+        }
+        
+        // Map today's attendance from API
+        // Only show as "present" if type is "attendance", not "absence"
+        if (data.today && data.today.type === 'attendance') {
+          const timestamp = data.today.timestamp
+          setTodayStatus({
+            date: formatDate(timestamp),
+            status: 'present',
+            title: `Present on ${formatFullDate(timestamp)}`,
+            subtitle: 'Location on Yogyakarta, Sleman', // TODO: Get from actual location data
+          })
+        } else {
+          setTodayStatus(null)
+        }
+        
+        // Map absence history from API (max 3 items)
+        if (data.absence && Array.isArray(data.absence)) {
+          const mappedAbsences = data.absence.slice(0, 3).map((item) => {
+            // Determine status based on verify info
+            let status = 'pending'
+            let subtitle = 'Submitting an absence request'
+            
+            if (item.verify && item.verify.sign_status) {
+              const signStatus = item.verify.sign_status.toLowerCase()
+              const verifierName = item.verify.username || 'Admin'
+              
+              if (signStatus === 'allow') {
+                status = 'approved'
+                subtitle = `${item.option === 'sick' ? 'S' : 'I'} • Verified by ${verifierName}`
+              } else if (signStatus === 'reject' || signStatus === 'rejected') {
+                status = 'rejected'
+                subtitle = `${item.option === 'sick' ? 'S' : 'I'} • Verified by ${verifierName}`
+              }
+            }
+            
+            // Use reason as title
+            const title = item.reason || (item.option === 'sick' ? 'Izin karena sakit' : 'Izin')
+            
+            return {
+              id: item.id || Math.random().toString(),
+              date: '03/07', // TODO: Get from actual timestamp when available
+              status: status,
+              title: title,
+              subtitle: subtitle,
+            }
+          })
+          
+          setAbsenceList(mappedAbsences)
+        } else {
+          setAbsenceList([])
+        }
+        
+        // Mark as no longer initial load after first success
+        if (isInitialLoad) {
+          isInitialLoad = false
+          setLoading(false)
+        }
+      } catch (err) {
+        // Only show error toast on initial load, silent fail on polling
+        if (isInitialLoad) {
+          toast.error(err.message || 'Failed to load home data')
+          console.error('getUserHome error:', err)
+          setLoading(false)
+        }
+      }
+    }
+
+    // Initial fetch
+    fetchHomeData()
+    
+    // Set up polling interval - refresh every 10 seconds
+    const intervalId = setInterval(() => {
+      fetchHomeData()
+    }, 10000)
+    
+    // Cleanup interval on unmount
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [])
 
   function handlePickAttendance() {
     setSheetOpen(false)
@@ -54,36 +155,58 @@ export default function Main() {
     navigate('/absence')
   }
 
+  if (loading) {
+    return (
+      <main className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-20">
+        <div className="animate-pulse">
+          <div className="h-8 w-64 rounded bg-neutral-200" />
+          
+          <section className="mt-6">
+            <div className="mb-2 h-4 w-16 rounded bg-neutral-200" />
+            <div className="h-20 w-full rounded-xl bg-neutral-200" />
+          </section>
+
+          <section className="mt-6">
+            <div className="mb-2 h-4 w-20 rounded bg-neutral-200" />
+            <div className="flex flex-col gap-2">
+              <div className="h-20 w-full rounded-xl bg-neutral-200" />
+              <div className="h-20 w-full rounded-xl bg-neutral-200" />
+            </div>
+          </section>
+        </div>
+      </main>
+    )
+  }
+
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-8">
+    <main className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-20">
       <h1 className="text-xl font-bold text-neutral-900">
-        {greeting}, {currentUser.name} <span aria-hidden>👋</span>
+        {greeting}, {userName} <span aria-hidden>👋</span>
       </h1>
 
       <section className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral">Today</h2>
         {todayStatus ? (
-          <AbsenceRow
-            date={todayStatus.date}
-            status={todayStatus.status}
-            title={todayStatus.title}
-            subtitle={todayStatus.subtitle}
-          />
+          <AbsenceCard {...todayStatus} />
         ) : (
-          <EmptyState label="No attendance status yet" />
+          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8">
+            <p className="text-sm text-neutral">No attendance status yet</p>
+          </div>
         )}
       </section>
 
       <section className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral">Absence</h2>
-        {historyList.length > 0 ? (
+        {absenceList.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {historyList.map((item) => (
-              <AbsenceRow key={item.id} {...item} />
+            {absenceList.map((item) => (
+              <AbsenceCard key={item.id} {...item} />
             ))}
           </div>
         ) : (
-          <EmptyState label="There is no absence list" />
+          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8">
+            <p className="text-sm text-neutral">There is no absence list</p>
+          </div>
         )}
       </section>
 

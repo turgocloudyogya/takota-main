@@ -50,6 +50,29 @@ func InitS3(cfg *config.Config) error {
 		log.Printf("✓ Created S3 bucket: %s", cfg.S3.BucketName)
 	}
 
+	// Set bucket policy to allow public read access for attendance photos
+	// This is needed when using PublicEndpoint (Docker setup)
+	if cfg.S3.PublicEndpoint != "" {
+		policy := fmt.Sprintf(`{
+			"Version": "2012-10-17",
+			"Statement": [
+				{
+					"Effect": "Allow",
+					"Principal": {"AWS": ["*"]},
+					"Action": ["s3:GetObject"],
+					"Resource": ["arn:aws:s3:::%s/*"]
+				}
+			]
+		}`, cfg.S3.BucketName)
+		
+		err = Client.SetBucketPolicy(ctx, cfg.S3.BucketName, policy)
+		if err != nil {
+			log.Printf("Warning: Failed to set bucket policy (photos may not be publicly accessible): %v", err)
+		} else {
+			log.Printf("✓ Set public read policy for bucket: %s", cfg.S3.BucketName)
+		}
+	}
+
 	log.Println("✓ S3 storage initialized successfully")
 	return nil
 }
@@ -113,6 +136,17 @@ func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (
 	// If CloudFront is enabled, use CloudFront signed URL
 	if Config.UseCloudFront && Config.CloudFrontDomain != "" {
 		return getCloudFrontSignedURL(objectKey, expiry)
+	}
+
+	// If PublicEndpoint is set, return direct public URL (assumes bucket is public-read)
+	// This is needed for Docker setup where internal endpoint differs from browser-accessible endpoint
+	if Config.PublicEndpoint != "" {
+		protocol := "http://"
+		if Config.UseSSL {
+			protocol = "https://"
+		}
+		publicURL := fmt.Sprintf("%s%s/%s/%s", protocol, Config.PublicEndpoint, Config.BucketName, objectKey)
+		return publicURL, nil
 	}
 
 	// Otherwise use S3 presigned URL

@@ -10,6 +10,7 @@ import {
   TriangleExclamation,
   PaperPlane,
 } from '@gravity-ui/icons'
+import { submitAttendance } from '../lib/api.js'
 
 // Browsers only ever show the native permission dialog once. After the user
 // has explicitly blocked a permission, calling the API again just fails
@@ -35,6 +36,7 @@ export default function Attendance() {
   const [facingMode, setFacingMode] = useState('environment')
   const [useCameraTracking, setUseCameraTracking] = useState(true)
 
+  const [gpsCoords, setGpsCoords] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -47,12 +49,16 @@ export default function Attendance() {
 
   async function requestLocation() {
     try {
-      await new Promise((resolve, reject) =>
+      const position = await new Promise((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 10000,
         }),
       )
+      setGpsCoords({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      })
       setLocationStatus('granted')
     } catch {
       setLocationStatus('denied')
@@ -132,14 +138,51 @@ export default function Attendance() {
     setConfirmOpen(true)
   }
 
-  function handleConfirmAttendance() {
+  async function handleConfirmAttendance() {
+    if (!gpsCoords) {
+      toast.error('GPS location not available')
+      return
+    }
+
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+
+    try {
+      // Capture photo from video stream if camera tracking is enabled
+      let photoFile = null
+      if (useCameraTracking && videoRef.current && streamRef.current) {
+        const canvas = document.createElement('canvas')
+        canvas.width = videoRef.current.videoWidth
+        canvas.height = videoRef.current.videoHeight
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(videoRef.current, 0, 0)
+        
+        // Convert canvas to blob
+        const blob = await new Promise((resolve) => {
+          canvas.toBlob(resolve, 'image/jpeg', 0.85)
+        })
+        
+        if (blob) {
+          photoFile = new File([blob], `attendance-${Date.now()}.jpg`, { type: 'image/jpeg' })
+        }
+      }
+
+      // Call API
+      await submitAttendance({
+        latitude: String(gpsCoords.latitude),
+        longitude: String(gpsCoords.longitude),
+        photo: photoFile,
+      })
+
+      toast.success('Attendance submitted successfully!')
       setConfirmOpen(false)
       stopStream()
       setSubmitted(true)
-    }, 1200)
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit attendance')
+      console.error('submitAttendance error:', err)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const permissionsChecked = locationStatus !== null && cameraStatus !== null

@@ -89,3 +89,9 @@ body {
     animation: none !important;
   }
 }
+
+/* Custom sizes for absence badge (h-13 = 3.25rem, w-15 = 3.75rem) */
+@theme {
+  --spacing-13: 3.25rem;
+  --spacing-15: 3.75rem;
+}

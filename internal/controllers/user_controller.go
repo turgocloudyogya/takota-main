@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/carakan/takota/internal/config"
@@ -81,11 +82,17 @@ func (ctrl *UserController) Home(c *gin.Context) {
 		Title: utils.GetGreetingTitle(user.Callname),
 	}
 
-	// Get today's attendance
+	// Get today's attendance or absence
 	var todayAttendance *TodayAttendance
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	now := time.Now().UTC()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+	
 	var attendance models.Attendance
-	err := ctrl.DB.Where("user_id = ? AND type = ? AND created_at >= ?", uid, "attendance", today).
+	// Check for any attendance or absence today
+	err := ctrl.DB.Where("user_id = ? AND created_at >= ? AND created_at < ?", 
+		uid, startOfDay, endOfDay).
+		Order("created_at DESC").
 		First(&attendance).Error
 	if err == nil {
 		todayAttendance = &TodayAttendance{
@@ -149,15 +156,20 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 	uid, _ := uuid.Parse(userID.(string))
 
 	// VALIDATION: Check if user already has attendance today
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	// Use start and end of day in UTC for proper range check
+	now := time.Now().UTC()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+	
 	var existingAttendance models.Attendance
-	err := ctrl.DB.Where("user_id = ? AND type = ? AND DATE(created_at) = DATE(?)", uid, "attendance", today).
+	err := ctrl.DB.Where("user_id = ? AND type = ? AND created_at >= ? AND created_at < ?", 
+		uid, "attendance", startOfDay, endOfDay).
 		First(&existingAttendance).Error
 	if err == nil {
 		// User sudah absen hari ini
 		utils.RespondError(c, http.StatusBadRequest, "You have already submitted attendance today", "ATTENDANCE_ALREADY_SUBMITTED")
 		return
-	} else if err != nil && err.Error() != "record not found" {
+	} else if err != nil && !strings.Contains(err.Error(), "record not found") {
 		utils.RespondError(c, http.StatusInternalServerError, "Database error", "DB_ERROR")
 		return
 	}
@@ -175,16 +187,18 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 		return
 	}
 
-	// Check distance from office
-	distance := utils.CalculateDistance(
-		userLat, userLon,
-		ctrl.Config.App.OfficeLatitude,
-		ctrl.Config.App.OfficeLongitude,
-	)
+	// Check distance from office (only if radius validation is enabled)
+	if ctrl.Config.App.AttendanceRadiusEnabled {
+		distance := utils.CalculateDistance(
+			userLat, userLon,
+			ctrl.Config.App.OfficeLatitude,
+			ctrl.Config.App.OfficeLongitude,
+		)
 
-	if distance > ctrl.Config.App.AttendanceRadiusMeters {
-		utils.RespondError(c, http.StatusBadRequest, "You are out of location radius", utils.ErrOutOfRadius)
-		return
+		if distance > ctrl.Config.App.AttendanceRadiusMeters {
+			utils.RespondError(c, http.StatusBadRequest, "You are out of location radius", utils.ErrOutOfRadius)
+			return
+		}
 	}
 
 	// Handle photo upload
@@ -261,15 +275,19 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 	uid, _ := uuid.Parse(userID.(string))
 
 	// VALIDATION 1: Check if user already has normal attendance today
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	now := time.Now().UTC()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	endOfDay := startOfDay.Add(24 * time.Hour)
+	
 	var attendanceToday models.Attendance
-	err := ctrl.DB.Where("user_id = ? AND type = ? AND DATE(created_at) = DATE(?)", uid, "attendance", today).
+	err := ctrl.DB.Where("user_id = ? AND type = ? AND created_at >= ? AND created_at < ?", 
+		uid, "attendance", startOfDay, endOfDay).
 		First(&attendanceToday).Error
 	if err == nil {
 		// User sudah absen normal hari ini, tidak boleh ngajuin perizinan
 		utils.RespondError(c, http.StatusBadRequest, "Cannot submit absence after normal attendance", "CANNOT_SUBMIT_ABSENCE_AFTER_ATTENDANCE")
 		return
-	} else if err != nil && err.Error() != "record not found" {
+	} else if err != nil && !strings.Contains(err.Error(), "record not found") {
 		utils.RespondError(c, http.StatusInternalServerError, "Database error", "DB_ERROR")
 		return
 	}

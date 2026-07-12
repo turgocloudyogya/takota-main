@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { Button, Card } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
@@ -36,8 +36,29 @@ export default function AdminAttendance() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
-  const loadPage = useCallback(async (index, cursors, term) => {
-    setLoading(true)
+  // Use refs to store latest values for polling
+  const pageIndexRef = useRef(pageIndex)
+  const lastIdsRef = useRef(lastIds)
+  const searchRef = useRef(search)
+
+  // Update refs when state changes
+  useEffect(() => {
+    pageIndexRef.current = pageIndex
+  }, [pageIndex])
+
+  useEffect(() => {
+    lastIdsRef.current = lastIds
+  }, [lastIds])
+
+  useEffect(() => {
+    searchRef.current = search
+  }, [search])
+
+  const loadPage = useCallback(async (index, cursors, term, isPolling = false) => {
+    // Only show loading spinner if not polling
+    if (!isPolling) {
+      setLoading(true)
+    }
     try {
       const json = await api.listAttendance({ limit: LIMIT, lastId: cursors[index] || '', search: term })
       const rawList = unwrapList(json, 'attendances')
@@ -53,12 +74,18 @@ export default function AdminAttendance() {
         })
       }
     } catch (err) {
-      toast.error(err.message || 'Gagal memuat data presensi.')
+      // Only show error toast if not polling
+      if (!isPolling) {
+        toast.error(err.message || 'Gagal memuat data presensi.')
+      }
     } finally {
-      setLoading(false)
+      if (!isPolling) {
+        setLoading(false)
+      }
     }
   }, [])
 
+  // Initial data load only
   useEffect(() => {
     let cancelled = false
     async function run() {
@@ -89,6 +116,18 @@ export default function AdminAttendance() {
       cancelled = true
     }
   }, [])
+
+  // Polling interval - uses refs to get latest values without re-creating interval
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Use refs to get current values without triggering effect dependencies
+      loadPage(pageIndexRef.current, lastIdsRef.current, searchRef.current, true)
+    }, 15000)
+    
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [loadPage]) // Only re-create interval if loadPage changes
 
   function handleSearchSubmit() {
     setSearch(searchInput)

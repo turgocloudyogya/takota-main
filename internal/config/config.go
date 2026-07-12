@@ -54,6 +54,7 @@ type S3Config struct {
 	UseSSL                bool
 	UsePathStyleEndpoint  bool
 	Region                string
+	PublicEndpoint        string // Public endpoint for browser access (e.g., localhost:9000)
 	UseCloudFront         bool
 	CloudFrontDomain      string
 	CloudFrontPrivateKey  string
@@ -66,10 +67,11 @@ type JWTConfig struct {
 }
 
 type AppConfig struct {
-	AttendanceRadiusMeters  float64
-	OfficeLatitude          float64
-	OfficeLongitude         float64
-	MaxLoginAttempts        int
+	AttendanceRadiusMeters   float64
+	AttendanceRadiusEnabled  bool
+	OfficeLatitude           float64
+	OfficeLongitude          float64
+	MaxLoginAttempts         int
 	LoginLockDurationMinutes int
 }
 
@@ -118,6 +120,7 @@ func LoadConfig() (*Config, error) {
 			UseSSL:                getEnvAsBool("S3_USE_SSL", false),
 			UsePathStyleEndpoint:  getEnvAsBool("S3_USE_PATH_STYLE_ENDPOINT", true),
 			Region:                getEnv("S3_REGION", "us-east-1"),
+			PublicEndpoint:        getEnv("S3_PUBLIC_ENDPOINT", ""), // If empty, use Endpoint
 			UseCloudFront:         getEnvAsBool("S3_USE_CLOUDFRONT", false),
 			CloudFrontDomain:      getEnv("CLOUDFRONT_DOMAIN", ""),
 			CloudFrontPrivateKey:  getEnv("CLOUDFRONT_PRIVATE_KEY", ""),
@@ -128,10 +131,11 @@ func LoadConfig() (*Config, error) {
 			ExpiryHours: getEnvAsInt("JWT_EXPIRY_HOURS", 24),
 		},
 		App: AppConfig{
-			AttendanceRadiusMeters:  getEnvAsFloat("ATTENDANCE_RADIUS_METERS", 100),
-			OfficeLatitude:          getEnvAsFloat("OFFICE_LATITUDE", -7.7546612),
-			OfficeLongitude:         getEnvAsFloat("OFFICE_LONGITUDE", 110.3658561),
-			MaxLoginAttempts:        getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+			AttendanceRadiusMeters:   getEnvAsFloat("ATTENDANCE_RADIUS_METERS", 100),
+			AttendanceRadiusEnabled:  getEnvAsBool("ATTENDANCE_RADIUS_ENABLED", true),
+			OfficeLatitude:           getEnvAsFloat("OFFICE_LATITUDE", -7.7546612),
+			OfficeLongitude:          getEnvAsFloat("OFFICE_LONGITUDE", 110.3658561),
+			MaxLoginAttempts:         getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
 			LoginLockDurationMinutes: getEnvAsInt("LOGIN_LOCK_DURATION_MINUTES", 5),
 		},
 		FileUpload: FileUploadConfig{

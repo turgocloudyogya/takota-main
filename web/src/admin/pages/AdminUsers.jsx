@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { Button, Card } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
-import { PersonPlus, Pencil, TrashBin, Persons } from '@gravity-ui/icons'
+import { PersonPlus, Pencil, TrashBin, Persons, Layers, Person, ShieldKeyhole } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { unwrapList, normalizeUser } from '../lib/normalize.js'
-import { Toolbar, PagerFooter } from '../components/ListChrome.jsx'
+import { Toolbar, PagerFooter, SegmentedFilter } from '../components/ListChrome.jsx'
 import { TypeChip } from '../components/StatusChip.jsx'
 import { ConfirmDialog } from '../components/Modals.jsx'
 import UserFormModal from '../components/UserFormModal.jsx'
@@ -22,15 +22,53 @@ export default function AdminUsers() {
   const [pageIndex, setPageIndex] = useState(0)
   const [lastIds, setLastIds] = useState([''])
   const [hasNext, setHasNext] = useState(false)
+  const [typeFilter, setTypeFilter] = useState('all') // 'all' | 'user' | 'admin' — view-only split of the current page
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  const typeCounts = useMemo(
+    () => ({
+      all: items.length,
+      user: items.filter((u) => u.type !== 'admin').length,
+      admin: items.filter((u) => u.type === 'admin').length,
+    }),
+    [items]
+  )
+
+  const filteredItems = useMemo(() => {
+    if (typeFilter === 'all') return items
+    return items.filter((u) => (typeFilter === 'admin' ? u.type === 'admin' : u.type !== 'admin'))
+  }, [items, typeFilter])
+
+  const filterNoun = typeFilter === 'admin' ? 'admin' : typeFilter === 'user' ? 'siswa' : 'pengguna'
+
+  // Use refs to store latest values for polling
+  const pageIndexRef = useRef(pageIndex)
+  const lastIdsRef = useRef(lastIds)
+  const searchRef = useRef(search)
+
+  // Update refs when state changes
+  useEffect(() => {
+    pageIndexRef.current = pageIndex
+  }, [pageIndex])
+
+  useEffect(() => {
+    lastIdsRef.current = lastIds
+  }, [lastIds])
+
+  useEffect(() => {
+    searchRef.current = search
+  }, [search])
+
   const loadPage = useCallback(
-    async (index, cursors, term) => {
-      setLoading(true)
+    async (index, cursors, term, isPolling = false) => {
+      // Only show loading spinner if not polling
+      if (!isPolling) {
+        setLoading(true)
+      }
       try {
         const json = await api.listUsers({ limit: LIMIT, lastId: cursors[index] || '', search: term })
         const rawList = unwrapList(json, 'users')
@@ -46,14 +84,20 @@ export default function AdminUsers() {
           })
         }
       } catch (err) {
-        toast.error(err.message || 'Gagal memuat data siswa.')
+        // Only show error toast if not polling
+        if (!isPolling) {
+          toast.error(err.message || 'Gagal memuat data pengguna.')
+        }
       } finally {
-        setLoading(false)
+        if (!isPolling) {
+          setLoading(false)
+        }
       }
     },
     []
   )
 
+  // Initial data load only
   useEffect(() => {
     let cancelled = false
     async function run() {
@@ -74,7 +118,7 @@ export default function AdminUsers() {
           })
         }
       } catch (err) {
-        if (!cancelled) toast.error(err.message || 'Gagal memuat data siswa.')
+        if (!cancelled) toast.error(err.message || 'Gagal memuat data pengguna.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -84,6 +128,18 @@ export default function AdminUsers() {
       cancelled = true
     }
   }, [])
+
+  // Polling interval - uses refs to get latest values without re-creating interval
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Use refs to get current values without triggering effect dependencies
+      loadPage(pageIndexRef.current, lastIdsRef.current, searchRef.current, true)
+    }, 15000)
+    
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [loadPage]) // Only re-create interval if loadPage changes
 
   function handleSearchSubmit() {
     setSearch(searchInput)
@@ -137,9 +193,19 @@ export default function AdminUsers() {
     <div className="flex flex-col gap-5">
       <PageHeader
         icon={Persons}
-        eyebrow="Data Siswa"
-        title="Siswa"
-        description="Kelola akun siswa untuk aplikasi presensi Takota — tambah, ubah, atau hapus akun."
+        eyebrow="Data Pengguna"
+        title="Users"
+        description="Kelola akun pengguna (siswa & admin) untuk aplikasi presensi Takota — tambah, ubah, atau hapus akun."
+      />
+
+      <SegmentedFilter
+        value={typeFilter}
+        onChange={setTypeFilter}
+        options={[
+          { key: 'all', label: 'Semua', count: typeCounts.all, icon: Layers, tone: 'neutral' },
+          { key: 'user', label: 'Siswa', count: typeCounts.user, icon: Person, tone: 'neutral' },
+          { key: 'admin', label: 'Admin', count: typeCounts.admin, icon: ShieldKeyhole, tone: 'accent' },
+        ]}
       />
 
       <Toolbar
@@ -147,11 +213,11 @@ export default function AdminUsers() {
         onSearchChange={setSearchInput}
         onSearchSubmit={handleSearchSubmit}
         onRefresh={handleRefresh}
-        placeholder="Cari nama atau username siswa…"
+        placeholder="Cari nama atau username…"
         actions={
           <Button variant="primary" size="sm" onPress={openCreate}>
             <Icon data={PersonPlus} size={15} />
-            Tambah Siswa
+            Tambah {typeFilter === 'admin' ? 'Admin' : typeFilter === 'user' ? 'Siswa' : 'Pengguna'}
           </Button>
         }
       />
@@ -174,14 +240,20 @@ export default function AdminUsers() {
                     Memuat data…
                   </td>
                 </tr>
-              ) : items.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-8">
-                    <EmptyState label="Belum ada data siswa" />
+                    <EmptyState
+                      label={
+                        items.length === 0
+                          ? 'Belum ada data pengguna'
+                          : `Tidak ada akun ${filterNoun} di halaman ini`
+                      }
+                    />
                   </td>
                 </tr>
               ) : (
-                items.map((user) => (
+                filteredItems.map((user) => (
                   <tr key={user.id} className="hover:bg-neutral-50/60">
                     <td className="px-4 py-3">
                       <p className="font-medium text-neutral-900">{user.nickname}</p>
@@ -224,7 +296,11 @@ export default function AdminUsers() {
             onPrev={handlePrev}
             onNext={handleNext}
             loading={loading}
-            countLabel={`Halaman ${pageIndex + 1} · ${items.length} siswa ditampilkan`}
+            countLabel={
+              typeFilter === 'all'
+                ? `Halaman ${pageIndex + 1} · ${items.length} pengguna ditampilkan`
+                : `Halaman ${pageIndex + 1} · ${filteredItems.length} dari ${items.length} pengguna (${filterNoun})`
+            }
           />
         </div>
       </Card>
@@ -234,12 +310,13 @@ export default function AdminUsers() {
         onOpenChange={setFormOpen}
         user={editingUser}
         onSaved={handleRefresh}
+        defaultType={typeFilter === 'admin' ? 'admin' : 'user'}
       />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Hapus akun siswa?"
+        title={`Hapus akun ${deleteTarget?.type === 'admin' ? 'admin' : 'siswa'}?`}
         description={
           deleteTarget
             ? `Akun "${deleteTarget.nickname}" (${deleteTarget.username}) akan dihapus permanen dan tidak dapat dikembalikan.`

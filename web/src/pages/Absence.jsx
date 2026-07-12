@@ -4,11 +4,13 @@ import { toast } from 'sonner'
 import { Drawer } from 'vaul'
 import { Icon } from '@gravity-ui/uikit'
 import { ChevronLeft, ChevronDown, Files, Xmark, PaperPlane } from '@gravity-ui/icons'
+import { submitAbsence } from '../lib/api.js'
 
 // The 2 choices shown under "Select a reason", per design.
+// Backend expects: 'sick' or 'permission'
 const REASON_OPTIONS = [
-  { value: 'izin', label: 'Absence / Izin' },
-  { value: 'sakit', label: 'Sick / Sakit' },
+  { value: 'permission', label: 'Absence / Izin' },
+  { value: 'sick', label: 'Sick / Sakit' },
 ]
 
 function getFileExt(name = '') {
@@ -78,13 +80,25 @@ export default function Absence() {
     setConfirmOpen(true)
   }
 
-  function handleConfirmAbsence() {
+  async function handleConfirmAbsence() {
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+
+    try {
+      await submitAbsence({
+        option: reasonType.value,
+        reason: reasonText.trim(),
+        file: file || undefined,
+      })
+
+      toast.success('Absence submitted successfully!')
       setConfirmOpen(false)
       setSubmitted(true)
-    }, 1200)
+    } catch (err) {
+      toast.error(err.message || 'Failed to submit absence')
+      console.error('submitAbsence error:', err)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (submitted) {

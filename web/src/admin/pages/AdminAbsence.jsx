@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { Button, Card } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
-import { Check, Xmark, FileText, FileCheck } from '@gravity-ui/icons'
+import { Check, Xmark, FileText, FileCheck, TrashBin } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { unwrapList, normalizeAbsence } from '../lib/normalize.js'
 import { parseApiDate } from '../lib/dateWindow.js'
@@ -29,10 +29,32 @@ export default function AdminAbsence() {
   const [lastIds, setLastIds] = useState([''])
   const [hasNext, setHasNext] = useState(false)
   const [pendingAction, setPendingAction] = useState(null) // { row, sign }
+  const [pendingDelete, setPendingDelete] = useState(null) // { row }
   const [processing, setProcessing] = useState(false)
 
-  const loadPage = useCallback(async (index, cursors, term) => {
-    setLoading(true)
+  // Use refs to store latest values for polling
+  const pageIndexRef = useRef(pageIndex)
+  const lastIdsRef = useRef(lastIds)
+  const searchRef = useRef(search)
+
+  // Update refs when state changes
+  useEffect(() => {
+    pageIndexRef.current = pageIndex
+  }, [pageIndex])
+
+  useEffect(() => {
+    lastIdsRef.current = lastIds
+  }, [lastIds])
+
+  useEffect(() => {
+    searchRef.current = search
+  }, [search])
+
+  const loadPage = useCallback(async (index, cursors, term, isPolling = false) => {
+    // Only show loading spinner if not polling
+    if (!isPolling) {
+      setLoading(true)
+    }
     try {
       const json = await api.listAbsence({ limit: LIMIT, lastId: cursors[index] || '', search: term })
       const rawList = unwrapList(json, 'absences')
@@ -48,12 +70,18 @@ export default function AdminAbsence() {
         })
       }
     } catch (err) {
-      toast.error(err.message || 'Gagal memuat data izin.')
+      // Only show error toast if not polling
+      if (!isPolling) {
+        toast.error(err.message || 'Gagal memuat data izin.')
+      }
     } finally {
-      setLoading(false)
+      if (!isPolling) {
+        setLoading(false)
+      }
     }
   }, [])
 
+  // Initial data load only
   useEffect(() => {
     let cancelled = false
     async function run() {
@@ -84,6 +112,18 @@ export default function AdminAbsence() {
       cancelled = true
     }
   }, [])
+
+  // Polling interval - uses refs to get latest values without re-creating interval
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Use refs to get current values without triggering effect dependencies
+      loadPage(pageIndexRef.current, lastIdsRef.current, searchRef.current, true)
+    }, 15000)
+    
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [loadPage]) // Only re-create interval if loadPage changes
 
   function handleSearchSubmit() {
     setSearch(searchInput)
@@ -118,6 +158,21 @@ export default function AdminAbsence() {
       handleRefresh()
     } catch (err) {
       toast.error(err.message || 'Gagal memperbarui status pengajuan.')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!pendingDelete) return
+    setProcessing(true)
+    try {
+      await api.deleteAbsence(pendingDelete.row.id)
+      toast.success('Pengajuan izin berhasil dihapus.')
+      setPendingDelete(null)
+      handleRefresh()
+    } catch (err) {
+      toast.error(err.message || 'Gagal menghapus pengajuan.')
     } finally {
       setProcessing(false)
     }
@@ -170,7 +225,7 @@ export default function AdminAbsence() {
                 items.map((row) => (
                   <tr key={row.id} className="hover:bg-neutral-50/60">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-neutral-900">{row.name || '—'}</p>
+                      <p className="font-medium text-neutral-900">{row.name || row.raw?.nickname || '—'}</p>
                       {row.username && <p className="text-xs text-neutral">{row.username}</p>}
                     </td>
                     <td className="px-4 py-3 text-neutral-700">{formatDate(row.dateRaw)}</td>
@@ -214,21 +269,33 @@ export default function AdminAbsence() {
                               isIconOnly
                               className="text-danger"
                               aria-label="Tolak"
-                              onPress={() => setPendingAction({ row, sign: 'deny' })}
+                              onPress={() => setPendingAction({ row, sign: 'reject' })}
                             >
                               <Icon data={Xmark} size={15} />
                             </Button>
                           </>
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onPress={() =>
-                              setPendingAction({ row, sign: row.sign === 'allow' ? 'deny' : 'allow' })
-                            }
-                          >
-                            Ubah
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onPress={() =>
+                                setPendingAction({ row, sign: row.sign === 'allow' ? 'reject' : 'allow' })
+                              }
+                            >
+                              Ubah
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              isIconOnly
+                              className="text-danger"
+                              aria-label="Hapus"
+                              onPress={() => setPendingDelete({ row })}
+                            >
+                              <Icon data={TrashBin} size={15} />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -263,9 +330,24 @@ export default function AdminAbsence() {
             : ''
         }
         confirmLabel={pendingAction?.sign === 'allow' ? 'Setujui' : 'Tolak'}
-        danger={pendingAction?.sign === 'deny'}
+        danger={pendingAction?.sign === 'reject'}
         loading={processing}
         onConfirm={handleConfirmAction}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Hapus pengajuan izin ini?"
+        description={
+          pendingDelete
+            ? `Pengajuan dari "${pendingDelete.row.name || pendingDelete.row.username}" akan dihapus permanen. Setelah dihapus, status verifikasi tidak bisa diubah lagi.`
+            : ''
+        }
+        confirmLabel="Hapus"
+        danger={true}
+        loading={processing}
+        onConfirm={handleConfirmDelete}
       />
     </div>
   )

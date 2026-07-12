@@ -54,3 +54,63 @@ export function PagerFooter({ pageIndex, hasNext, onPrev, onNext, loading, count
     </div>
   )
 }
+
+// Sliding segmented switch for splitting a list by category (e.g. all /
+// siswa / admin) without leaving the page or refetching — a client-side view
+// filter over rows already loaded. The active pill glides between segments;
+// each segment's active color can be tuned via `tone` to echo the meaning it
+// carries elsewhere in the UI (e.g. TypeChip's accent color for "admin").
+const FILTER_TONE_TEXT = {
+  accent: 'text-primary',
+  neutral: 'text-neutral-900',
+}
+const FILTER_TONE_BADGE = {
+  accent: 'bg-primary/10 text-primary',
+  neutral: 'bg-neutral-200/70 text-neutral-700',
+}
+
+export function SegmentedFilter({ options, value, onChange }) {
+  const activeIndex = Math.max(0, options.findIndex((opt) => opt.key === value))
+
+  return (
+    <div className="inline-flex rounded-2xl bg-neutral-100 p-1">
+      <div
+        className="relative grid"
+        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+      >
+        <span
+          className="absolute inset-y-0 rounded-xl bg-white shadow-sm ring-1 ring-app-border/10 transition-transform duration-200 ease-out"
+          style={{ width: `${100 / options.length}%`, transform: `translateX(${activeIndex * 100}%)` }}
+          aria-hidden="true"
+        />
+        {options.map((opt) => {
+          const active = opt.key === value
+          const tone = opt.tone || 'neutral'
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onChange(opt.key)}
+              aria-pressed={active}
+              className={`relative z-10 flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold whitespace-nowrap transition-colors duration-200 ${
+                active ? FILTER_TONE_TEXT[tone] : 'text-neutral hover:text-neutral-900'
+              }`}
+            >
+              {opt.icon && <Icon data={opt.icon} size={14} />}
+              {opt.label}
+              {typeof opt.count === 'number' && (
+                <span
+                  className={`rounded-full px-1.5 py-px text-[10px] leading-normal tabular-nums transition-colors duration-200 ${
+                    active ? FILTER_TONE_BADGE[tone] : 'bg-neutral-200/60 text-neutral'
+                  }`}
+                >
+                  {opt.count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

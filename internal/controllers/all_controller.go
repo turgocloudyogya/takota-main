@@ -48,9 +48,11 @@ type PhotosResponse struct {
 }
 
 type PhotoItem struct {
-	ID          string `json:"id"`
-	URL         string `json:"url"`
-	Description string `json:"description"`
+	ID          string     `json:"id"`
+	URL         string     `json:"url"`
+	Description string     `json:"description"`
+	Nickname    string     `json:"nickname,omitempty"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
 }
 
 // GetInfo returns global user info with validation check
@@ -170,6 +172,8 @@ func (ctrl *AllController) GetPhotos(c *gin.Context) {
 			ID:          att.ID.String(),
 			URL:         photoURL,
 			Description: description,
+			Nickname:    att.User.Nickname,
+			CreatedAt:   &att.CreatedAt,
 		})
 	}
 
@@ -182,5 +186,39 @@ func (ctrl *AllController) GetPhotos(c *gin.Context) {
 	utils.RespondSuccess(c, http.StatusOK, PhotosResponse{
 		Data:   items,
 		LastID: nextLastID,
+	})
+}
+
+// DeletePhoto deletes a photo (attendance record with photo) - Admin only
+func (ctrl *AllController) DeletePhoto(c *gin.Context) {
+	photoID := c.Param("id")
+	
+	id, err := uuid.Parse(photoID)
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Invalid photo ID", "INVALID_ID")
+		return
+	}
+
+	// Find attendance with photo
+	var attendance models.Attendance
+	if err := ctrl.DB.Where("id = ? AND photo IS NOT NULL", id).First(&attendance).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Photo not found", "NOT_FOUND")
+		return
+	}
+
+	// Delete photo from S3
+	ctx := context.Background()
+	if attendance.Photo != nil {
+		s3.DeleteFile(ctx, *attendance.Photo)
+	}
+
+	// Delete attendance record
+	if err := ctrl.DB.Delete(&attendance).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to delete photo", "DELETE_ERROR")
+		return
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"message": "Photo deleted successfully",
 	})
 }

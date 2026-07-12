@@ -1,40 +1,19 @@
-// Date helpers for building the two-week (12 working-day) attendance window
-// used by the "Daftar Hadir Peserta Didik" recap, matching the uploaded CSV
-// template (Senin–Sabtu, twice).
+// Date helpers for the "Daftar Hadir Peserta Didik" recap.
+//
+// The recap's print layout (see absensi_template.html) is built out of
+// fixed 12-working-day blocks (Senin–Sabtu, twice = one block), two blocks
+// per page. The admin only picks a start/end date range here; the server is
+// responsible for chunking that range into blocks/pages and for always
+// rendering the full 12-column grid per block (see backend contract).
+// These helpers only support the date-range picker UI itself.
 
-import { addDays, startOfWeek, format, isAfter, isSameDay, startOfDay } from 'date-fns'
+import { format, isAfter, addDays, startOfDay } from 'date-fns'
 
-export const DAY_NAMES_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-
-/**
- * Given any date within the first week of the desired period, returns the 12
- * working days (Mon–Sat, twice) that make up the two-week attendance window.
- */
-export function getTwoWeekWindow(anchorDate) {
-  const monday = startOfWeek(anchorDate, { weekStartsOn: 1 })
-  const days = []
-  for (let week = 0; week < 2; week += 1) {
-    for (let d = 0; d < 6; d += 1) {
-      days.push(addDays(monday, week * 7 + d))
-    }
-  }
-  return days
-}
+const WORKING_DAYS_PER_BLOCK = 12 // Senin–Sabtu x2
+const BLOCKS_PER_PAGE = 2
 
 export function formatShortDate(date) {
-  return format(date, 'dd/MM')
-}
-
-export function formatDayLabel(date) {
-  return `${DAY_NAMES_ID[date.getDay()]} ${formatShortDate(date)}`
-}
-
-export function isFutureDay(date) {
-  return isAfter(startOfDay(date), startOfDay(new Date()))
-}
-
-export function isSameCalendarDay(a, b) {
-  return isSameDay(a, b)
+  return format(date, 'dd/MM/yyyy')
 }
 
 export function toDateKey(date) {
@@ -54,4 +33,31 @@ export function parseApiDate(value) {
   }
   const d = new Date(value)
   return Number.isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * Counts working days (Senin–Sabtu, i.e. everything except Minggu/Sunday)
+ * between two 'yyyy-MM-dd' date-key strings, inclusive on both ends. Used
+ * only to preview how many pages a recap will produce — the server does
+ * the authoritative chunking.
+ */
+export function countWorkingDays(startDateKey, endDateKey) {
+  if (!startDateKey || !endDateKey) return 0
+  const start = startOfDay(new Date(`${startDateKey}T00:00:00`))
+  const end = startOfDay(new Date(`${endDateKey}T00:00:00`))
+  if (isAfter(start, end)) return 0
+
+  let count = 0
+  let cursor = start
+  while (!isAfter(cursor, end)) {
+    if (cursor.getDay() !== 0) count += 1 // 0 = Minggu/Sunday, excluded
+    cursor = addDays(cursor, 1)
+  }
+  return count
+}
+
+/** Estimated page count for a given working-day count (min. 1). */
+export function estimatePageCount(workingDays) {
+  const perPage = WORKING_DAYS_PER_BLOCK * BLOCKS_PER_PAGE
+  return Math.max(1, Math.ceil(workingDays / perPage))
 }

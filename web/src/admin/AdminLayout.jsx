@@ -7,7 +7,7 @@ import {
   Clock,
   FileCheck,
   FileArrowDown,
-  CurlyBrackets,
+  Picture,
   ArrowRightFromLine,
   LayoutSideContentLeft,
   Xmark,
@@ -105,11 +105,11 @@ function IconTooltip({ children }) {
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: House },
-  { to: '/admin/users', label: 'Siswa', icon: Persons },
+  { to: '/admin/users', label: 'Users', icon: Persons },
   { to: '/admin/attendance', label: 'Presensi', icon: Clock },
   { to: '/admin/absence', label: 'Izin & Sakit', icon: FileCheck },
+  { to: '/admin/photos', label: 'Galeri Foto', icon: Picture },
   { to: '/admin/reports', label: 'Rekap & Unduh', icon: FileArrowDown },
-  { to: '/admin/api-tester', label: 'Uji Respons API', icon: CurlyBrackets },
 ]
 
 function NavList({ onNavigate, collapsed = false }) {
@@ -173,12 +173,12 @@ export default function AdminLayout() {
   }, [collapsed])
 
   if (!isAdminSession(session)) {
-    return <Navigate to="/admin/login" replace />
+    return <Navigate to="/" replace />
   }
 
   function handleLogout() {
     api.logout()
-    navigate('/admin/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   const initial = session.username?.[0]?.toUpperCase() || 'A'

@@ -42,6 +42,7 @@ const SIGN_CONFIG = {
   allow: { label: 'Disetujui', color: 'success' },
   approved: { label: 'Disetujui', color: 'success' },
   deny: { label: 'Ditolak', color: 'danger' },
+  reject: { label: 'Ditolak', color: 'danger' },
   rejected: { label: 'Ditolak', color: 'danger' },
   pending: { label: 'Menunggu', color: 'warning' },
 }

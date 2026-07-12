@@ -7,13 +7,12 @@ import Absence from './pages/Absence.jsx'
 import Attendance from './pages/Attendance.jsx'
 import Photos from './pages/Photos.jsx'
 import AdminLayout from './admin/AdminLayout.jsx'
-import AdminLogin from './admin/pages/AdminLogin.jsx'
 import AdminDashboard from './admin/pages/AdminDashboard.jsx'
 import AdminUsers from './admin/pages/AdminUsers.jsx'
 import AdminAttendance from './admin/pages/AdminAttendance.jsx'
 import AdminAbsence from './admin/pages/AdminAbsence.jsx'
+import AdminPhotos from './admin/pages/AdminPhotos.jsx'
 import AdminReports from './admin/pages/AdminReports.jsx'
-import AdminApiTester from './admin/pages/AdminApiTester.jsx'
 
 export default function App() {
   return (
@@ -29,15 +28,14 @@ export default function App() {
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/photos" element={<Photos />} />
 
-        <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="absence" element={<AdminAbsence />} />
+          <Route path="photos" element={<AdminPhotos />} />
           <Route path="reports" element={<AdminReports />} />
-          <Route path="api-tester" element={<AdminApiTester />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

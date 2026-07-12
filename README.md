@@ -1,11 +1,12 @@
-# Takota Backend API
+# Takota - Sistem Presensi & Absensi
 
-A modern, production-ready attendance and absence management system built with Go, PostgreSQL, Redis, and S3 object storage.
+Aplikasi presensi dan absensi terintegrasi yang modern dan production-ready, dibangun dengan Go, React, PostgreSQL, Redis, dan S3 object storage.
 
 ![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
 ![Go Version](https://img.shields.io/badge/go-1.23-blue)
+![React](https://img.shields.io/badge/react-18-blue)
 ![Docker](https://img.shields.io/badge/docker-compose-blue)
-![Tests](https://img.shields.io/badge/tests-36%2F36%20passed-green)
+![Tests](https://img.shields.io/badge/tests-passing-green)
 
 ---
 
@@ -28,16 +29,16 @@ A modern, production-ready attendance and absence management system built with G
 
 ## 🎯 Overview
 
-Takota Backend API is a comprehensive attendance management system designed for enterprise use. It provides:
+Takota adalah sistem manajemen presensi dan absensi yang komprehensif, dirancang untuk penggunaan enterprise. Aplikasi ini menyediakan:
 
-- **User-friendly attendance tracking** with GPS location validation
-- **Absence/leave management** with document uploads
-- **Administrative controls** for user and attendance management
-- **Real-time data export** to CSV format
-- **Secure authentication** with JWT and role-based access control
-- **Scalable architecture** with caching and distributed storage
+- **Pelacakan presensi yang user-friendly** dengan validasi lokasi GPS
+- **Manajemen izin/sakit** dengan upload dokumen
+- **Kontrol administratif** untuk manajemen user dan data presensi
+- **Export data real-time** ke format CSV dan PDF
+- **Autentikasi aman** dengan JWT dan role-based access control
+- **Arsitektur scalable** dengan caching dan distributed storage
 
-Perfect for companies with remote and office-based employees who need reliable attendance tracking.
+Sempurna untuk perusahaan dengan karyawan remote dan office-based yang membutuhkan sistem presensi yang handal.
 
 ---
 
@@ -85,11 +86,18 @@ Perfect for companies with remote and office-based employees who need reliable a
 
 ## 🛠️ Tech Stack
 
-### Programming & Framework
+### Backend
 - **Language:** Go 1.23
 - **Web Framework:** Gin 1.9.1
 - **Validation:** go-playground/validator/v10
 - **Authentication:** golang-jwt/jwt/v5
+
+### Frontend
+- **Framework:** React 18
+- **Build Tool:** Vite 8
+- **UI Library:** Gravity UI, Hero UI
+- **Styling:** Tailwind CSS
+- **State Management:** React Hooks
 
 ### Database & Caching
 - **Database:** PostgreSQL 16 (Alpine)
@@ -112,72 +120,106 @@ Perfect for companies with remote and office-based employees who need reliable a
 - **Containerization:** Docker (Alpine images)
 - **Orchestration:** Docker Compose
 - **Networking:** Bridge network with service discovery
+- **Reverse Proxy:** Nginx (production)
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 📖 Pilih Dokumentasi Sesuai Kebutuhan:
 
-- Docker & Docker Compose (recommended)
-- Or: Go 1.23, PostgreSQL 16, Redis 7, MinIO
+| Kebutuhan | Dokumentasi | Deskripsi |
+|-----------|-------------|-----------|
+| 🔵 **Development** | **[QUICK_START_DEV.md](QUICK_START_DEV.md)** | Setup development dengan Make commands (Recommended) |
+| 🟢 **Production** | **[QUICK_START_PROD.md](QUICK_START_PROD.md)** | Deploy ke production server |
+| 📚 **Lengkap** | **[INSTALL.md](INSTALL.md)** | Panduan instalasi detail & troubleshooting |
+| 📋 **Index** | **[DOCS_INDEX.md](DOCS_INDEX.md)** | Index semua dokumentasi |
 
-### Using Docker (Recommended)
+---
 
-#### 1. Clone & Setup
+### ⚡ Quick Start (Development - Recommended)
+
+**Prerequisites:**
+- Docker & Docker Compose
+- Go 1.23+
+- Node.js 16+
+- Make (optional, recommended)
+
+**4 Perintah:**
 
 ```bash
-cd src
+# 1. Setup
+make setup          # Create .env from .env.example
 
-# Copy environment file
+# 2. Install
+make install        # Install Go + npm dependencies
+
+# 3. Start services
+make docker-up      # Start PostgreSQL, Redis, MinIO
+
+# 4. Run app
+make dev            # Run backend + frontend (hot reload)
+```
+
+**Akses:**
+- Frontend: http://localhost:5173 (Vite dev server)
+- Backend: http://localhost:8080 (API)
+
+**Default Login:**
+- Admin: `admin` / `admin123`
+- User: `user001` / `user123`
+
+**Why Make?**
+- ✅ Hot reload (frontend & backend)
+- ✅ Fast iteration
+- ✅ Easy debugging
+- ✅ One command to rule them all
+
+**Dokumentasi lengkap:** [QUICK_START_DEV.md](QUICK_START_DEV.md)
+
+---
+
+### 🐳 Alternative: Docker Compose (All-in-One)
+
+Jika tidak mau install Go/Node, gunakan Docker saja:
+
+```bash
+# Setup
 cp .env.example .env
 
-# Optional: Edit .env for custom settings
-# Default values are pre-configured for local development
+# Start everything
+docker compose up -d --build
+
+# Access
+# http://localhost:8080
 ```
 
-#### 2. Start Services
+**Chromium untuk PDF sudah ter-bundle di container!**
 
+---
+
+### 🚀 Production Deployment
+
+Lihat panduan lengkap di **[QUICK_START_PROD.md](QUICK_START_PROD.md)**
+
+**Build & Deploy:**
 ```bash
-# Build and start all containers
-docker-compose up -d --build
+# 1. Build (local/CI)
+make build          # Build backend + frontend
 
-# Wait for services to be healthy (typically 30 seconds)
-docker-compose ps
+# 2. Package
+tar -czf takota-production.tar.gz bin/ web/dist/ templates/ ...
 
-# Verify API is responding
-curl http://localhost:8080/health
-# Response: {"status":"ok"}
+# 3. Upload & deploy ke server
 ```
 
-#### 3. Access Services
+**Recommended Strategy: Hybrid**
+- Backend Go native dengan systemd
+- PostgreSQL, Redis, MinIO di Docker
+- Nginx reverse proxy + SSL
+- Chromium untuk PDF generation
 
-```
-API:           http://localhost:8080
-MinIO Console: http://localhost:9001
-PostgreSQL:    localhost:5432
-Redis:         localhost:6379
-```
-
-#### 4. Test Login
-
-```bash
-curl -X POST http://localhost:8080/api/auth \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
-
-# Response: {"token":"<JWT_TOKEN>","login_as":"admin","redirect":"/dash"}
-```
-
-#### 5. Stop Services
-
-```bash
-# Stop all containers
-docker-compose down
-
-# Stop and remove volumes (delete all data)
-docker-compose down -v
-```
+**Dokumentasi lengkap:** [DEPLOYMENT_STRATEGIES.md](DEPLOYMENT_STRATEGIES.md)
 
 ### Manual Setup (Without Docker)
 
@@ -251,43 +293,128 @@ go build -o takota-api ./cmd/api
 ### System Design
 
 ```
-┌─────────────┐
-│   Client    │
-└──────┬──────┘
-       │ HTTP/HTTPS
-       ▼
-┌─────────────────────────────────┐
-│   Gin Web Framework (Port 8080) │
-│  ┌──────────────────────────┐   │
-│  │   Middleware Stack       │   │
-│  │  - JWT Validation        │   │
-│  │  - Role-Based Access     │   │
-│  │  - Password Check        │   │
-│  └──────────────────────────┘   │
-│                                  │
-│  ┌──────────────────────────┐   │
-│  │   Route Handlers         │   │
-│  │  - Auth                  │   │
-│  │  - User                  │   │
-│  │  - Admin                 │   │
-│  │  - Global                │   │
-│  └──────────────────────────┘   │
-└──────────────────────────────────┘
-   │          │          │
-   ▼          ▼          ▼
-┌────────┐ ┌───────┐ ┌─────────┐
-│  GORM  │ │ Redis │ │ MinIO/S3│
-│   +    │ │       │ │         │
-│ pgx    │ │       │ │         │
-└─────┬──┘ └───────┘ └─────────┘
-      │
-      ▼
-┌──────────────────┐
-│  PostgreSQL 16   │
-│  - Users         │
-│  - Attendance    │
-│  - Absence       │
-└──────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                      Client Browser                      │
+└──────────────────────┬──────────────────────────────────┘
+                       │ HTTP/HTTPS
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│           Takota Application (Port 8080)                │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │   Gin Web Framework (Go Backend)                 │  │
+│  ├──────────────────────────────────────────────────┤  │
+│  │                                                   │  │
+│  │  Static Files     │     API Endpoints            │  │
+│  │  (React Frontend) │     (/api/*)                 │  │
+│  │                   │                               │  │
+│  │  GET /            │  POST /api/auth              │  │
+│  │  GET /assets/*    │  GET  /api/admin/users       │  │
+│  │                   │  POST /api/user/attendance   │  │
+│  │                   │  GET  /api/admin/export      │  │
+│  │                   │  ...                          │  │
+│  └─────────┬─────────┴─────────┬─────────────────────┘  │
+│            │                   │                         │
+│            │                   ▼                         │
+│            │         ┌──────────────────────┐           │
+│            │         │   Middleware Stack   │           │
+│            │         │  - JWT Validation    │           │
+│            │         │  - Role-Based Access │           │
+│            │         │  - Password Check    │           │
+│            │         └──────────────────────┘           │
+│            │                   │                         │
+│            │                   ▼                         │
+│            │         ┌──────────────────────┐           │
+│            │         │  Controllers         │           │
+│            │         │  - Auth              │           │
+│            │         │  - User              │           │
+│            │         │  - Admin             │           │
+│            │         │  - Export (PDF/CSV)  │           │
+│            │         └──────────────────────┘           │
+└────────────┼─────────────────┬──────────────────────────┘
+             │                 │
+             │                 ▼
+             │    ┌────────────┴────────────┬──────────────┐
+             │    │                         │              │
+             │    ▼                         ▼              ▼
+             │ ┌─────────┐            ┌─────────┐   ┌──────────┐
+             │ │  GORM   │            │  Redis  │   │  MinIO   │
+             │ │   +     │            │ (Cache) │   │  (S3)    │
+             │ │  pgx    │            └─────────┘   └──────────┘
+             │ └────┬────┘                 :6379       :9000
+             │      │
+             │      ▼
+             │ ┌──────────────┐
+             │ │ PostgreSQL   │
+             │ │  :5432       │
+             │ └──────────────┘
+             │
+             ▼
+      Chromium (Headless)
+      For PDF Generation
+```
+
+### Application Flow
+
+**1. User Access Application:**
+```
+Browser → http://localhost:8080
+         ↓
+Backend serves React app (web/dist/index.html)
+         ↓
+React app loads in browser
+         ↓
+User sees Login page
+```
+
+**2. User Login:**
+```
+React → POST /api/auth {username, password}
+       ↓
+Backend validates credentials
+       ↓
+Generate JWT token + Auth ID
+       ↓
+Store Auth ID in Redis/PostgreSQL
+       ↓
+Return {token, role} to frontend
+       ↓
+React stores token in sessionStorage
+       ↓
+Redirect to dashboard
+```
+
+**3. User Submit Attendance:**
+```
+React → POST /api/user/attendance {location, photo}
+       ↓
+Middleware validates JWT token
+       ↓
+Controller validates GPS radius
+       ↓
+Upload photo to MinIO S3
+       ↓
+Save record to PostgreSQL
+       ↓
+Return success response
+       ↓
+React shows success toast
+```
+
+**4. Admin Export PDF:**
+```
+React → GET /api/admin/export/pdf?start_date=...&student_ids=...
+       ↓
+Backend queries attendance data (PostgreSQL)
+       ↓
+Render HTML template (templates/absensi_template.html)
+       ↓
+Chromium converts HTML → PDF
+       ↓
+Stream PDF to browser
+       ↓
+Browser auto-downloads PDF file
 ```
 
 ### Data Flow
@@ -308,6 +435,12 @@ go build -o takota-api ./cmd/api
    - Document uploaded to S3/MinIO
    - Admin approval workflow initiated
    - Status tracked in PostgreSQL
+
+4. **Export:**
+   - Admin requests data export (CSV/PDF)
+   - Query data from PostgreSQL
+   - Generate file (CSV or PDF via Chromium)
+   - Stream to browser for download
 
 ---
 
