@@ -13,10 +13,12 @@
   --color-warning: #f0b409;
   --color-neutral: #737373;
   --color-primary: #2b7fff;
-  --color-gold: oklch(79.5% 0.184 86.047);
+  /* oklch(79.5% 0.184 86.047) converted to RGB for html2canvas compatibility */
+  --color-gold: #f5c542;
 
   /* Shared border tone used across cards, inputs, dividers */
-  --color-app-border: oklch(55.1% 0.027 264.364);
+  /* oklch(55.1% 0.027 264.364) converted to RGB for html2canvas compatibility */
+  --color-app-border: #7d7d8f;
 }
 
 html,
@@ -38,10 +40,11 @@ body {
   --normal-bg: #ffffff;
   --normal-border: var(--color-app-border);
   --normal-text: #171717;
-  --success-bg: color-mix(in oklch, var(--color-success) 12%, white);
+  /* Replacing color-mix(in oklch) with rgba for html2canvas compatibility */
+  --success-bg: rgba(0, 188, 125, 0.12);
   --success-border: var(--color-success);
   --success-text: #05543a;
-  --error-bg: color-mix(in oklch, var(--color-danger) 10%, white);
+  --error-bg: rgba(251, 44, 54, 0.10);
   --error-border: var(--color-danger);
   --error-text: #7a1116;
 }
@@ -65,10 +68,11 @@ body {
    dense admin tool full of tables and stat cards. */
 .card {
   border-radius: 1.125rem !important;
-  border: 1px solid color-mix(in oklch, var(--color-app-border) 12%, transparent);
+  /* Replacing color-mix(in oklch) with rgba for html2canvas compatibility */
+  border: 1px solid rgba(125, 125, 143, 0.12);
   box-shadow:
-    0 1px 2px color-mix(in oklch, var(--color-app-border) 8%, transparent),
-    0 8px 20px -12px color-mix(in oklch, var(--color-app-border) 30%, transparent);
+    0 1px 2px rgba(125, 125, 143, 0.08),
+    0 8px 20px -12px rgba(125, 125, 143, 0.30);
 }
 
 /* Signature: a slow "presence" pulse used sparingly — the sidebar mark and

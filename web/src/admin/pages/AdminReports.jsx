@@ -7,6 +7,7 @@ import * as api from '../lib/api.js'
 import { unwrapList, normalizeUser } from '../lib/normalize.js'
 import { formatShortDate, countWorkingDays, estimatePageCount } from '../lib/dateWindow.js'
 import { downloadBlob } from '../lib/download.js'
+import { downloadAttendanceReportPdf } from '../lib/attendanceReportHtml.js'
 import { TextInput } from '../components/FormField.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
@@ -129,9 +130,16 @@ export default function AdminReports() {
     setBuilding(true)
     try {
       const payload = { startDate, endDate, duName, duAddress, studentIds: [...selectedIds] }
-      const { blob, filename } =
-        format === 'xlsx' ? await api.exportAttendanceXLSX(payload) : await api.exportAttendancePDF(payload)
-      downloadBlob(blob, filename)
+      const filename = `Rekap-Presensi_${startDate}_${endDate}.${format}`
+
+      if (format === 'xlsx') {
+        const { blob } = await api.exportAttendanceXLSX(payload)
+        downloadBlob(blob, filename)
+      } else {
+        const doc = await api.fetchAttendanceReportData(payload)
+        await downloadAttendanceReportPdf(doc, filename)
+      }
+
       toast.success(`Rekap presensi ${format.toUpperCase()} berhasil dibuat dan diunduh.`)
     } catch (err) {
       toast.error(err.message || `Gagal membuat rekap presensi ${format.toUpperCase()}.`)

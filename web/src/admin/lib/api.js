@@ -231,10 +231,6 @@ export async function signAbsence(id, sign) {
   return request('/api/admin/absence', { method: 'PATCH', body: { id, sign } })
 }
 
-export async function deleteAbsence(id) {
-  return request(`/api/admin/absence/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
-
 // ---------------------------------------------------------------------------
 // Admin — Export
 // ---------------------------------------------------------------------------
@@ -251,8 +247,14 @@ export async function exportAttendanceServer({ month, lang = 'id' } = {}) {
   return { blob, filename }
 }
 
-export async function exportAttendancePDF({ startDate, endDate, duName = '', duAddress = '', studentIds = [] } = {}) {
-  const response = await request('/api/admin/export/pdf', {
+export async function fetchAttendanceReportData({
+  startDate,
+  endDate,
+  duName = '',
+  duAddress = '',
+  studentIds = [],
+} = {}) {
+  const response = await request('/api/admin/export/report-data', {
     params: {
       start_date: startDate,
       end_date: endDate,
@@ -260,11 +262,27 @@ export async function exportAttendancePDF({ startDate, endDate, duName = '', duA
       du_address: duAddress || undefined,
       student_ids: studentIds.length > 0 ? studentIds.join(',') : undefined,
     },
-    raw: true,
   })
-  const blob = await response.blob()
-  const filename = `Rekap-Presensi_${startDate}_${endDate}.pdf`
-  return { blob, filename }
+  
+  // Debug logging
+  console.log('[API] fetchAttendanceReportData response:', response)
+  
+  // Backend mengembalikan PDFTemplateData langsung, atau mungkin wrapped
+  // Coba beberapa kemungkinan format:
+  if (response?.pages) {
+    // Format langsung: { pages: [...] }
+    return response
+  } else if (response?.data?.pages) {
+    // Format wrapped: { data: { pages: [...] } }
+    return response.data
+  } else if (response?.data) {
+    // Format lain: { data: {...} }
+    return response.data
+  }
+  
+  // Fallback: return as-is
+  console.warn('[API] Unexpected response format for attendance report data')
+  return response
 }
 
 export async function exportAttendanceXLSX({ startDate, endDate, duName = '', duAddress = '', studentIds = [] } = {}) {
@@ -293,10 +311,6 @@ export async function globalInfo() {
 
 export async function listPhotos({ limit = 50, lastId = '' } = {}) {
   return request('/api/all/photos', { params: { limit, last_id: lastId } })
-}
-
-export async function deletePhoto(id) {
-  return request(`/api/admin/photo/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export { ApiError }

@@ -132,9 +132,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			admin.GET("/attendances", adminCtrl.ListAttendances)
 			admin.GET("/absences", adminCtrl.ListAbsences)
 			admin.DELETE("/attendance", adminCtrl.DeleteAttendance)
-			admin.DELETE("/absence/:id", adminCtrl.DeleteAbsence)
 			admin.PATCH("/absence", adminCtrl.SignatureAbsence)
-			admin.DELETE("/photo/:id", allCtrl.DeletePhoto)
 
 			// User management
 			admin.GET("/users", adminCtrl.ListUsers)
@@ -144,7 +142,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 
 			// Export
 			admin.GET("/export", adminCtrl.ExportAttendance)
-			admin.GET("/export/pdf", adminCtrl.ExportAttendancePDF)
+			admin.GET("/export/report-data", adminCtrl.ExportAttendanceReportData)
 			admin.GET("/export/xlsx", adminCtrl.ExportAttendanceXLSX)
 		}
 

@@ -2,12 +2,9 @@ package controllers
 
 import (
 	"bytes"
-	"context"
 	"encoding/csv"
 	"fmt"
-	"html/template"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -128,9 +125,11 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 	c.Data(http.StatusOK, "text/csv", buf.Bytes())
 }
 
-// ExportAttendancePDF exports the attendance recap to PDF using the shared
-// data-assembly algorithm and absensi_template.html.
-func (ctrl *AdminController) ExportAttendancePDF(c *gin.Context) {
+// ExportAttendanceReportData returns the assembled attendance recap as JSON
+// (same Doc/Pages/Blocks/Siswa structure used for the XLSX export), so the
+// frontend can render it into the absensi_template.html markup itself and
+// generate the PDF client-side (no server-side browser/Chromium needed).
+func (ctrl *AdminController) ExportAttendanceReportData(c *gin.Context) {
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
 	duName := c.Query("du_name")
@@ -149,43 +148,7 @@ func (ctrl *AdminController) ExportAttendancePDF(c *gin.Context) {
 		return
 	}
 
-	// Define template functions
-	funcMap := template.FuncMap{
-		"inc": func(i int) int {
-			return i + 1
-		},
-		"seq": func(n int) []int {
-			result := make([]int, n)
-			for i := range result {
-				result[i] = i
-			}
-			return result
-		},
-	}
-
-	// Render HTML template
-	htmlContent, err := utils.RenderTemplate("templates/absensi_template.html", funcMap, doc)
-	if err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, "Failed to render template", "RENDER_ERROR")
-		return
-	}
-
-	// URL-encode the HTML content for data URL
-	encodedHTML := url.PathEscape(htmlContent)
-
-	// Generate PDF
-	ctx := context.Background()
-	pdfBytes, err := utils.GeneratePDFFromHTML(ctx, encodedHTML)
-	if err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, "Failed to generate PDF", "PDF_ERROR")
-		return
-	}
-
-	// Set response headers
-	filename := fmt.Sprintf("Rekap-Presensi_%s_%s.pdf", startDateStr, endDateStr)
-	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-	c.Data(http.StatusOK, "application/pdf", pdfBytes)
+	utils.RespondSuccess(c, http.StatusOK, doc)
 }
 
 // ExportAttendanceXLSX exports the attendance recap to XLSX using the same
