@@ -86,16 +86,25 @@ migrate-down:
 
 # Docker commands
 docker-up:
-	@echo "🐳 Starting Docker services..."
-	docker-compose up -d
+	@echo "🐳 Starting Docker services (services only, no API)..."
+	docker-compose -f docker-compose.dev.yml up -d
 	@echo "✅ Services started!"
 	@echo "📊 PostgreSQL: localhost:5432"
 	@echo "🔴 Redis:      localhost:6379"
 	@echo "📦 MinIO:      localhost:9000 (Console: 9001)"
+	@echo ""
+	@echo "ℹ️  API tidak dijalankan via Docker (gunakan: make dev)"
+
+docker-up-all:
+	@echo "🐳 Starting ALL services including API..."
+	docker-compose up -d
+	@echo "✅ All services started!"
+	@echo "🌐 Application: http://localhost:8080"
 
 docker-down:
 	@echo "🛑 Stopping Docker services..."
-	docker-compose down
+	docker-compose -f docker-compose.dev.yml down
+	docker-compose down 2>/dev/null || true
 	@echo "✅ Services stopped!"
 
 docker-logs:

@@ -191,9 +191,17 @@ func (ctrl *AllController) GetPhotos(c *gin.Context) {
 
 // DeletePhoto deletes a photo (attendance record with photo) - Admin only
 func (ctrl *AllController) DeletePhoto(c *gin.Context) {
-	photoID := c.Param("id")
+	// Use request body like DeleteAttendance for consistency
+	var req struct {
+		ID string `json:"id" binding:"required"`
+	}
 	
-	id, err := uuid.Parse(photoID)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Photo ID is required", "INVALID_REQUEST")
+		return
+	}
+	
+	id, err := uuid.Parse(req.ID)
 	if err != nil {
 		utils.RespondError(c, http.StatusBadRequest, "Invalid photo ID", "INVALID_ID")
 		return

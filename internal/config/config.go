@@ -54,7 +54,7 @@ type S3Config struct {
 	UseSSL                bool
 	UsePathStyleEndpoint  bool
 	Region                string
-	PublicEndpoint        string // Public endpoint for browser access (e.g., localhost:9000)
+	PublicHost            string
 	UseCloudFront         bool
 	CloudFrontDomain      string
 	CloudFrontPrivateKey  string
@@ -67,11 +67,7 @@ type JWTConfig struct {
 }
 
 type AppConfig struct {
-	AttendanceRadiusMeters   float64
-	AttendanceRadiusEnabled  bool
-	OfficeLatitude           float64
-	OfficeLongitude          float64
-	MaxLoginAttempts         int
+	MaxLoginAttempts        int
 	LoginLockDurationMinutes int
 }
 
@@ -113,14 +109,14 @@ func LoadConfig() (*Config, error) {
 			Enabled:  getEnv("REDIS_URL", "") != "",
 		},
 		S3: S3Config{
-			Endpoint:              getEnv("S3_ENDPOINT", "localhost:9000"),
-			AccessKey:             getEnv("S3_ACCESS_KEY", "minioadmin"),
-			SecretKey:             getEnv("S3_SECRET_KEY", "minioadmin"),
+			Endpoint:              getEnv("S3_ENDPOINT", ""),
+			AccessKey:             getEnv("S3_ACCESS_KEY", ""),
+			SecretKey:             getEnv("S3_SECRET_KEY", ""),
 			BucketName:            getEnv("S3_BUCKET_NAME", "takota-bucket"),
-			UseSSL:                getEnvAsBool("S3_USE_SSL", false),
-			UsePathStyleEndpoint:  getEnvAsBool("S3_USE_PATH_STYLE_ENDPOINT", true),
+			UseSSL:                getEnvAsBool("S3_USE_SSL", true),
+			UsePathStyleEndpoint:  getEnvAsBool("S3_USE_PATH_STYLE_ENDPOINT", false),
 			Region:                getEnv("S3_REGION", "us-east-1"),
-			PublicEndpoint:        getEnv("S3_PUBLIC_ENDPOINT", ""), // If empty, use Endpoint
+			PublicHost:            getEnv("S3_PUBLIC_HOST", ""),
 			UseCloudFront:         getEnvAsBool("S3_USE_CLOUDFRONT", false),
 			CloudFrontDomain:      getEnv("CLOUDFRONT_DOMAIN", ""),
 			CloudFrontPrivateKey:  getEnv("CLOUDFRONT_PRIVATE_KEY", ""),
@@ -131,11 +127,7 @@ func LoadConfig() (*Config, error) {
 			ExpiryHours: getEnvAsInt("JWT_EXPIRY_HOURS", 24),
 		},
 		App: AppConfig{
-			AttendanceRadiusMeters:   getEnvAsFloat("ATTENDANCE_RADIUS_METERS", 100),
-			AttendanceRadiusEnabled:  getEnvAsBool("ATTENDANCE_RADIUS_ENABLED", true),
-			OfficeLatitude:           getEnvAsFloat("OFFICE_LATITUDE", -7.7546612),
-			OfficeLongitude:          getEnvAsFloat("OFFICE_LONGITUDE", 110.3658561),
-			MaxLoginAttempts:         getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+			MaxLoginAttempts:        getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
 			LoginLockDurationMinutes: getEnvAsInt("LOGIN_LOCK_DURATION_MINUTES", 5),
 		},
 		FileUpload: FileUploadConfig{

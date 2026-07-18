@@ -1,255 +1,80 @@
-# 📚 Dokumentasi Takota - Index
+# 📚 Index Dokumentasi Takota
 
-Selamat datang di dokumentasi project Takota! Berikut adalah panduan lengkap untuk menggunakan, mengembangkan, dan men-deploy aplikasi ini.
-
----
-
-## 🚀 Mulai Cepat
-
-Baru menggunakan Takota? Mulai dari sini:
-
-1. **[README_QUICK.md](README_QUICK.md)** 📖
-   - Quick reference & cheat sheet
-   - Command shortcuts
-   - Fitur overview
-
-2. **[INSTALL.md](INSTALL.md)** 📦
-   - Panduan instalasi lengkap
-   - Step-by-step setup
-   - Troubleshooting common issues
-
-3. **Run:**
-   ```bash
-   make install  # Install dependencies
-   make dev      # Start application
-   ```
+Selamat datang! Pilih dokumentasi sesuai kebutuhan Anda:
 
 ---
 
-## 📂 Dokumentasi Lengkap
+## 🚀 Quick Start
 
-### Untuk Developer
+**Baru pertama kali? Mulai dari sini:**
 
-| Dokumen | Deskripsi | Kapan Digunakan |
-|---------|-----------|-----------------|
-| **[README_PROJECT.md](README_PROJECT.md)** | Overview project & features | First time reading |
-| **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** | Struktur folder detail | Understanding codebase |
-| **[INSTALL.md](INSTALL.md)** | Installation guide | Setting up project |
-| **[TESTING_PDF_FEATURE.md](TESTING_PDF_FEATURE.md)** | Testing PDF feature | Testing exports |
+### 1️⃣ [RUNNING.md](RUNNING.md) ⭐ **BACA INI DULU**
+Panduan lengkap cara menjalankan backend & frontend dengan 4 metode berbeda:
+- ✅ Development dengan Make (recommended)
+- ✅ Manual tanpa Make
+- ✅ Docker Compose all-in-one
+- ✅ Production build
 
-### Untuk Administrator
-
-| Dokumen | Deskripsi | Kapan Digunakan |
-|---------|-----------|-----------------|
-| **[INSTALL.md](INSTALL.md)** | Installation & configuration | Server setup |
-| **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** | Migration from old structure | Upgrading |
-| **[CHANGELOG.md](CHANGELOG.md)** | Version history | Tracking changes |
-
-### Untuk Project Manager
-
-| Dokumen | Deskripsi | Kapan Digunakan |
-|---------|-----------|-----------------|
-| **[README_QUICK.md](README_QUICK.md)** | Quick overview | Demo & presentation |
-| **[INTEGRATION_SUMMARY.md](INTEGRATION_SUMMARY.md)** | Integration details | Review progress |
-| **[CHANGELOG.md](CHANGELOG.md)** | What's new | Planning updates |
-
----
-
-## 🗂️ Struktur Dokumentasi
-
-```
-takota/
-├── 📘 README.md                    # Backend README (original)
-├── 📗 README_PROJECT.md            # Main project overview
-├── 📙 README_QUICK.md              # Quick reference
-├── 📦 INSTALL.md                   # Installation guide
-├── 📂 PROJECT_STRUCTURE.md         # Folder structure
-├── 🔄 MIGRATION_GUIDE.md           # Migration from old structure
-├── 📝 CHANGELOG.md                 # Version history
-├── 🎯 INTEGRATION_SUMMARY.md       # Integration details
-├── 🧪 TESTING_PDF_FEATURE.md       # PDF testing guide
-└── 📚 DOCS_INDEX.md                # This file (index)
+**Quick command:**
+```bash
+make setup     # Setup .env
+make install   # Install dependencies
+make docker-up # Start services
+make dev       # Run backend + frontend
 ```
 
 ---
 
-## 🎯 Quick Navigation
+## 📖 Dokumentasi Utama
 
-### I. Setup & Installation
+### [README.md](README.md)
+Overview lengkap project:
+- ✨ Features & capabilities
+- 🛠️ Tech stack
+- 🏗️ Architecture diagram
+- 📡 API endpoints overview
+- 🔒 Security features
 
-**"Saya ingin install project ini"**
-→ [INSTALL.md](INSTALL.md)
-
-**"Apa saja requirements yang dibutuhkan?"**
-→ [INSTALL.md - Prerequisites](INSTALL.md#prerequisites)
-
-**"Bagaimana cara run development?"**
-→ [INSTALL.md - Quick Start](INSTALL.md#quick-start)
-
-### II. Development
-
-**"Bagaimana struktur folder project ini?"**
-→ [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
-
-**"Dimana file untuk fitur X?"**
-→ [PROJECT_STRUCTURE.md - Deskripsi Folder](PROJECT_STRUCTURE.md#deskripsi-folder-utama)
-
-**"Bagaimana flow data dari frontend ke backend?"**
-→ [PROJECT_STRUCTURE.md - Data Flow](PROJECT_STRUCTURE.md#data-flow)
-
-### III. Features
-
-**"Apa saja fitur yang tersedia?"**
-→ [README_QUICK.md - Fitur Utama](README_QUICK.md#fitur-utama)
-
-**"Bagaimana cara generate PDF?"**
-→ [TESTING_PDF_FEATURE.md](TESTING_PDF_FEATURE.md)
-
-**"Apa saja endpoint API?"**
-→ [README_QUICK.md - API Endpoints](README_QUICK.md#api-endpoints)
-
-### IV. Migration & Updates
-
-**"Cara migrate dari struktur lama?"**
-→ [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)
-
-**"Apa yang berubah di versi terbaru?"**
-→ [CHANGELOG.md](CHANGELOG.md)
-
-**"Bagaimana proses integrasi dilakukan?"**
-→ [INTEGRATION_SUMMARY.md](INTEGRATION_SUMMARY.md)
-
-### V. Troubleshooting
-
-**"Error saat install dependencies"**
-→ [INSTALL.md - Troubleshooting](INSTALL.md#troubleshooting)
-
-**"PDF generation tidak berfungsi"**
-→ [TESTING_PDF_FEATURE.md - Troubleshooting](TESTING_PDF_FEATURE.md#troubleshooting)
-
-**"Database connection error"**
-→ [INSTALL.md - Troubleshooting](INSTALL.md#troubleshooting)
+### [INSTALL.md](INSTALL.md)
+Panduan instalasi detail:
+- Prerequisites installation
+- Environment configuration
+- Database setup
+- Troubleshooting instalasi
 
 ---
 
-## 📊 Diagram Project
+## 🔵 Development
 
-### Architecture Overview
+### [QUICK_START_DEV.md](QUICK_START_DEV.md)
+Development setup cepat dengan Make commands dan hot reload
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Takota System                        │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  Frontend (React)          Backend (Go)                 │
-│  ┌──────────────┐          ┌──────────────┐            │
-│  │              │  HTTP    │              │            │
-│  │  Web UI      │◄────────►│  API Server  │            │
-│  │  (Vite)      │  8080    │  (Gin)       │            │
-│  └──────────────┘          └──────┬───────┘            │
-│       :5173                       │                     │
-│                                   │                     │
-│                    ┌──────────────┼──────────────┐      │
-│                    │              │              │      │
-│              ┌─────▼─────┐  ┌────▼────┐  ┌─────▼─────┐│
-│              │PostgreSQL │  │  Redis  │  │   MinIO   ││
-│              │ (Data)    │  │ (Cache) │  │  (Files)  ││
-│              └───────────┘  └─────────┘  └───────────┘│
-│                  :5432         :6379         :9000     │
-└─────────────────────────────────────────────────────────┘
-```
+---
 
-### Request Flow (PDF Export)
+## 🟢 Production
 
-```
-User Browser
-    │
-    │ 1. Click "Buat & Unduh PDF"
-    ▼
-Frontend (AdminReports.jsx)
-    │
-    │ 2. GET /api/admin/export/pdf?start_date=...&student_ids=...
-    ▼
-Backend (export_controller.go)
-    │
-    ├─► 3. Query attendance data
-    │        │
-    │        ▼
-    │   PostgreSQL
-    │        │
-    │        │ Return attendance records
-    │        ▼
-    │   Format to PDFTemplateData
-    │
-    ├─► 4. Render HTML template
-    │        │
-    │        ▼
-    │   absensi_template.html
-    │        │
-    │        │ Return rendered HTML
-    │        ▼
-    │   HTML string
-    │
-    ├─► 5. Convert HTML → PDF
-    │        │
-    │        ▼
-    │   chromedp (Chrome headless)
-    │        │
-    │        │ Return PDF bytes
-    │        ▼
-    │   PDF binary
-    │
-    └─► 6. Send PDF response
-         │
-         ▼
-Frontend receives PDF
-    │
-    │ 7. Browser auto-download
-    ▼
-User gets PDF file
-```
+### [QUICK_START_PROD.md](QUICK_START_PROD.md)
+Production deployment guide
 
-### Folder Structure
+### [DEPLOYMENT_STRATEGIES.md](DEPLOYMENT_STRATEGIES.md)
+Strategi deployment production:
+- Docker deployment
+- Native binary deployment
+- Hybrid approach
+- Nginx reverse proxy
+- SSL/TLS setup
 
-```
-takota/
-│
-├── Backend (Root Level)
-│   ├── cmd/              Entry points
-│   ├── internal/         Core logic
-│   │   ├── controllers/  HTTP handlers
-│   │   ├── models/       Data structures
-│   │   ├── middlewares/  HTTP middlewares
-│   │   └── utils/        Helpers
-│   ├── pkg/              Reusable packages
-│   ├── migrations/       DB migrations
-│   └── templates/        HTML templates
-│
-├── Frontend (web/)
-│   ├── src/
-│   │   ├── admin/        Admin dashboard
-│   │   │   ├── pages/    Admin pages
-│   │   │   ├── lib/      Admin utilities
-│   │   │   └── components/
-│   │   ├── pages/        User pages
-│   │   ├── components/   User components
-│   │   └── lib/          User utilities
-│   ├── public/           Static assets
-│   └── dist/             Build output (generated)
-│
-├── Documentation
-│   ├── README*.md        Various READMEs
-│   ├── INSTALL.md        Installation guide
-│   ├── CHANGELOG.md      Version history
-│   └── ...
-│
-└── Scripts & Config
-    ├── Makefile          Build commands
-    ├── start-*.sh        Helper scripts
-    ├── .env.example      Config template
-    ├── docker-compose.yml Docker setup
-    └── .gitignore        Git ignore
-```
+---
+
+## 📂 Project Info
+### [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
+Struktur folder dan arsitektur project:
+- Folder structure detail
+- Component organization
+- Data flow
+
+### [CHANGELOG.md](CHANGELOG.md)
+Version history dan update log
 
 ---
 
@@ -258,168 +83,198 @@ takota/
 ### Development
 ```bash
 make install      # Install all dependencies
-make dev          # Run backend + frontend
+make dev          # Run backend + frontend (hot reload)
 make backend      # Run backend only
 make frontend     # Run frontend only
 ```
 
-### Build
-```bash
-make build        # Build all
-make build-backend   # Build backend only
-make build-frontend  # Build frontend only
-```
-
 ### Docker
 ```bash
-make docker-up    # Start services
+make docker-up    # Start PostgreSQL, Redis, MinIO
 make docker-down  # Stop services
 make docker-logs  # View logs
 ```
 
-### Testing
+### Build & Test
 ```bash
-make test         # Run all tests
-make test-backend    # Backend tests
-make test-frontend   # Frontend tests
+make build        # Build production binary + static files
+make test         # Run tests
+make clean        # Clean build artifacts
 ```
 
 ### Utility
 ```bash
 make check        # Check system requirements
-make clean        # Clean build artifacts
+make setup        # Create .env from .env.example
 make help         # Show all commands
 ```
 
 ---
 
-## 📖 Reading Order (Recommended)
+## 🎯 Quick Navigation
 
-### For First-Time Setup:
+**"Bagaimana cara menjalankan aplikasi?"**  
+→ [RUNNING.md](RUNNING.md) ⭐
 
-1. **[README_QUICK.md](README_QUICK.md)** - Overview singkat
-2. **[INSTALL.md](INSTALL.md)** - Setup environment
-3. **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Understand codebase
-4. Start developing! 🚀
+**"Cara install dari awal?"**  
+→ [INSTALL.md](INSTALL.md)
 
-### For Migration from Old Structure:
+**"Struktur project seperti apa?"**  
+→ [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
 
-1. **[INTEGRATION_SUMMARY.md](INTEGRATION_SUMMARY.md)** - Understand changes
-2. **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Migration steps
-3. **[CHANGELOG.md](CHANGELOG.md)** - What's new
-4. Testing & deployment
+**"Deploy ke production?"**  
+→ [QUICK_START_PROD.md](QUICK_START_PROD.md) + [DEPLOYMENT_STRATEGIES.md](DEPLOYMENT_STRATEGIES.md)
 
-### For Feature Development:
-
-1. **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Find relevant files
-2. **[README_QUICK.md](README_QUICK.md)** - Check existing features
-3. Write code
-4. Update **[CHANGELOG.md](CHANGELOG.md)**
+**"Apa saja yang berubah?"**  
+→ [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-## 🎓 Learning Resources
+## 📊 Architecture Overview
 
-### Backend (Go)
-- [Go Documentation](https://go.dev/doc/)
-- [Gin Framework](https://gin-gonic.com/docs/)
-- [GORM ORM](https://gorm.io/docs/)
+```
+┌─────────────────────────────────────────────────┐
+│              Takota Application                 │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  Frontend (React + Vite)                        │
+│  ┌──────────────────┐                          │
+│  │  Web Interface   │  :5173 (dev)             │
+│  │  (Static Files)  │  :8080 (prod)            │
+│  └────────┬─────────┘                          │
+│           │                                     │
+│           │ HTTP/HTTPS                          │
+│           ▼                                     │
+│  ┌──────────────────┐                          │
+│  │  Backend (Go)    │  :8080                   │
+│  │  API Server      │                          │
+│  └────┬─────────────┘                          │
+│       │                                         │
+│       ├─► PostgreSQL :5432 (Database)          │
+│       ├─► Redis      :6379 (Cache, optional)   │
+│       └─► MinIO      :9000 (S3 Storage)        │
+│                                                 │
+└─────────────────────────────────────────────────┘
+```
 
-### Frontend (React)
-- [React Documentation](https://react.dev/)
-- [Vite Guide](https://vitejs.dev/guide/)
-- [HeroUI Components](https://heroui.com/)
+---
 
-### Database
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [Redis Documentation](https://redis.io/docs/)
+## 📖 Reading Order
 
-### Tools
-- [Docker Documentation](https://docs.docker.com/)
-- [chromedp](https://github.com/chromedp/chromedp)
+### 🆕 First Time Setup
+1. [RUNNING.md](RUNNING.md) - **START HERE**
+2. [README.md](README.md) - Overview features
+3. [INSTALL.md](INSTALL.md) - Detail instalasi
+4. Start coding! 🚀
+
+### 🚀 Development
+1. [RUNNING.md](RUNNING.md) - Cara run dev environment
+2. [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Pahami struktur code
+3. [QUICK_START_DEV.md](QUICK_START_DEV.md) - Dev workflow
+
+### 📦 Production Deployment
+1. [QUICK_START_PROD.md](QUICK_START_PROD.md) - Production checklist
+2. [DEPLOYMENT_STRATEGIES.md](DEPLOYMENT_STRATEGIES.md) - Deployment options
+3. [RUNNING.md - Metode 4](RUNNING.md#metode-4-production-build) - Build production
+
+---
+
+## 🗂️ File Structure
+
+```
+takota-app/
+│
+├── 📚 Documentation
+│   ├── RUNNING.md              ⭐ Cara menjalankan aplikasi
+│   ├── README.md               📖 Overview & features
+│   ├── DOCS_INDEX.md           📑 Index ini
+│   ├── INSTALL.md              📦 Installation guide
+│   ├── QUICK_START_DEV.md      🔵 Development quick start
+│   ├── QUICK_START_PROD.md     🟢 Production quick start
+│   ├── DEPLOYMENT_STRATEGIES.md 🚀 Deployment strategies
+│   ├── PROJECT_STRUCTURE.md    📂 Project structure
+│   └── CHANGELOG.md            📝 Version history
+│
+├── 🔧 Backend (Go)
+│   ├── cmd/api/                Entry point
+│   ├── internal/               Core application
+│   │   ├── controllers/        HTTP handlers
+│   │   ├── models/            Data models
+│   │   ├── middlewares/       Auth, etc.
+│   │   └── utils/             Helpers
+│   ├── pkg/                   Shared packages
+│   ├── migrations/            Database migrations
+│   └── templates/             HTML templates
+│
+├── 🎨 Frontend (React)
+│   └── web/
+│       ├── src/               Source code
+│       │   ├── admin/        Admin dashboard
+│       │   ├── pages/        User pages
+│       │   └── components/   Shared components
+│       └── dist/             Build output (generated)
+│
+├── 🐳 Configuration
+│   ├── Makefile               Build commands
+│   ├── docker-compose.yml     Docker services
+│   ├── .env.example          Config template
+│   └── start-*.sh            Helper scripts
+│
+└── 📦 Dependencies
+    ├── go.mod                Go dependencies
+    └── web/package.json      npm dependencies
+```
 
 ---
 
 ## 🤝 Contributing
 
-Tertarik untuk contribute? Baca:
-
-1. **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Pahami struktur
-2. **[CHANGELOG.md](CHANGELOG.md)** - Cek rencana fitur
-3. Fork → Branch → Commit → Push → Pull Request
-4. Update documentation yang relevan
-
----
-
-## 📞 Support & Help
-
-### Documentation Issues
-- Check **[INSTALL.md - Troubleshooting](INSTALL.md#troubleshooting)**
-- Search in all .md files
-
-### Technical Issues
-- Check logs: `docker-compose logs` atau `journalctl`
-- Enable debug mode: `GIN_MODE=debug` in .env
-- Test individual components
-
-### Feature Requests
-- Check **[CHANGELOG.md - Upcoming Features](CHANGELOG.md#upcoming-features)**
-- Open issue with detailed description
+Contribution welcome! Steps:
+1. Fork repository
+2. Read [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)
+3. Create feature branch
+4. Commit changes
+5. Update [CHANGELOG.md](CHANGELOG.md)
+6. Open Pull Request
 
 ---
 
-## 📝 Documentation Maintenance
+## 📞 Need Help?
 
-### When to Update:
+### Troubleshooting
+- [RUNNING.md - Troubleshooting](RUNNING.md#troubleshooting) - Common issues & fixes
+- [INSTALL.md - Troubleshooting](INSTALL.md#troubleshooting) - Installation problems
 
-| Change | Update File |
-|--------|-------------|
-| New feature | CHANGELOG.md, README_QUICK.md |
-| Bug fix | CHANGELOG.md |
-| Config change | INSTALL.md, .env.example |
-| Folder structure | PROJECT_STRUCTURE.md |
-| API endpoint | README_QUICK.md |
-| Migration step | MIGRATION_GUIDE.md |
+### Logs
+```bash
+# View logs
+docker-compose logs -f         # All services
+docker-compose logs -f api     # Backend only
+docker-compose logs -f postgres # Database only
+```
 
-### How to Update:
+### Health Check
+```bash
+# Check if backend is running
+curl http://localhost:8080/health
 
-1. Edit relevant .md file
-2. Keep formatting consistent
-3. Add to CHANGELOG.md
-4. Commit with clear message
-
----
-
-## ✅ Documentation Checklist
-
-Semua dokumentasi lengkap? Cek:
-
-- [x] README_PROJECT.md - Overview & intro
-- [x] README_QUICK.md - Quick reference
-- [x] INSTALL.md - Installation guide
-- [x] PROJECT_STRUCTURE.md - Folder structure
-- [x] MIGRATION_GUIDE.md - Migration steps
-- [x] INTEGRATION_SUMMARY.md - Integration details
-- [x] CHANGELOG.md - Version history
-- [x] TESTING_PDF_FEATURE.md - PDF testing
-- [x] DOCS_INDEX.md - This index
-- [x] Makefile - Build commands
-- [x] start-*.sh - Helper scripts
-
-**Status: ✅ Complete & Up-to-date**
+# Should return: {"status":"OK"}
+```
 
 ---
 
-## 📊 Documentation Statistics
+## 📚 External Resources
 
-- **Total Documents**: 10 files
-- **Total Lines**: ~3500+ lines
-- **Languages**: Markdown, Shell, Makefile
-- **Last Updated**: 10 Juli 2026
-- **Version**: 1.1.0
+- **Go**: https://go.dev/doc/
+- **React**: https://react.dev/
+- **Gin Framework**: https://gin-gonic.com/docs/
+- **PostgreSQL**: https://www.postgresql.org/docs/
+- **Docker**: https://docs.docker.com/
 
 ---
 
-**Need specific help? Use Ctrl+F to search across all documentation!**
+**Last Updated**: 18 Juli 2026  
+**Version**: 1.0.0
 
-**Happy Reading & Coding! 📚🚀**
+**Happy Coding! 🚀**
+

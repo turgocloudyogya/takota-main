@@ -133,12 +133,16 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			admin.GET("/absences", adminCtrl.ListAbsences)
 			admin.DELETE("/attendance", adminCtrl.DeleteAttendance)
 			admin.PATCH("/absence", adminCtrl.SignatureAbsence)
+			admin.DELETE("/absence/:id", adminCtrl.DeleteAbsence)
 
 			// User management
 			admin.GET("/users", adminCtrl.ListUsers)
 			admin.POST("/user", adminCtrl.CreateUser)
 			admin.POST("/user/:user_id", adminCtrl.UpdateUser)
 			admin.DELETE("/user/:user_id", adminCtrl.DeleteUser)
+
+			// Photos management (use request body like attendance)
+			admin.DELETE("/photo", allCtrl.DeletePhoto)
 
 			// Export
 			admin.GET("/export", adminCtrl.ExportAttendance)

@@ -174,33 +174,6 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 		return
 	}
 
-	// Parse coordinates
-	userLat, err := utils.ParseFloat64(req.Latitude)
-	if err != nil {
-		utils.RespondError(c, http.StatusBadRequest, "Invalid latitude", utils.ErrBodyFillAll)
-		return
-	}
-
-	userLon, err := utils.ParseFloat64(req.Longitude)
-	if err != nil {
-		utils.RespondError(c, http.StatusBadRequest, "Invalid longitude", utils.ErrBodyFillAll)
-		return
-	}
-
-	// Check distance from office (only if radius validation is enabled)
-	if ctrl.Config.App.AttendanceRadiusEnabled {
-		distance := utils.CalculateDistance(
-			userLat, userLon,
-			ctrl.Config.App.OfficeLatitude,
-			ctrl.Config.App.OfficeLongitude,
-		)
-
-		if distance > ctrl.Config.App.AttendanceRadiusMeters {
-			utils.RespondError(c, http.StatusBadRequest, "You are out of location radius", utils.ErrOutOfRadius)
-			return
-		}
-	}
-
 	// Handle photo upload
 	var photoPath *string
 	file, fileHeader, err := c.Request.FormFile("photo")

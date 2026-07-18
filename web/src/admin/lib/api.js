@@ -231,6 +231,10 @@ export async function signAbsence(id, sign) {
   return request('/api/admin/absence', { method: 'PATCH', body: { id, sign } })
 }
 
+export async function deleteAbsence(id) {
+  return request(`/api/admin/absence/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 // ---------------------------------------------------------------------------
 // Admin — Export
 // ---------------------------------------------------------------------------
@@ -311,6 +315,10 @@ export async function globalInfo() {
 
 export async function listPhotos({ limit = 50, lastId = '' } = {}) {
   return request('/api/all/photos', { params: { limit, last_id: lastId } })
+}
+
+export async function deletePhoto(id) {
+  return request('/api/admin/photo', { method: 'DELETE', body: { id } })
 }
 
 export { ApiError }
