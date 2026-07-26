@@ -230,7 +230,6 @@ docker network rm takota_takota-network
 
 **Kelebihan:**
 - ✅ Production-like environment
-- ✅ Chromium for PDF ter-bundle
 - ✅ Tidak perlu Go/Node di host
 - ⚠️ No hot reload (need rebuild)
 
@@ -369,9 +368,6 @@ docker compose restart api
 | `takota-redis` | Redis 7 | 6379 | Cache (optional) |
 | `takota-minio` | MinIO/S3 | 9000, 9001 | File storage |
 
-**🎯 Chromium untuk PDF sudah ter-bundle di container `takota-api`**  
-Tidak perlu install Chrome di host machine!
-
 ---
 
 ## 🔧 Konfigurasi Environment
@@ -493,9 +489,8 @@ REDIS_URL=
 ### PDF generation tidak berfungsi
 
 ```bash
-# Chromium sudah ter-bundle di container
-# Jika error, check logs:
-docker compose logs api | grep -i "pdf\|chrome"
+# Check logs:
+docker compose logs api | grep -i "pdf"
 
 # Rebuild container:
 docker compose up -d --build api

@@ -148,5 +148,4 @@ check:
 	@command -v node >/dev/null 2>&1 && echo "✅ Node.js installed: $$(node --version)" || echo "❌ Node.js not found"
 	@command -v npm >/dev/null 2>&1 && echo "✅ npm installed: $$(npm --version)" || echo "❌ npm not found"
 	@command -v docker >/dev/null 2>&1 && echo "✅ Docker installed: $$(docker --version)" || echo "❌ Docker not found"
-	@command -v chromium >/dev/null 2>&1 && echo "✅ Chromium installed" || command -v google-chrome >/dev/null 2>&1 && echo "✅ Chrome installed" || echo "⚠️  Chrome/Chromium not found (needed for PDF generation)"
 	@echo ""

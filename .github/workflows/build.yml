@@ -1,0 +1,319 @@
+# =============================================================================
+#  Build & Push to GHCR + Security Scanning Pipeline
+# =============================================================================
+# Workflow ini menggabungkan 2 pipeline jadi satu:
+#   1. Build & Push   → Build image Docker dan push ke GitHub Container Registry
+#   2. Security Scan  → Gitleaks (secrets) + Semgrep (SAST) + Trivy (container)
+#
+# Trigger: HANYA saat ada push ke branch main (tidak ada schedule/cron).
+# Hasil scan diupload ke tab GitHub Security (Code scanning alerts).
+# =============================================================================
+
+name: Build, Push & Security Scan
+
+on:
+  push:
+    branches: ['main']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Minimal permission yang dibutuhkan oleh seluruh job di workflow ini
+permissions:
+  contents: read
+  packages: write         # Push image ke GHCR
+  security-events: write  # Upload SARIF ke GitHub Security tab
+  actions: read
+
+# Batalkan run lama jika ada push baru di branch yang sama
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # JOB 1 ─── SECRETS SCANNING dengan GITLEAKS
+  # ===========================================================================
+  gitleaks:
+    name:  Secrets Scan · Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name:  Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # fetch-depth: 0 → ambil seluruh git history
+          # Penting agar Gitleaks bisa scan semua commit, bukan hanya yang terbaru
+          fetch-depth: 0
+
+      - name:  Run Gitleaks Secrets Detection
+        id: gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Wajib diisi jika repo ini milik sebuah GitHub Organization (berbayar):
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        with:
+          # Gunakan konfigurasi custom dari .gitleaks.toml (jika ada di root repo)
+          # args: --config .gitleaks.toml --exit-code=0
+          args: --exit-code=0   # exit 0 agar pipeline tidak langsung fail
+        continue-on-error: true  # Tetap lanjut meskipun ditemukan secret
+
+      - name:  Upload Gitleaks SARIF
+        if: always() && hashFiles('results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif
+          category: gitleaks-secrets
+
+      - name: Gitleaks Summary
+        if: always()
+        run: |
+          if [ "${{ steps.gitleaks.outcome }}" = "success" ]; then
+            echo "### ✅ Gitleaks: Tidak ada secrets ditemukan" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Gitleaks: Ditemukan potensi secrets/credentials!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "👉 Periksa **Security > Code scanning alerts** untuk detail." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Jika ini false positive**, tambahkan pattern ke \`.gitleaks.toml\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ===========================================================================
+  # JOB 2 ─── SAST dengan SEMGREP
+  # ===========================================================================
+  semgrep:
+    name:  SAST Scan · Semgrep
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    # Skip untuk bot (Dependabot, Renovate) → mereka tidak perlu SAST
+    if: |
+      !contains(github.actor, 'dependabot') &&
+      !contains(github.actor, 'renovate')
+    steps:
+      - name:  Checkout repository
+        uses: actions/checkout@v7
+
+      - name:  Prepare Semgrep Config
+        id: semgrep_config
+        run: |
+          # Ruleset default yang selalu dijalankan
+          BASE_RULES="--config p/default --config p/owasp-top-ten --config p/security-audit --config p/secrets"
+
+          # Gunakan ruleset custom jika ada file .semgrep.yml di root repo
+          CUSTOM_RULES=""
+          if [ -f ".semgrep.yml" ]; then
+            CUSTOM_RULES="--config .semgrep.yml"
+          fi
+
+          echo "rules=$BASE_RULES $CUSTOM_RULES" >> $GITHUB_OUTPUT
+          echo " Semgrep rules: $BASE_RULES $CUSTOM_RULES"
+
+      - name:  Run Semgrep SAST
+        id: semgrep
+        run: |
+          semgrep scan \
+            ${{ steps.semgrep_config.outputs.rules }} \
+            --sarif \
+            --output semgrep.sarif \
+            --metrics=off \
+            --timeout 300 \
+            --max-target-bytes 10000000 \
+            --exclude "node_modules" \
+            --exclude "vendor" \
+            --exclude "dist" \
+            --exclude "build" \
+            --exclude ".next" \
+            --exclude ".nuxt" \
+            --exclude "*.min.js" \
+            .
+        env:
+          # Opsional: token Semgrep Cloud Platform untuk dashboard & notifikasi
+          # Buat token di: https://semgrep.dev/manage/settings
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        continue-on-error: true
+
+      - name:  Upload Semgrep SARIF
+        if: always() && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep-sast
+
+      - name:  Upload Semgrep Report Artifact
+        if: always() && hashFiles('semgrep.sarif') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: semgrep-sarif-${{ github.run_id }}
+          path: semgrep.sarif
+          retention-days: 30
+
+      - name: Semgrep Summary
+        if: always()
+        run: |
+          if [ "${{ steps.semgrep.outcome }}" = "success" ]; then
+            echo "### ✅ Semgrep: Tidak ada kerentanan kritis ditemukan" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Semgrep: Ditemukan potensi kerentanan keamanan!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "👉 Periksa **Security > Code scanning alerts** untuk detail lengkap." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ===========================================================================
+  # JOB 3 ─── BUILD & PUSH IMAGE KE GHCR
+  # ===========================================================================
+  build-and-push-image:
+    name:  Build & Push to GHCR
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+  # ===========================================================================
+  # JOB 4 ─── CONTAINER IMAGE SCANNING dengan TRIVY
+  # ===========================================================================
+  # Job ini men-scan IMAGE YANG SUDAH DI-PUSH oleh job build-and-push-image
+  # (berdasarkan digest-nya), jadi tidak perlu build ulang dari Dockerfile.
+  trivy:
+    name:  Container Scan · Trivy
+    runs-on: ubuntu-latest
+    needs: build-and-push-image
+    steps:
+      - name:  Checkout repository
+        uses: actions/checkout@v7
+
+      # Diperlukan supaya Trivy bisa pull image dari GHCR (terutama jika repo/package private)
+      - name:  Log in to the container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Trivy Image Scan (scan image asli yang baru di-push) ───────────────
+      - name:  Trivy · Image Vulnerability Scan
+        id: trivy_image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push-image.outputs.digest }}
+          format: sarif
+          output: trivy-image.sarif
+          # Level severity yang dilaporkan
+          severity: "CRITICAL,HIGH"
+          # exit-code: "1" → fail pipeline jika ada CRITICAL/HIGH (uncomment jika perlu)
+          exit-code: "0"
+          # Abaikan CVE yang belum ada fix-nya
+          ignore-unfixed: true
+          # Jenis vulnerability yang di-scan
+          vuln-type: "os,library"
+          # File untuk ignore CVE tertentu (lihat .trivyignore)
+          trivyignores: .trivyignore
+        continue-on-error: true
+
+      # ── Trivy Filesystem Scan (bonus: scan kode & dependencies) ───────────
+      - name:  Trivy · Filesystem Scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table          # Tampilkan sebagai tabel di log
+          severity: "CRITICAL,HIGH,MEDIUM"
+          exit-code: "0"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+        continue-on-error: true
+
+      - name:  Upload Trivy SARIF
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-container
+
+      - name:  Upload Trivy Report Artifact
+        if: always() && hashFiles('trivy-image.sarif') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-sarif-${{ github.run_id }}
+          path: trivy-image.sarif
+          retention-days: 30
+
+      - name: Trivy Summary
+        if: always()
+        run: |
+          echo "### 📦 Trivy Container Scan" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push-image.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.trivy_image.outcome }}" = "success" ]; then
+            echo "- **Status**: ✅ Tidak ada kerentanan CRITICAL/HIGH ditemukan" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: ⚠️ Ditemukan kerentanan! Lihat **Security > Code scanning alerts**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ===========================================================================
+  # JOB 5 ─── SECURITY SUMMARY (selalu berjalan di akhir)
+  # ===========================================================================
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [gitleaks, semgrep, trivy]
+    if: always()
+    steps:
+      - name: Generate Final Summary
+        run: |
+          GITLEAKS_STATUS="${{ needs.gitleaks.result }}"
+          SEMGREP_STATUS="${{ needs.semgrep.result }}"
+          TRIVY_STATUS="${{ needs.trivy.result }}"
+
+          icon_gitleaks="✅"
+          icon_semgrep="✅"
+          icon_trivy="✅"
+
+          [ "$GITLEAKS_STATUS" != "success" ] && icon_gitleaks=""
+          [ "$SEMGREP_STATUS" != "success" ] && icon_semgrep=""
+          [ "$TRIVY_STATUS" != "success" ] && icon_trivy=""
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ##  Security Scan Summary
+
+          | Tool | Scope | Status |
+          |------|-------|--------|
+          |  Gitleaks | Secrets & Credentials | ${icon_gitleaks} ${GITLEAKS_STATUS} |
+          |  Semgrep | SAST · Code Vulnerabilities | ${icon_semgrep} ${SEMGREP_STATUS} |
+          |  Trivy | Container & Dependency CVE | ${icon_trivy} ${TRIVY_STATUS} |
+
+          ---
+           **Lihat detail lengkap** di tab **Security → Code scanning alerts**
+          EOF

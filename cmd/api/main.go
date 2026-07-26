@@ -102,6 +102,11 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// Serve static files (React frontend)
+	router.Static("/assets", "./web/dist/assets")
+	router.StaticFile("/favicon.ico", "./web/dist/favicon.ico")
+	router.StaticFile("/vite.svg", "./web/dist/vite.svg")
+
 	// API routes
 	api := router.Group("/api")
 	{
@@ -158,4 +163,18 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			all.GET("/photos", allCtrl.GetPhotos)
 		}
 	}
+
+	// SPA fallback - serve index.html for all non-API routes
+	// This MUST be the last route!
+	router.NoRoute(func(c *gin.Context) {
+		// Skip API routes (return 404 for API endpoints)
+		path := c.Request.URL.Path
+		if len(path) >= 4 && path[:4] == "/api" {
+			c.JSON(404, gin.H{"error": "API endpoint not found"})
+			return
+		}
+
+		// Serve index.html for all other routes (SPA routing)
+		c.File("./web/dist/index.html")
+	})
 }

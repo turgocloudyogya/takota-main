@@ -120,20 +120,19 @@ Sempurna untuk perusahaan dengan karyawan remote dan office-based yang membutuhk
 - **Containerization:** Docker (Alpine images)
 - **Orchestration:** Docker Compose
 - **Networking:** Bridge network with service discovery
-- **Reverse Proxy:** Nginx (production)
+- **Web Server:** Go/Gin (serves API + static files)
 
 ---
 
 ## 🚀 Quick Start
 
-### 📖 Pilih Dokumentasi Sesuai Kebutuhan:
+### 📖 Documentation:
 
-| Kebutuhan | Dokumentasi | Deskripsi |
-|-----------|-------------|-----------|
-| 🔵 **Development** | **[QUICK_START_DEV.md](QUICK_START_DEV.md)** | Setup development dengan Make commands (Recommended) |
-| 🟢 **Production** | **[QUICK_START_PROD.md](QUICK_START_PROD.md)** | Deploy ke production server |
-| 📚 **Lengkap** | **[INSTALL.md](INSTALL.md)** | Panduan instalasi detail & troubleshooting |
-| 📋 **Index** | **[DOCS_INDEX.md](DOCS_INDEX.md)** | Index semua dokumentasi |
+| Guide | Description |
+|-------|-------------|
+| 🔵 **[QUICK_START_DEV.md](QUICK_START_DEV.md)** | Development setup with hot reload |
+| 🟢 **[DEPLOYMENT_PRODUCTION.md](DEPLOYMENT_PRODUCTION.md)** | Production deployment with Docker |
+| 📄 **[CHANGELOG.md](CHANGELOG.md)** | Version history and updates |
 
 ---
 
@@ -204,32 +203,35 @@ docker compose up -d --build
 docker compose down
 ```
 
-**Chromium untuk PDF sudah ter-bundle di container!**
-
 ---
 
 ### 🚀 Production Deployment
 
-Lihat panduan lengkap di **[QUICK_START_PROD.md](QUICK_START_PROD.md)**
+Lihat panduan lengkap di **[DEPLOYMENT_PRODUCTION.md](DEPLOYMENT_PRODUCTION.md)**
 
-**Build & Deploy:**
+**Quick Deploy:**
 ```bash
-# 1. Build (local/CI)
-make build          # Build backend + frontend
+# 1. Clone & Setup
+git clone https://github.com/yourusername/takota-app.git
+cd takota-app
+cp .env.example .env
+nano .env  # Edit production values
 
-# 2. Package
-tar -czf takota-production.tar.gz bin/ web/dist/ templates/ ...
+# 2. Login to registry
+echo "YOUR_GITHUB_TOKEN" | docker login ghcr.io -u YOUR_USERNAME --password-stdin
 
-# 3. Upload & deploy ke server
+# 3. Deploy
+docker compose -f docker-compose.production.yml up -d
+
+# 4. Access
+# http://your-domain.com
 ```
 
-**Recommended Strategy: Hybrid**
-- Backend Go native dengan systemd
-- PostgreSQL, Redis, MinIO di Docker
-- Nginx reverse proxy + SSL
-- Chromium untuk PDF generation
+**Production Stack:**
+- Takota API (serves API + React frontend)
+- PostgreSQL, Redis, Supabase Storage
 
-**Dokumentasi lengkap:** [DEPLOYMENT_STRATEGIES.md](DEPLOYMENT_STRATEGIES.md)
+**Dokumentasi lengkap:** [DEPLOYMENT_PRODUCTION.md](DEPLOYMENT_PRODUCTION.md)
 
 ### Manual Setup (Without Docker)
 
@@ -360,9 +362,6 @@ go build -o takota-api ./cmd/api
              │ │  :5432       │
              │ └──────────────┘
              │
-             ▼
-      Chromium (Headless)
-      For PDF Generation
 ```
 
 ### Application Flow
@@ -420,9 +419,7 @@ Backend queries attendance data (PostgreSQL)
        ↓
 Render HTML template (templates/absensi_template.html)
        ↓
-Chromium converts HTML → PDF
-       ↓
-Stream PDF to browser
+Frontend generates PDF from HTML
        ↓
 Browser auto-downloads PDF file
 ```
@@ -449,7 +446,7 @@ Browser auto-downloads PDF file
 4. **Export:**
    - Admin requests data export (CSV/PDF)
    - Query data from PostgreSQL
-   - Generate file (CSV or PDF via Chromium)
+   - Generate file (CSV server-side or PDF client-side)
    - Stream to browser for download
 
 ---
@@ -500,8 +497,6 @@ GET    /api/all/photos        Get attendance photo gallery
 ```
 GET    /health                Health check
 ```
-
-**For detailed API documentation, see [API_DOCS.md](./docs/API_DOCS.md)**
 
 ---
 
@@ -618,73 +613,51 @@ bash test_comprehensive_final.sh
 cat test_results.json
 ```
 
-**For detailed testing procedures, see [TESTING.md](./docs/TESTING.md)**
-
 ---
 
 ## 🚢 Deployment
 
 ### Production Deployment
 
-#### Step 1: Setup Infrastructure
+See complete guide: **[DEPLOYMENT_PRODUCTION.md](DEPLOYMENT_PRODUCTION.md)**
 
-```bash
-# Create production .env
-cp .env.example .env
-nano .env  # Edit with production values
+**Quick Steps:**
 
-# Key production settings:
-APP_ENV=production
-GIN_MODE=release
-JWT_SECRET=generate-strong-random-key
-DB_SSL_MODE=require
-S3_ENDPOINT=aws.s3.amazonaws.com  # or your S3 provider
-REDIS_URL=redis://production-redis-host:6379
+1. **Prepare Server**
+   ```bash
+   # Install Docker
+   curl -fsSL https://get.docker.com | sh
+   ```
+
+2. **Setup Configuration**
+   ```bash
+   cp .env.example .env
+   nano .env  # Edit: DB_PASSWORD, JWT_SECRET, S3_ACCESS_KEY, etc.
+   ```
+
+3. **Login to Registry**
+   ```bash
+   echo "YOUR_GITHUB_TOKEN" | docker login ghcr.io -u YOUR_USERNAME --password-stdin
+   ```
+
+4. **Deploy**
+   ```bash
+   docker compose -f docker-compose.production.yml up -d
+   ```
+
+5. **Setup SSL (Production)**
+   ```bash
+   # Use Cloudflare Tunnel or Caddy for SSL
+   # See DEPLOYMENT_PRODUCTION.md for details
+   ```
+
+**Architecture:**
+```
+Internet → Takota API (80) → PostgreSQL, Redis, Supabase Storage
 ```
 
-#### Step 2: Build Docker Images
-
-```bash
-# Build for production
-docker build -t takota-api:v1.0.0 .
-
-# Tag for registry
-docker tag takota-api:v1.0.0 your-registry/takota-api:v1.0.0
-
-# Push to registry
-docker push your-registry/takota-api:v1.0.0
-```
-
-#### Step 3: Deploy to Server
-
-```bash
-# Pull latest image
-docker pull your-registry/takota-api:v1.0.0
-
-# Start container
-docker run -d \
-  --name takota-api \
-  --env-file .env \
-  -p 8080:8080 \
-  your-registry/takota-api:v1.0.0
-```
-
-#### Step 4: Setup SSL/TLS
-
-```bash
-# Use reverse proxy (nginx/traefik) for SSL termination
-# Or configure with Let's Encrypt certificates
-```
-
-#### Step 5: Configure Backups
-
-```bash
-# Setup PostgreSQL backups
-# Setup Redis persistence
-# Setup S3 lifecycle policies
-```
-
-**For detailed deployment guide, see [BUILD.md](./docs/BUILD.md)**
+**For detailed deployment guide, including SSL setup, backup, monitoring, see:**
+- **[DEPLOYMENT_PRODUCTION.md](DEPLOYMENT_PRODUCTION.md)** - Complete deployment guide
 
 ---
 
@@ -889,16 +862,12 @@ docker-compose logs -f minio
 
 ## 📚 Documentation
 
-Comprehensive documentation is available in the `docs/` folder:
-
-- **[API_DOCS.md](./docs/API_DOCS.md)** - Complete API reference
-- **[DB_SCHEMA.md](./docs/DB_SCHEMA.md)** - Database schema details
-- **[TECH_FRAMEWORK.md](./docs/TECH_FRAMEWORK.md)** - Technology stack
-- **[TESTING.md](./docs/TESTING.md)** - Testing procedures
-- **[BUILD.md](./docs/BUILD.md)** - Build & deployment
-- **[PROJECT_SUMMARY.md](./docs/PROJECT_SUMMARY.md)** - Architecture overview
-- **[TEST_REPORT.md](./docs/TEST_REPORT.md)** - Test results
-- **[DEPLOYMENT_STATUS.md](./docs/DEPLOYMENT_STATUS.md)** - Current status
+| Document | Description |
+|----------|-------------|
+| **[README.md](README.md)** | Project overview & quick start |
+| **[QUICK_START_DEV.md](QUICK_START_DEV.md)** | Development setup guide |
+| **[DEPLOYMENT_PRODUCTION.md](DEPLOYMENT_PRODUCTION.md)** | Production deployment guide |
+| **[CHANGELOG.md](CHANGELOG.md)** | Version history |
 
 ---
 

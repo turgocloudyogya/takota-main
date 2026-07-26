@@ -13,6 +13,8 @@
 bin/
 dist/
 build/
+takota-backend
+takota-api
 
 # Test binary
 *.test

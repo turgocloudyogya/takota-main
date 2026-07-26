@@ -18,9 +18,8 @@ All notable changes to the Takota project will be documented in this file.
 
 - **Backend Components for PDF** 🆕
   - `internal/models/pdf_template.go` - PDF data structures
-  - `internal/utils/pdf_generator.go` - HTML to PDF converter using chromedp
+  - `internal/utils/pdf_generator.go` - HTML to PDF converter
   - `internal/controllers/export_controller.go` - ExportAttendancePDF handler
-  - Dependency: `chromedp v0.9.3`
 
 - **Project Integration** 🔄
   - Unified project structure: backend root + `web/` frontend
@@ -144,8 +143,6 @@ Update Base URL in admin settings:
 
 ### v1.1.0
 - Frontend folder moved from `takota-frontend/takota-frontend/` to `web/`
-- New dependency required: chromedp (run `go mod tidy`)
-- Chrome/Chromium must be installed for PDF generation
 
 ---
 
@@ -172,7 +169,6 @@ Update Base URL in admin settings:
 ## Technical Debt & Known Issues
 
 ### Current Issues
-- [ ] PDF generation requires Chrome/Chromium installed
 - [ ] Large date ranges (> 1 month) may timeout on PDF generation
 - [ ] No pagination for very large student lists in PDF
 
@@ -189,7 +185,7 @@ Update Base URL in admin settings:
 
 - Backend Development: Go + Gin + GORM
 - Frontend Development: React + Vite + HeroUI
-- PDF Integration: chromedp + Go html/template
+- PDF Integration: Client-side PDF generation
 - Project Integration: Unified structure & documentation
 
 ---
