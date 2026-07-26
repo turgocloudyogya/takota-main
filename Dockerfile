@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Build Frontend
 # ============================================
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/web
 
@@ -9,13 +9,15 @@ WORKDIR /app/web
 COPY web/package*.json ./
 
 # Install dependencies (including devDependencies for build)
-RUN npm ci
+# Use --legacy-peer-deps in case of peer dependency conflicts
+RUN npm ci || npm install --legacy-peer-deps
 
 # Copy frontend source
 COPY web/ ./
 
 # Build frontend for production
-RUN npm run build
+# Set NODE_OPTIONS to increase memory if needed
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Verify build output exists
 RUN ls -la dist/ && echo "Frontend build successful"
