@@ -55,8 +55,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -a -installsuffix cgo \
     -o takota-api ./cmd/api
 
-# Verify binary is built
-RUN ls -lh takota-api && file takota-api
+# Verify binary is built and executable
+RUN ls -lh takota-api && test -x takota-api && echo "✓ Binary built successfully"
 
 # ============================================
 # Stage 3: Final Production Image
