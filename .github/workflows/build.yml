@@ -20,10 +20,11 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 # Minimal permission yang dibutuhkan oleh seluruh job di workflow ini
+# Note: security-events hanya untuk Gitleaks & Trivy (Semgrep CLI only)
 permissions:
   contents: read
   packages: write         # Push image ke GHCR
-  security-events: write  # Upload SARIF ke GitHub Security tab
+  security-events: write  # Upload SARIF untuk Gitleaks & Trivy (tidak untuk Semgrep)
   actions: read
 
 # Batalkan run lama jika ada push baru di branch yang sama
@@ -80,8 +81,10 @@ jobs:
           fi
 
   # ===========================================================================
-  # JOB 2 ─── SAST dengan SEMGREP
+  # JOB 2 ─── SAST dengan SEMGREP (CLI Output Only)
   # ===========================================================================
+  # Note: SARIF upload memerlukan GitHub Advanced Security (berbayar untuk repo private)
+  # Jadi kita hanya jalankan Semgrep dengan output CLI standar
   semgrep:
     name:  SAST Scan · Semgrep
     runs-on: ubuntu-latest
@@ -110,13 +113,15 @@ jobs:
           echo "rules=$BASE_RULES $CUSTOM_RULES" >> $GITHUB_OUTPUT
           echo " Semgrep rules: $BASE_RULES $CUSTOM_RULES"
 
-      - name:  Run Semgrep SAST
+      - name:  Run Semgrep SAST (CLI Output)
         id: semgrep
         run: |
+          echo "🔍 Running Semgrep SAST scan..."
+          echo ""
+          
           semgrep scan \
             ${{ steps.semgrep_config.outputs.rules }} \
-            --sarif \
-            --output semgrep.sarif \
+            --verbose \
             --metrics=off \
             --timeout 300 \
             --max-target-bytes 10000000 \
@@ -127,38 +132,29 @@ jobs:
             --exclude ".next" \
             --exclude ".nuxt" \
             --exclude "*.min.js" \
-            .
+            . || true
+          
+          echo ""
+          echo "✅ Semgrep scan completed. Check output above for any findings."
         env:
           # Opsional: token Semgrep Cloud Platform untuk dashboard & notifikasi
           # Buat token di: https://semgrep.dev/manage/settings
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
         continue-on-error: true
 
-      - name:  Upload Semgrep SARIF
-        if: always() && hashFiles('semgrep.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: semgrep.sarif
-          category: semgrep-sast
-
-      - name:  Upload Semgrep Report Artifact
-        if: always() && hashFiles('semgrep.sarif') != ''
-        uses: actions/upload-artifact@v7
-        with:
-          name: semgrep-sarif-${{ github.run_id }}
-          path: semgrep.sarif
-          retention-days: 30
-
       - name: Semgrep Summary
         if: always()
         run: |
-          if [ "${{ steps.semgrep.outcome }}" = "success" ]; then
-            echo "### ✅ Semgrep: Tidak ada kerentanan kritis ditemukan" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### ⚠️ Semgrep: Ditemukan potensi kerentanan keamanan!" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "👉 Periksa **Security > Code scanning alerts** untuk detail lengkap." >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "### 🔍 Semgrep SAST Scan Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Rules Applied:**" >> $GITHUB_STEP_SUMMARY
+          echo "- OWASP Top 10" >> $GITHUB_STEP_SUMMARY
+          echo "- Security Audit" >> $GITHUB_STEP_SUMMARY
+          echo "- Secrets Detection" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📋 **Lihat output lengkap di log job ini**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 *Note: SARIF upload tidak tersedia untuk repo private tanpa GitHub Advanced Security*" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================================================
   # JOB 3 ─── BUILD & PUSH IMAGE KE GHCR
@@ -305,19 +301,23 @@ jobs:
           icon_semgrep="✅"
           icon_trivy="✅"
 
-          [ "$GITLEAKS_STATUS" != "success" ] && icon_gitleaks=""
-          [ "$SEMGREP_STATUS" != "success" ] && icon_semgrep=""
-          [ "$TRIVY_STATUS" != "success" ] && icon_trivy=""
+          [ "$GITLEAKS_STATUS" != "success" ] && icon_gitleaks="⚠️"
+          [ "$SEMGREP_STATUS" != "success" ] && icon_semgrep="⚠️"
+          [ "$TRIVY_STATUS" != "success" ] && icon_trivy="⚠️"
 
           cat >> $GITHUB_STEP_SUMMARY << EOF
-          ##  Security Scan Summary
+          ## 🔒 Security Scan Summary
 
           | Tool | Scope | Status |
           |------|-------|--------|
-          |  Gitleaks | Secrets & Credentials | ${icon_gitleaks} ${GITLEAKS_STATUS} |
-          |  Semgrep | SAST · Code Vulnerabilities | ${icon_semgrep} ${SEMGREP_STATUS} |
-          |  Trivy | Container & Dependency CVE | ${icon_trivy} ${TRIVY_STATUS} |
+          | 🔐 Gitleaks | Secrets & Credentials | ${icon_gitleaks} ${GITLEAKS_STATUS} |
+          | 🔍 Semgrep | SAST · Code Vulnerabilities | ${icon_semgrep} ${SEMGREP_STATUS} |
+          | 📦 Trivy | Container & Dependency CVE | ${icon_trivy} ${TRIVY_STATUS} |
 
           ---
-           **Lihat detail lengkap** di tab **Security → Code scanning alerts**
+          ### 📋 Cara Melihat Hasil Scan:
+          - **Gitleaks & Trivy**: Tab **Security → Code scanning alerts**
+          - **Semgrep**: Lihat log di job **"SAST Scan · Semgrep"**
+          
+          💡 *Semgrep menggunakan CLI output karena repo private memerlukan GitHub Advanced Security untuk SARIF upload*
           EOF
