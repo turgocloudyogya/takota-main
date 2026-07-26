@@ -172,6 +172,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      # Setup Docker Buildx (required for cache and multi-platform)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to the container registry
         uses: docker/login-action@v4
         with:
