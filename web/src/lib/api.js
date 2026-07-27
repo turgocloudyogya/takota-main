@@ -1,6 +1,6 @@
 // API client for user pages (Main, Attendance, Absence, Photos)
 
-const API_BASE = localStorage.getItem('api-base-url') || 'http://localhost:8080'
+const API_BASE = localStorage.getItem('api-base-url') || ''
 
 function getToken() {
   try {

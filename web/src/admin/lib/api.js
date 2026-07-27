@@ -6,7 +6,7 @@
 import { getToken, setToken, clearSession } from './session.js'
 
 const BASE_URL_KEY = 'takota_api_base_url'
-const DEFAULT_BASE_URL = 'http://localhost:8080'
+const DEFAULT_BASE_URL = ''
 
 export function getBaseUrl() {
   try {

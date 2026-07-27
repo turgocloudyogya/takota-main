@@ -5,7 +5,7 @@ import { Icon } from '@gravity-ui/uikit'
 import { At, Key, Eye, EyeSlash, Person } from '@gravity-ui/icons'
 
 // Import API and session utilities from admin
-const API_BASE = localStorage.getItem('api-base-url') || 'http://localhost:8080'
+const API_BASE = localStorage.getItem('api-base-url') || ''
 
 async function loginAPI(username, password) {
   const response = await fetch(`${API_BASE}/api/auth`, {

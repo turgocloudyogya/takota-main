@@ -5,7 +5,7 @@ import { Icon } from '@gravity-ui/uikit'
 import { Key, Eye, EyeSlash, ShieldKeyhole } from '@gravity-ui/icons'
 
 const MIN_PASSWORD_LENGTH = 6 // Changed from 8 to match backend requirement
-const API_BASE = localStorage.getItem('api-base-url') || 'http://localhost:8080'
+const API_BASE = localStorage.getItem('api-base-url') || ''
 
 async function changePasswordAPI(currentPassword, newPassword, repeatPassword) {
   const token = localStorage.getItem('takota_admin_token') || localStorage.getItem('takota_token')
