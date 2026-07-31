@@ -1,117 +1,57 @@
-# ============================================
-# Stage 1: Build Frontend
-# ============================================
-FROM node:20-alpine AS frontend-builder
+# =========================================================
+# Takota - Multi-stage Dockerfile
+# Builds the React frontend and Go backend, then packages
+# both into a single Nginx image that serves the frontend
+# and reverse-proxies /api/* to the backend.
+# =========================================================
 
-WORKDIR /app/web
+# ---------- Stage 1: Build frontend ----------
+FROM node:22-alpine AS frontend-build
 
-# Copy frontend package files first for better layer caching
-COPY web/package*.json ./
+WORKDIR /app/frontend
 
-# Install dependencies (including devDependencies for build)
-# Use --legacy-peer-deps in case of peer dependency conflicts
-RUN npm ci || npm install --legacy-peer-deps
+# Install dependencies first (better layer caching)
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
-# Copy frontend source
-COPY web/ ./
+# Copy source and build
+COPY frontend/ .
+RUN npm run build
 
-# Build frontend for production
-# Set NODE_OPTIONS to increase memory if needed
-RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+# ---------- Stage 2: Build backend ----------
+FROM golang:1.25-alpine AS backend-build
 
-# Verify build output exists
-RUN ls -la dist/ && echo "Frontend build successful"
-
-# ============================================
-# Stage 2: Build Backend
-# ============================================
-FROM golang:1.23-alpine AS backend-builder
+WORKDIR /app/backend
 
 # Install build dependencies
-RUN apk add --no-cache git gcc musl-dev
+RUN apk add --no-cache git
 
-# Set GOTOOLCHAIN to auto untuk allow Go version lebih tinggi
-ENV GOTOOLCHAIN=auto
-
-# Build arguments
-ARG VERSION=dev
-ARG BUILD_DATE=unknown
-
-WORKDIR /app
-
-# Copy go mod files first for better layer caching
-COPY go.mod go.sum ./
+# Download modules first (better layer caching)
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-# Copy source code
-COPY cmd/ ./cmd/
-COPY internal/ ./internal/
-COPY pkg/ ./pkg/
+# Copy source and build a static binary
+COPY backend/ .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /out/takota-api ./cmd/api
 
-# Build the application with optimizations
-# Note: Removed GOARCH=amd64 to build for target platform (multi-arch support)
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_DATE}" \
-    -a -installsuffix cgo \
-    -o takota-api ./cmd/api
+# ---------- Stage 3: Final image (Nginx + backend) ----------
+FROM nginx:1.27-alpine
 
-# Verify binary is built and executable
-RUN ls -lh takota-api && test -x takota-api && echo "✓ Binary built successfully"
+RUN apk add --no-cache ca-certificates tzdata
 
-# ============================================
-# Stage 3: Final Production Image
-# ============================================
-FROM alpine:latest
-
-# Build arguments
-ARG VERSION=dev
-ARG BUILD_DATE=unknown
-
-# Add metadata labels
-LABEL maintainer="Takota Team"
-LABEL org.opencontainers.image.title="Takota Attendance System"
-LABEL org.opencontainers.image.description="Production-ready attendance management system"
-LABEL org.opencontainers.image.version="${VERSION}"
-LABEL org.opencontainers.image.created="${BUILD_DATE}"
-
-# Install runtime dependencies
-RUN apk --no-cache add \
-    ca-certificates \
-    tzdata \
-    wget \
-    && rm -rf /var/cache/apk/*
-
-# Create non-root user
-RUN addgroup -g 1000 takota && \
-    adduser -D -u 1000 -G takota takota
-
-# Set working directory
 WORKDIR /app
 
-# Copy binary from backend builder
-COPY --from=backend-builder --chown=takota:takota /app/takota-api .
+# Nginx config (serves frontend + proxies /api to backend)
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
-# Copy frontend dist from frontend builder
-COPY --from=frontend-builder --chown=takota:takota /app/web/dist ./web/dist
+# Frontend static files
+COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 
-# Copy templates directory (required for PDF export)
-COPY --chown=takota:takota templates/ ./templates/
+# Backend binary
+COPY --from=backend-build /out/takota-api /usr/local/bin/takota-api
 
-# Copy .env.example for reference (optional)
-COPY --chown=takota:takota .env.example .
+# Expose HTTP port
+EXPOSE 80
 
-# Make binary executable
-RUN chmod +x ./takota-api
-
-# Switch to non-root user
-USER takota
-
-# Expose port
-EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
-
-# Run the application
-CMD ["./takota-api"]
+# Start the backend in the background, then Nginx in the foreground
+CMD ["sh", "-c", "/usr/local/bin/takota-api & exec nginx -g 'daemon off;'"]

@@ -1,111 +1,29 @@
 # Git
 .git
 .gitignore
-.github
 
-# Documentation
-*.md
-docs/
-DOCS_INDEX.md
-README.md
-CHANGELOG.md
-LICENSE
+# Secrets — never send to the build context
+**/.env
+**/.env.*
+!**/.env.example
 
-# Environment files
-.env
-.env.local
-.env.*.local
+# Node
+frontend/node_modules
+frontend/dist
+frontend/coverage
 
-# Development files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+# Go build artifacts
+backend/bin
+backend/vendor
 
-# Testing
-testing/
-test/
-*_test.go
-*.test
-coverage.txt
-coverage.out
-
-# Build artifacts (will be rebuilt in Docker)
-bin/
-dist/
-build/
-web/dist/
-web/node_modules/
-node_modules/
-
-# Logs
+# Logs & temp
 *.log
-logs/
-*.tmp
+tmp
+temp
 
-# Docker files (not needed inside image)
-Dockerfile
-Dockerfile.*
-docker-compose*.yml
-.dockerignore
+# Docs
+*.md
+nginx/README.md
 
-# CI/CD
-.github/
-
-# Scripts (optional, bisa diinclude jika diperlukan)
-scripts/
-*.sh
-
-# Temporary files
-tmp/
-temp/
-*.pid
-*.seed
-*.cache
-
-# IDE specific
-*.iml
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# OS files
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-
-# Backup files
-*.bak
-*.backup
-*.old
-
-# Database files (should be in volumes)
-*.db
-*.sqlite
-*.sqlite3
-
-# Makefile (not needed in production image)
-Makefile
-
-# Frontend specific
-web/.next/
-web/.nuxt/
-web/.cache/
-web/.vite/
-web/.turbo/
-web/coverage/
-web/storybook-static/
-
-# Go specific
-vendor/
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+# OS
+.DS_Store
