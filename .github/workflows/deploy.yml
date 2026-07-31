@@ -37,7 +37,7 @@ jobs:
 
       - name: Compute lowercase image reference
         run: |
-          echo "IMAGE=ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]' >> "$GITHUB_ENV"
+          echo "IMAGE=$(echo 'ghcr.io/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       # ---------- Build (multi-stage: frontend + backend) ----------
       - name: Build image (load into local docker for testing)
