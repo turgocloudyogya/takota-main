@@ -152,8 +152,15 @@ export async function login(username, password) {
   return token
 }
 
-export function logout() {
-  clearSession()
+export async function logout() {
+  try {
+    await request('/api/auth/logout', { method: 'POST' })
+  } catch {
+    // Best-effort: even if the server is unreachable, always clear the local
+    // session so the user isn't locked in a logout loop.
+  } finally {
+    clearSession()
+  }
 }
 
 export async function changePassword({ currentPassword, newPassword, repeatPassword }) {

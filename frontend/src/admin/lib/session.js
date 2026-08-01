@@ -31,6 +31,17 @@ export function setToken(token) {
 
 export function clearSession() {
   setToken(null)
+  // The login flow stores the token under multiple keys; clearing only
+  // takota_admin_token lets AuthGate find the still-valid token via
+  // takota_token and bounce the user back in (logout loop). Remove them all.
+  const legacyKeys = ['takota_token', 'token', 'takota-username', 'takota-role']
+  for (const key of legacyKeys) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      // ignore storage failures
+    }
+  }
 }
 
 /**

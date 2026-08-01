@@ -54,7 +54,7 @@ export default function Login() {
       localStorage.setItem('takota-role', data.login_as)
 
       // Check if password change is required
-      const redirectPath = data.redirect || (data.login_as === 'admin' ? '/dash' : '/main')
+      const redirectPath = data.redirect || (data.login_as === 'admin' ? '/admin' : '/main')
       
       if (redirectPath === '/chpw') {
         toast.info('Anda harus mengganti password terlebih dahulu.')

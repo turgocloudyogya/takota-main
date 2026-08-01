@@ -144,8 +144,8 @@ src/
 `App.jsx` defines the routes. An `AuthGate` component validates the JWT on every route change by calling `GET /api/all/info`:
 
 - Invalid session → `clearSession()` and redirect to `/` (login).
-- Valid session on `/` → forwarded to the backend-provided `redirect_home` (`/main` for users, `/dash` for admins).
-- `redirect_home` values are enforced server-side by the `RequireRole` middlewares, so an admin hitting `/main` gets pushed to `/dash` by the gate.
+- Valid session on `/` → forwarded to the backend-provided `redirect_home` (`/main` for users, `/admin` for admins).
+- `redirect_home` values are enforced server-side by the `RequireRole` middlewares, so an admin hitting `/main` gets pushed to `/admin` by the gate.
 
 ### Home (Main.jsx)
 

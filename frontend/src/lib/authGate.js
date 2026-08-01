@@ -4,7 +4,7 @@
 // still valid. On every route change the gate re-checks it (no polling):
 //   - token missing / invalid  -> session cleared, user lands on "/"
 //   - token valid and user is on "/" -> redirected to data.redirect_home
-//     (the backend returns "/main" for users and "/dash" for admins)
+//     (the backend returns "/main" for users and "/admin" for admins)
 //   - network / parse problems  -> left alone (no forced logout)
 
 const API_BASE =
@@ -65,6 +65,6 @@ export async function checkAuth() {
   return {
     valid: true,
     role: json.data.role,
-    redirectHome: json.data.redirect_home || (json.data.role === 'admin' ? '/dash' : '/main'),
+    redirectHome: json.data.redirect_home || (json.data.role === 'admin' ? '/admin' : '/main'),
   }
 }

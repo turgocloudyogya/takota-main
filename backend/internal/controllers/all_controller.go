@@ -99,7 +99,7 @@ func (ctrl *AllController) GetInfo(c *gin.Context) {
 	// Build response
 	redirectHome := "/main"
 	if user.Type == "admin" {
-		redirectHome = "/dash"
+		redirectHome = "/admin"
 	}
 
 	utils.RespondSuccess(c, http.StatusOK, InfoResponse{

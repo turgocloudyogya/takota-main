@@ -136,7 +136,7 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 	// Determine redirect
 	redirect := "/main"
 	if user.Type == "admin" {
-		redirect = "/dash"
+		redirect = "/admin"
 	}
 	if user.ChangeAsLogin {
 		redirect = "/chpw"
@@ -233,7 +233,7 @@ func (ctrl *AuthController) ChangePassword(c *gin.Context) {
 	// Determine redirect
 	redirect := "/main"
 	if user.Type == "admin" {
-		redirect = "/dash"
+		redirect = "/admin"
 	}
 
 	utils.RespondSuccess(c, http.StatusOK, LoginResponse{
@@ -241,4 +241,41 @@ func (ctrl *AuthController) ChangePassword(c *gin.Context) {
 		LoginAs:  user.Type,
 		Redirect: redirect,
 	})
+}
+
+// Logout invalidates the current session by rotating the user's auth_id,
+// so any previously issued JWT can no longer pass AuthMiddleware validation.
+func (ctrl *AuthController) Logout(c *gin.Context) {
+	ctx := context.Background()
+
+	// Get user from context (set by AuthMiddleware)
+	userID, _ := c.Get("user_id")
+	uid, err := uuid.Parse(userID.(string))
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, "JWT not valid", utils.ErrTokenInvalid)
+		return
+	}
+
+	// Get user from database
+	var user models.User
+	if err := ctrl.DB.Where("id = ?", uid).First(&user).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "User not found", utils.ErrUserNotFound)
+		return
+	}
+
+	// Rotate auth_id to invalidate all existing tokens
+	authID := jwtpkg.GenerateAuthID()
+	user.AuthID = &authID
+	if err := ctrl.DB.Save(&user).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to update user", "DB_ERROR")
+		return
+	}
+
+	// Update Redis if enabled
+	if redis.Enabled {
+		expiry := time.Duration(ctrl.Config.JWT.ExpiryHours) * time.Hour
+		redis.SetAuthID(ctx, user.ID.String(), authID, expiry)
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{"message": "Logout successful"})
 }
