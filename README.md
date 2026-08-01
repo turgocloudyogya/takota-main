@@ -7,7 +7,7 @@ The project is a monorepo with two parts:
 - `frontend/`: React application built with Vite, Tailwind CSS, Gravity UI, and Hero UI.
 - `backend/`: Go API built with Gin, GORM, PostgreSQL, Redis, and S3 compatible storage.
 
-In production, a single Nginx container serves the built frontend and reverse-proxies `/api/*` requests to the Go backend.
+In production, a single Nginx container serves the built frontend and reverse-proxies `/api/*` requests to the Go backend. A supervisor entrypoint (`docker/entrypoint.sh`) runs both processes together: if the backend or Nginx dies, the other is stopped and the container exits with a non-zero status so the orchestrator restarts the whole thing instead of serving a broken half-started app. A container `HEALTHCHECK` hits `/health` through Nginx, so the image only reports healthy when both Nginx and the API respond.
 
 ## Tech Stack
 
@@ -89,6 +89,7 @@ docker run -d --name takota-minio \
 
 ```bash
 docker run -d --name takota \
+  --restart unless-stopped \
   -p 80:80 \
   -e PORT=8080 \
   -e DB_HOST=host.docker.internal \
@@ -160,6 +161,7 @@ services:
     build: .
     ports:
       - "80:80"
+    restart: unless-stopped
     depends_on:
       - db
       - minio
