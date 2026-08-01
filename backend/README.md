@@ -200,8 +200,10 @@ choco install golang postgresql redis
 createdb takota_db
 createuser takota --password
 
-# Run migrations
+# Run migrations (optional - the app also runs embedded migrations automatically on startup)
 psql -U takota -d takota_db -f migrations/001_initial_schema.sql
+psql -U takota -d takota_db -f migrations/002_add_sign_status.sql
+psql -U takota -d takota_db -f migrations/003_add_display_address.sql
 ```
 
 #### 3. Setup Redis
@@ -373,6 +375,7 @@ Create `.env` file in `src/` directory with the following variables:
 PORT=8080                        # API port (default: 8080)
 APP_ENV=development              # Environment: development/production
 GIN_MODE=debug                   # Gin logging: debug/release
+TIMEZONE_APP=Asia/Jakarta        # App timezone for greetings/timestamps (fallback: TIMEZONE, then UTC)
 ```
 
 #### Database Configuration
@@ -506,6 +509,7 @@ JWT_SECRET=generate-strong-random-key
 DB_SSL_MODE=require
 S3_ENDPOINT=aws.s3.amazonaws.com  # or your S3 provider
 REDIS_URL=redis://production-redis-host:6379
+TIMEZONE_APP=Asia/Jakarta         # choose the timezone of your users
 ```
 
 #### Step 2: Build Docker Images
@@ -633,7 +637,10 @@ src/
 │   └── jwt/
 │       └── jwt.go                     # JWT utilities
 ├── migrations/
-│   └── 001_initial_schema.sql         # Database schema
+│   ├── migrations.go                   # Embeds *.sql so migrations run automatically
+│   ├── 001_initial_schema.sql          # Database schema + seed users
+│   ├── 002_add_sign_status.sql         # sign_status column
+│   └── 003_add_display_address.sql     # display_address column (reverse geocoding)
 ├── testing/                           # Test files
 │   ├── test_comprehensive_final.sh
 │   ├── test_docker.sh

@@ -218,7 +218,12 @@ export default function AdminAttendance() {
                     </td>
                     <td className="px-4 py-3 text-neutral-700">{formatDateTime(row.dateRaw)}</td>
                     <td className="px-4 py-3 text-neutral-700">
-                      {row.location ? (
+                      {row.displayAddress ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Icon data={MapPin} size={13} className="text-neutral" />
+                          {row.displayAddress}
+                        </span>
+                      ) : row.location ? (
                         <span className="inline-flex items-center gap-1">
                           <Icon data={MapPin} size={13} className="text-neutral" />
                           {row.location}

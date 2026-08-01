@@ -111,9 +111,11 @@ docker run -d --name takota \
 
 > Linux note: add `--add-host=host.docker.internal:host-gateway` to the run command so the container can reach services on the host machine.
 
-### 4. Apply migrations (first run only)
+### 4. Apply migrations (automatic)
 
-The schema is created automatically by GORM on startup. For the default admin and user accounts, apply the migration files once:
+Migrations run automatically: the backend embeds the SQL files from `backend/migrations/` and applies any that have not been applied yet on every startup (tracked in the `schema_migrations` table). It waits for PostgreSQL to be reachable first, so no manual step is required.
+
+If you prefer to apply them manually (first run only):
 
 ```bash
 docker run --rm -i \
@@ -125,6 +127,11 @@ docker run --rm -i \
   -e PGPASSWORD=takota \
   postgres:16-alpine psql -h host.docker.internal -U takota -d takota_db \
   < backend/migrations/002_add_sign_status.sql
+
+docker run --rm -i \
+  -e PGPASSWORD=takota \
+  postgres:16-alpine psql -h host.docker.internal -U takota -d takota_db \
+  < backend/migrations/003_add_display_address.sql
 ```
 
 ### 5. Access the application
@@ -181,6 +188,7 @@ services:
       S3_USE_PATH_STYLE_ENDPOINT: "true"
       S3_REGION: us-east-1
       JWT_SECRET: change-this-secret
+      TIMEZONE_APP: Asia/Jakarta
 ```
 
 Then run:
@@ -189,7 +197,7 @@ Then run:
 docker compose up -d --build
 ```
 
-The migration files are mounted into the database container, so the schema and seed users are applied automatically on first start.
+The backend applies the embedded SQL migrations automatically once PostgreSQL is reachable, so the schema and seed users are created on first start.
 
 ## Configuration
 
@@ -207,6 +215,7 @@ All backend settings are read from environment variables. Copy `backend/.env.exa
 | `S3_USE_SSL`, `S3_USE_PATH_STYLE_ENDPOINT`, `S3_REGION` | S3 connection settings | - |
 | `JWT_SECRET` | Token signing secret | - |
 | `JWT_EXPIRY_HOURS` | Token lifetime in hours | `24` |
+| `TIMEZONE_APP` | App timezone for greetings/timestamps (falls back to `TIMEZONE`, then UTC) | `UTC` |
 
 ## Local Development (without Docker)
 

@@ -53,16 +53,17 @@ END;
 $$ language 'plpgsql';
 
 -- Trigger for users table
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger for attendance table
+DROP TRIGGER IF EXISTS update_attendance_updated_at ON attendance;
 CREATE TRIGGER update_attendance_updated_at BEFORE UPDATE ON attendance
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert default admin user (password: testing123)
 -- Password hash generated using bcrypt with cost 10
--- Insert default admin user (password: testing123)
 INSERT INTO users (id, username, password, nickname, callname, type, change_as_login)
 VALUES (
     uuid_generate_v4(),

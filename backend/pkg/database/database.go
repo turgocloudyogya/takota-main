@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -32,26 +33,31 @@ func InitDB(cfg *config.Config) error {
 		gormConfig.Logger = logger.Default.LogMode(logger.Error)
 	}
 
-	// Connect to database
-	DB, err = gorm.Open(postgres.Open(dsn), gormConfig)
-	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// Get underlying SQL DB
-	sqlDB, err := DB.DB()
-	if err != nil {
-		return fmt.Errorf("failed to get database instance: %w", err)
-	}
-
-	// Set connection pool settings
-	sqlDB.SetMaxOpenConns(cfg.Database.MaxConnections)
-	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-
-	// Test connection
-	if err := sqlDB.Ping(); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
+	// Connect to database with retry so the container can start before
+	// Postgres is ready and then run migrations automatically once it is up.
+	const maxAttempts = 15
+	connectAttempts := 0
+	for {
+		connectAttempts++
+		DB, err = gorm.Open(postgres.Open(dsn), gormConfig)
+		if err == nil {
+			var sqlDB *sql.DB
+			sqlDB, err = DB.DB()
+			if err == nil {
+				err = sqlDB.Ping()
+				if err == nil {
+					sqlDB.SetMaxOpenConns(cfg.Database.MaxConnections)
+					sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+					sqlDB.SetConnMaxLifetime(time.Hour)
+					break
+				}
+			}
+		}
+		if connectAttempts >= maxAttempts {
+			return fmt.Errorf("failed to connect to database after %d attempts: %w", maxAttempts, err)
+		}
+		log.Printf("⚠ Database not ready (attempt %d/%d), retrying in 3s...", connectAttempts, maxAttempts)
+		time.Sleep(3 * time.Second)
 	}
 
 	log.Println("✓ Database connected successfully")

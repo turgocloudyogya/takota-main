@@ -5,7 +5,25 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/carakan/takota/internal/config"
 )
+
+// appLocation returns the timezone configured via TIMEZONE_APP/TIMEZONE,
+// falling back to UTC when it is empty or invalid.
+func appLocation() *time.Location {
+	if config.GlobalConfig != nil && config.GlobalConfig.App.Timezone != "" {
+		if loc, err := time.LoadLocation(config.GlobalConfig.App.Timezone); err == nil {
+			return loc
+		}
+	}
+	return time.UTC
+}
+
+// Now returns the current time in the configured application timezone.
+func Now() time.Time {
+	return time.Now().In(appLocation())
+}
 
 // HashPassword hashes a password using bcrypt
 func HashPassword(password string) (string, error) {
@@ -19,9 +37,9 @@ func CheckPasswordHash(password, hash string) bool {
 	return err == nil
 }
 
-// GetGreetingTime returns greeting based on server time
+// GetGreetingTime returns greeting based on the configured app timezone
 func GetGreetingTime() string {
-	hour := time.Now().Hour()
+	hour := Now().Hour()
 	
 	if hour >= 5 && hour < 12 {
 		return "morning"

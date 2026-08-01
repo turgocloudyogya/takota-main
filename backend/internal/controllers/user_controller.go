@@ -36,8 +36,9 @@ type GreetingWidget struct {
 }
 
 type TodayAttendance struct {
-	Type      string    `json:"type"`
-	Timestamp time.Time `json:"timestamp"`
+	Type           string    `json:"type"`
+	Timestamp      time.Time `json:"timestamp"`
+	DisplayAddress *string   `json:"display_address"` // reverse-geocoded location label
 }
 
 type AbsenceItem struct {
@@ -89,8 +90,9 @@ func (ctrl *UserController) Home(c *gin.Context) {
 		First(&attendance).Error
 	if err == nil {
 		todayAttendance = &TodayAttendance{
-			Type:      attendance.Type,
-			Timestamp: attendance.CreatedAt,
+			Type:           attendance.Type,
+			Timestamp:      attendance.CreatedAt,
+			DisplayAddress: attendance.DisplayAddress,
 		}
 	}
 
@@ -194,17 +196,24 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 	// Generate Google Maps embed
 	gmapsEmbed := utils.GenerateGoogleMapsEmbed(req.Latitude, req.Longitude)
 
+	// Resolve human-readable address (best-effort, does not block submission)
+	displayAddress, geoErr := utils.ReverseGeocode(req.Latitude, req.Longitude)
+	if geoErr != nil {
+		displayAddress = nil
+	}
+
 	// Create attendance record
 	attendance := models.Attendance{
-		ID:         uuid.New(),
-		UserID:     uid,
-		Type:       "attendance",
-		Latitude:   &req.Latitude,
-		Longitude:  &req.Longitude,
-		Photo:      photoPath,
-		GmapsEmbed: &gmapsEmbed,
-		CreatedAt:  time.Now().UTC(),
-		UpdatedAt:  time.Now().UTC(),
+		ID:             uuid.New(),
+		UserID:         uid,
+		Type:           "attendance",
+		Latitude:       &req.Latitude,
+		Longitude:      &req.Longitude,
+		Photo:          photoPath,
+		GmapsEmbed:     &gmapsEmbed,
+		DisplayAddress: displayAddress,
+		CreatedAt:      time.Now().UTC(),
+		UpdatedAt:      time.Now().UTC(),
 	}
 
 	if err := ctrl.DB.Create(&attendance).Error; err != nil {

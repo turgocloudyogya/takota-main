@@ -7,6 +7,13 @@ import { getUserHome } from '../lib/api.js'
 import AbsenceCard from '../components/AbsenceCard.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
 
+const GREETING_LABELS = {
+  morning: 'Good Morning',
+  afternoon: 'Good Afternoon',
+  evening: 'Good Evening',
+  night: 'Good Night',
+}
+
 function useGreeting() {
   return useMemo(() => {
     const hour = new Date().getHours()
@@ -15,6 +22,11 @@ function useGreeting() {
     if (hour < 18) return 'Good Evening'
     return 'Good Night'
   }, [])
+}
+
+// Map the backend greeting time (computed in the server timezone) to a label
+function greetingFromTime(time) {
+  return GREETING_LABELS[time] || ''
 }
 
 function formatDate(timestamp) {
@@ -34,7 +46,7 @@ function formatFullDate(timestamp) {
 
 export default function Main() {
   const navigate = useNavigate()
-  const greeting = useGreeting()
+  const [greeting, setGreeting] = useState(useGreeting())
   const [sheetOpen, setSheetOpen] = useState(false)
 
   const [loading, setLoading] = useState(true)
@@ -55,20 +67,27 @@ export default function Main() {
         const response = await getUserHome()
         const data = response?.data || response
         
-        // Set user name from greeting_widget
+        // Set user name and greeting from the backend (timezone-aware)
         if (data.greeting_widget) {
           setUserName(data.greeting_widget.name || '')
+          const backendGreeting = greetingFromTime(data.greeting_widget.time)
+          if (backendGreeting) {
+            setGreeting(backendGreeting)
+          }
         }
         
         // Map today's attendance from API
         // Only show as "present" if type is "attendance", not "absence"
         if (data.today && data.today.type === 'attendance') {
           const timestamp = data.today.timestamp
+          const displayAddress = data.today.display_address
           setTodayStatus({
             date: formatDate(timestamp),
             status: 'present',
             title: `Present on ${formatFullDate(timestamp)}`,
-            subtitle: 'Location on Yogyakarta, Sleman', // TODO: Get from actual location data
+            subtitle: displayAddress
+              ? `Location on ${displayAddress}`
+              : 'Location on Yogyakarta, Sleman',
           })
         } else {
           setTodayStatus(null)
