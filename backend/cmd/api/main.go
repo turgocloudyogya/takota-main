@@ -103,6 +103,9 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		// Change password (auth required, no password change validation)
 		api.POST("/auth-chpw", middlewares.AuthMiddleware(db), authCtrl.ChangePassword)
 
+		// Logout (auth required, invalidates the session server-side)
+		api.POST("/auth/logout", middlewares.AuthMiddleware(db), authCtrl.Logout)
+
 		// User routes (auth required + user role + password changed)
 		user := api.Group("/user")
 		user.Use(middlewares.AuthMiddleware(db))

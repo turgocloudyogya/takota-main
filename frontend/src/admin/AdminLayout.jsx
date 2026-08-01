@@ -176,8 +176,8 @@ export default function AdminLayout() {
     return <Navigate to="/" replace />
   }
 
-  function handleLogout() {
-    api.logout()
+  async function handleLogout() {
+    await api.logout()
     navigate('/', { replace: true })
   }
 

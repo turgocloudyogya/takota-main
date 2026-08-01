@@ -66,9 +66,7 @@ export default function App() {
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/photos" element={<Photos />} />
 
-        {/* Backend redirect_home for admins is "/dash" */}
-        <Route path="/dash" element={<Navigate to="/admin/dashboard" replace />} />
-
+        {/* Backend redirect_home for admins is "/admin" (index redirects to /admin/dashboard) */}
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />

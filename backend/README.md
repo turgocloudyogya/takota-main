@@ -173,9 +173,9 @@ Redis:         localhost:6379
 ```bash
 curl -X POST http://localhost:8080/api/auth \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"testing123"}'
 
-# Response: {"token":"<JWT_TOKEN>","login_as":"admin","redirect":"/dash"}
+# Response: {"token":"<JWT_TOKEN>","login_as":"admin","redirect":"/admin"}
 ```
 
 #### 5. Stop Services
@@ -391,18 +391,17 @@ GET    /health                Health check
 
 ### Environment Variables
 
-Create `.env` file in `src/` directory with the following variables:
+All configuration is read from environment variables. A `.env` file is loaded automatically if present (see `.env.example` for the full template). Variables are grouped below by **required** and **optional**, with the code default where one exists.
 
-#### Server Configuration
+#### Required - Server
 
 ```env
 PORT=8080                        # API port (default: 8080)
 APP_ENV=development              # Environment: development/production
 GIN_MODE=debug                   # Gin logging: debug/release
-TIMEZONE_APP=Asia/Jakarta        # App timezone for greetings/timestamps (fallback: TIMEZONE, then UTC)
 ```
 
-#### Database Configuration
+#### Required - Database
 
 ```env
 DB_HOST=localhost                # PostgreSQL host
@@ -411,32 +410,31 @@ DB_USER=takota                   # Database user
 DB_PASSWORD=takota_password      # Database password
 DB_NAME=takota_db                # Database name
 DB_SSL_MODE=disable              # SSL mode: disable/require/verify-ca
-DB_MAX_CONNECTIONS=25            # Connection pool size
-DB_MAX_IDLE_CONNECTIONS=10       # Max idle connections
 ```
 
-#### Redis Configuration
+#### Required - JWT
 
 ```env
-REDIS_URL=redis://localhost:6379   # Redis connection URL (optional)
-REDIS_PASSWORD=                    # Redis password (if required)
-REDIS_DB=0                         # Redis database number
+JWT_SECRET=your-secret-key-change-in-production   # JWT signing secret
 ```
 
-#### S3/MinIO Configuration
+#### Required - S3/Object Storage
+
+`S3_ACCESS_KEY` and `S3_SECRET_KEY` are always required. `S3_ENDPOINT` and the SSL/path-style flags depend on the provider:
 
 ```env
+S3_ACCESS_KEY=minioadmin         # Access key (MinIO / AWS / R2)
+S3_SECRET_KEY=minioadmin         # Secret key
+S3_BUCKET_NAME=takota-bucket     # Storage bucket (default: takota-bucket)
+S3_REGION=us-east-1              # Region (default: us-east-1)
+
 # For Local MinIO (Development):
 S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
-S3_BUCKET_NAME=takota-bucket
 S3_USE_SSL=false
 S3_USE_PATH_STYLE_ENDPOINT=true
-S3_REGION=us-east-1
 
-# For AWS S3 (Production):
-# S3_ENDPOINT=https://s3.us-east-1.amazonaws.com
+# For AWS S3 (Production): leave S3_ENDPOINT empty (endpoint auto-detected from the bucket)
+# S3_ENDPOINT=
 # S3_USE_SSL=true
 # S3_USE_PATH_STYLE_ENDPOINT=false
 # Get credentials from AWS IAM
@@ -448,32 +446,66 @@ S3_REGION=us-east-1
 # See docs/S3_SETUP.md for detailed configuration
 ```
 
-#### JWT Configuration
+#### Optional - Server
 
 ```env
-JWT_SECRET=your-secret-key-change-in-production   # JWT signing secret
-JWT_EXPIRY_HOURS=24                               # Token expiry hours
+TIMEZONE_APP=Asia/Jakarta        # App timezone for greetings/timestamps
+TIMEZONE=Asia/Jakarta            # Fallback timezone when TIMEZONE_APP is unset (final fallback: UTC)
 ```
 
-#### Application Settings
+#### Optional - Database
 
 ```env
-MAX_LOGIN_ATTEMPTS=5               # Failed login attempts
-LOGIN_LOCK_DURATION_MINUTES=5      # Account lock duration
-MAX_ATTENDANCE_FILE_SIZE_MB=10     # Photo file size limit
-MAX_ABSENCE_FILE_SIZE_MB=50        # Document file size limit
+DB_MAX_CONNECTIONS=25            # Connection pool size (default: 25)
+DB_MAX_IDLE_CONNECTIONS=10       # Max idle connections (default: 10)
+DB_SSL_ENABLE=false              # Loaded by config, not yet used by the connection DSN
+DB_SSL_CA=                       # Loaded by config, not yet used by the connection DSN
+DB_SSL_CERT=                     # Loaded by config, not yet used by the connection DSN
+DB_SSL_KEY=                      # Loaded by config, not yet used by the connection DSN
+```
+
+#### Optional - Redis
+
+```env
+REDIS_URL=redis://localhost:6379   # Leave empty to disable Redis (falls back to PostgreSQL)
+REDIS_PASSWORD=                    # Redis password (if required)
+REDIS_DB=0                         # Redis database number
+```
+
+#### Optional - S3/Object Storage
+
+```env
+S3_PUBLIC_HOST=                    # Custom public host for preview URLs (e.g. http://localhost:9001)
+
+# CloudFront signed URLs (requires S3_USE_CLOUDFRONT=true):
+S3_USE_CLOUDFRONT=false
+CLOUDFRONT_DOMAIN=
+CLOUDFRONT_PRIVATE_KEY=
+CLOUDFRONT_PUBLIC_KEY_ID=
+```
+
+#### Optional - JWT & Application
+
+```env
+JWT_EXPIRY_HOURS=24               # Token expiry hours (default: 24)
+MAX_LOGIN_ATTEMPTS=5              # Failed login attempts (default: 5)
+LOGIN_LOCK_DURATION_MINUTES=5     # Account lock duration (default: 5)
+MAX_ATTENDANCE_FILE_SIZE_MB=10    # Photo file size limit (default: 10)
+MAX_ABSENCE_FILE_SIZE_MB=50       # Document file size limit (default: 50)
 ```
 
 ### Default Credentials
 
+Seed users are created by the initial migration (password: `testing123` for both):
+
 ```
 Admin Account:
   Username: admin
-  Password: admin123
+  Password: testing123
 
 Regular User:
   Username: user001
-  Password: user123
+  Password: testing123
 ```
 
 ---
@@ -489,7 +521,7 @@ curl http://localhost:8080/health
 # Login
 curl -X POST http://localhost:8080/api/auth \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"testing123"}'
 
 # Get user info (replace TOKEN with actual token)
 curl -H "Authorization: Bearer TOKEN" \
@@ -768,7 +800,7 @@ netstat -ano | findstr :8080  # Windows
 # Login again to get new token
 curl -X POST http://localhost:8080/api/auth \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"admin","password":"testing123"}'
 ```
 
 ### Getting Logs
