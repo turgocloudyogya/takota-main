@@ -247,61 +247,7 @@ export async function exportAttendanceServer({ month, lang = 'id' } = {}) {
   const blob = await response.blob()
   const disposition = response.headers.get('content-disposition') || ''
   const match = disposition.match(/filename="?([^";]+)"?/i)
-  const filename = match?.[1] || `rekap-presensi-${month || 'export'}.xlsx`
-  return { blob, filename }
-}
-
-export async function fetchAttendanceReportData({
-  startDate,
-  endDate,
-  duName = '',
-  duAddress = '',
-  studentIds = [],
-} = {}) {
-  const response = await request('/api/admin/export/report-data', {
-    params: {
-      start_date: startDate,
-      end_date: endDate,
-      du_name: duName || undefined,
-      du_address: duAddress || undefined,
-      student_ids: studentIds.length > 0 ? studentIds.join(',') : undefined,
-    },
-  })
-  
-  // Debug logging
-  console.log('[API] fetchAttendanceReportData response:', response)
-  
-  // Backend mengembalikan PDFTemplateData langsung, atau mungkin wrapped
-  // Coba beberapa kemungkinan format:
-  if (response?.pages) {
-    // Format langsung: { pages: [...] }
-    return response
-  } else if (response?.data?.pages) {
-    // Format wrapped: { data: { pages: [...] } }
-    return response.data
-  } else if (response?.data) {
-    // Format lain: { data: {...} }
-    return response.data
-  }
-  
-  // Fallback: return as-is
-  console.warn('[API] Unexpected response format for attendance report data')
-  return response
-}
-
-export async function exportAttendanceXLSX({ startDate, endDate, duName = '', duAddress = '', studentIds = [] } = {}) {
-  const response = await request('/api/admin/export/xlsx', {
-    params: {
-      start_date: startDate,
-      end_date: endDate,
-      du_name: duName || undefined,
-      du_address: duAddress || undefined,
-      student_ids: studentIds.length > 0 ? studentIds.join(',') : undefined,
-    },
-    raw: true,
-  })
-  const blob = await response.blob()
-  const filename = `Rekap-Presensi_${startDate}_${endDate}.xlsx`
+  const filename = match?.[1] || `rekap-presensi-${month || 'export'}.csv`
   return { blob, filename }
 }
 
@@ -315,10 +261,6 @@ export async function globalInfo() {
 
 export async function listPhotos({ limit = 50, lastId = '' } = {}) {
   return request('/api/all/photos', { params: { limit, last_id: lastId } })
-}
-
-export async function deletePhoto(id) {
-  return request('/api/admin/photo', { method: 'DELETE', body: { id } })
 }
 
 export { ApiError }

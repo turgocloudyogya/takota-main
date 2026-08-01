@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Picture, TrashBin } from '@gravity-ui/icons'
+import { Picture } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import PageHeader from '../components/PageHeader.jsx'
 import PhotoPreviewModal from '../../components/PhotoPreviewModal.jsx'
@@ -14,7 +14,6 @@ export default function AdminPhotos() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [activePhoto, setActivePhoto] = useState(null)
-  const [deleting, setDeleting] = useState(null)
 
   useEffect(() => {
     loadPhotos()
@@ -64,23 +63,6 @@ export default function AdminPhotos() {
     }
   }
 
-  async function handleDelete(photoId, e) {
-    e.stopPropagation()
-    
-    if (!confirm('Hapus foto ini?')) return
-
-    setDeleting(photoId)
-    try {
-      await api.deletePhoto(photoId)
-      setPhotos((prev) => prev.filter((p) => p.id !== photoId))
-      toast.success('Foto berhasil dihapus')
-    } catch (err) {
-      toast.error(err.message || 'Gagal menghapus foto')
-    } finally {
-      setDeleting(null)
-    }
-  }
-
   function handleLoadMore() {
     if (loadingMore || !hasMore || photos.length === 0) return
     const lastId = photos[photos.length - 1].id
@@ -93,7 +75,7 @@ export default function AdminPhotos() {
         icon={Picture}
         eyebrow="Galeri"
         title="Foto Presensi"
-        description="Galeri foto yang diupload siswa saat melakukan presensi dengan foto. Klik untuk preview, atau klik tombol hapus untuk menghapus foto."
+        description="Galeri foto yang diupload siswa saat melakukan presensi dengan foto. Klik untuk preview. Foto dihapus otomatis saat data presensinya dihapus."
       />
 
       {loading ? (
@@ -146,24 +128,13 @@ export default function AdminPhotos() {
                   className="h-full w-full object-cover" 
                 />
                 <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/0 to-transparent p-2 opacity-0 transition duration-150 group-hover:opacity-100">
-                  <div className="flex w-full items-center justify-between">
-                    <p className="truncate text-[11px] font-medium text-white">
-                      {photo.date ? new Date(photo.date).toLocaleDateString('id-ID', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                      }) : ''} • {photo.nickname}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDelete(photo.id, e)}
-                      disabled={deleting === photo.id}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-danger/90 text-white transition hover:bg-danger disabled:opacity-50"
-                      aria-label="Hapus foto"
-                    >
-                      <Icon data={TrashBin} size={14} />
-                    </button>
-                  </div>
+                  <p className="truncate text-[11px] font-medium text-white">
+                    {photo.date ? new Date(photo.date).toLocaleDateString('id-ID', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    }) : ''} • {photo.nickname}
+                  </p>
                 </div>
               </button>
             ))}
