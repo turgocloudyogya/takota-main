@@ -47,8 +47,17 @@ Backend:
 │   └── migrations/        SQL schema and seed data
 ├── nginx/default.conf     Nginx config (frontend + /api proxy)
 ├── Dockerfile             Multi-stage build (frontend + backend)
+├── AGENT.md               Contribution rules for humans and AI agents
+├── ARCHITECTURE.md        System architecture reference
 └── .github/workflows/     CI/CD (PR checks, build, test, publish)
 ```
+
+## Recent Changes
+
+- **Automatic database migrations** — the SQL files in `backend/migrations/` are embedded into the backend binary and applied automatically on every startup. Applied migrations are tracked in the `schema_migrations` table, the backend waits for PostgreSQL to become reachable before migrating, and every migration file is idempotent so existing databases upgrade cleanly.
+- **Human-readable attendance location (`display_address`)** — when a user submits attendance, the GPS coordinates are reverse-geocoded through OpenStreetMap Nominatim (a Go port of the former `tmp/get-location.js` sample) and stored in the new `display_address` column. It is shown on the user home and in the admin attendance list.
+- **Timezone-aware greetings** — a new `TIMEZONE_APP` variable (falls back to `TIMEZONE`, then to UTC) controls the greeting shown by the API and the PostgreSQL session timezone, so the app greets users correctly (e.g. "Good Morning" at 07:00 WIB) even when deployed in a different timezone.
+- **Container supervision & auth gate** — the Docker image runs the backend and Nginx under a supervisor entrypoint, so if either process dies the container exits and the orchestrator restarts it instead of serving a half-running app. `/api/all/info` is now protected by a token check.
 
 ## Getting Started with Docker
 
@@ -235,6 +244,18 @@ Backend:
 cd backend
 go run ./cmd/api
 ```
+
+## Commit Workflow
+
+All changes are developed on pull-request branches and merged into `main` only after review. **Never commit or push directly to `main`** — every commit must land on a PR branch first.
+
+1. Make sure you are not on `main` (use a branch such as `pr/update-fix-setup` or `feature/<topic>`).
+2. Commit your changes with a descriptive message (`feat:`, `fix:`, `docs:`, `refactor:`, ...).
+3. Run the required checks before pushing (see `AGENT.md`): backend build/vet, frontend build/lint, and a review of `git status`/`git diff` to make sure no secrets or build artifacts are staged.
+4. Push to your branch and open a Pull Request against `main`.
+5. Merge only after CI passes and the PR has been reviewed.
+
+Commits must never contain secrets (`.env` files, passwords, tokens). See `AGENT.md` for the full set of rules.
 
 ## CI/CD
 
