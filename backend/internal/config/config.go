@@ -69,6 +69,7 @@ type JWTConfig struct {
 type AppConfig struct {
 	MaxLoginAttempts        int
 	LoginLockDurationMinutes int
+	Timezone                string
 }
 
 type FileUploadConfig struct {
@@ -127,8 +128,9 @@ func LoadConfig() (*Config, error) {
 			ExpiryHours: getEnvAsInt("JWT_EXPIRY_HOURS", 24),
 		},
 		App: AppConfig{
-			MaxLoginAttempts:        getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+			MaxLoginAttempts:         getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
 			LoginLockDurationMinutes: getEnvAsInt("LOGIN_LOCK_DURATION_MINUTES", 5),
+			Timezone:                 getEnv("TIMEZONE_APP", getEnv("TIMEZONE", "UTC")),
 		},
 		FileUpload: FileUploadConfig{
 			MaxAttendanceFileSizeMB: int64(getEnvAsInt("MAX_ATTENDANCE_FILE_SIZE_MB", 10)),
@@ -174,12 +176,13 @@ func getEnvAsFloat(key string, defaultValue float64) float64 {
 
 func (c *Config) GetDSN() string {
 	return fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=UTC",
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		c.Database.Host,
 		c.Database.User,
 		c.Database.Password,
 		c.Database.DBName,
 		c.Database.Port,
 		c.Database.SSLMode,
+		c.App.Timezone,
 	)
 }

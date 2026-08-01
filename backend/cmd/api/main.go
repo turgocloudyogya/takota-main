@@ -10,6 +10,8 @@ import (
 	"github.com/carakan/takota/internal/controllers"
 	"github.com/carakan/takota/internal/middlewares"
 	jwtpkg "github.com/carakan/takota/pkg/jwt"
+	"github.com/carakan/takota/migrations"
+	"github.com/carakan/takota/pkg/migrator"
 	"github.com/carakan/takota/pkg/database"
 	"github.com/carakan/takota/pkg/redis"
 	"github.com/carakan/takota/pkg/s3"
@@ -31,6 +33,12 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.CloseDB()
+
+	// Run automatic SQL migrations
+	if err := migrator.Run(database.GetDB(), migrations.FS); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("✓ Database migrations completed")
 
 	// Initialize Redis
 	if err := redis.InitRedis(cfg); err != nil {

@@ -16,7 +16,8 @@ type Attendance struct {
 	File       *string    `gorm:"type:varchar(255)" json:"file"`
 	Latitude   *string    `gorm:"type:varchar(50)" json:"latitude"`
 	Longitude  *string    `gorm:"type:varchar(50)" json:"longitude"`
-	GmapsEmbed *string    `gorm:"type:text" json:"gmaps_embed"`
+	GmapsEmbed     *string    `gorm:"type:text" json:"gmaps_embed"`
+	DisplayAddress *string    `gorm:"type:text" json:"display_address"` // reverse-geocoded address for display
 	VerifyBy   *uuid.UUID `gorm:"type:uuid" json:"verify_by"`
 	SignStatus *string    `gorm:"type:varchar(20)" json:"sign_status"` // allow, reject, or NULL (pending)
 	CreatedAt  time.Time  `gorm:"type:timestamptz;default:CURRENT_TIMESTAMP" json:"created_at"`

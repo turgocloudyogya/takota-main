@@ -50,8 +50,16 @@ COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
 # Backend binary
 COPY --from=backend-build /out/takota-api /usr/local/bin/takota-api
 
+# Supervisor: runs backend + nginx, exits the container if either dies
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Health check goes through nginx -> backend /health, so it only reports
+# healthy when both nginx and the API are responding.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -q -O- http://127.0.0.1/health >/dev/null 2>&1 || exit 1
+
 # Expose HTTP port
 EXPOSE 80
 
-# Start the backend in the background, then Nginx in the foreground
-CMD ["sh", "-c", "/usr/local/bin/takota-api & exec nginx -g 'daemon off;'"]
+CMD ["/usr/local/bin/entrypoint.sh"]

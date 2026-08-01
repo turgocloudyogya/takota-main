@@ -26,13 +26,14 @@ type AttendanceListResponse struct {
 }
 
 type AttendanceListItem struct {
-	ID         string `json:"id"`
-	UserID     string `json:"user_id"`
-	Photo      string `json:"photo"`
-	GmapsEmbed string `json:"gmaps_embed"`
-	Latitude   string `json:"latitude"`
-	Longitude  string `json:"longitude"`
-	Timestamp  string `json:"timestamp"`
+	ID             string `json:"id"`
+	UserID         string `json:"user_id"`
+	Photo          string `json:"photo"`
+	GmapsEmbed     string `json:"gmaps_embed"`
+	DisplayAddress string `json:"display_address"`
+	Latitude       string `json:"latitude"`
+	Longitude      string `json:"longitude"`
+	Timestamp      string `json:"timestamp"`
 }
 
 type AbsenceListResponse struct {
@@ -114,6 +115,11 @@ func (ctrl *AdminController) ListAttendances(c *gin.Context) {
 			gmapsEmbed = *att.GmapsEmbed
 		}
 
+		displayAddress := ""
+		if att.DisplayAddress != nil {
+			displayAddress = *att.DisplayAddress
+		}
+
 		lat := ""
 		if att.Latitude != nil {
 			lat = *att.Latitude
@@ -125,13 +131,14 @@ func (ctrl *AdminController) ListAttendances(c *gin.Context) {
 		}
 
 		items = append(items, AttendanceListItem{
-			ID:         att.ID.String(),
-			UserID:     att.UserID.String(),
-			Photo:      photoURL,
-			GmapsEmbed: gmapsEmbed,
-			Latitude:   lat,
-			Longitude:  lon,
-			Timestamp:  att.CreatedAt.Format(time.RFC3339),
+			ID:             att.ID.String(),
+			UserID:         att.UserID.String(),
+			Photo:          photoURL,
+			GmapsEmbed:     gmapsEmbed,
+			DisplayAddress: displayAddress,
+			Latitude:       lat,
+			Longitude:      lon,
+			Timestamp:      att.CreatedAt.Format(time.RFC3339),
 		})
 	}
 

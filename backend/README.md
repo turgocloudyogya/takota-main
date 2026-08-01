@@ -3,7 +3,7 @@
 A modern, production-ready attendance and absence management system built with Go, PostgreSQL, Redis, and S3 object storage.
 
 ![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
-![Go Version](https://img.shields.io/badge/go-1.23-blue)
+![Go Version](https://img.shields.io/badge/go-1.25-blue)
 ![Docker](https://img.shields.io/badge/docker-compose-blue)
 ![Tests](https://img.shields.io/badge/tests-36%2F36%20passed-green)
 
@@ -66,7 +66,17 @@ Perfect for companies with remote and office-based employees who need reliable a
 
 ✅ **Location-Based Features**
 - Automatic Google Maps embedding
+- Reverse-geocoded `display_address` (OpenStreetMap Nominatim) shown on the user home and admin attendance list
 - Location history tracking
+
+✅ **Database Migrations**
+- SQL migrations embedded in the binary (`//go:embed`) and applied automatically on startup
+- Applied versions tracked in the `schema_migrations` table
+- Migrations are idempotent, so existing databases upgrade cleanly
+
+✅ **Timezone-Aware Greetings**
+- Configurable via `TIMEZONE_APP` (falls back to `TIMEZONE`, then UTC)
+- Greetings and the database session timezone follow the configured timezone
 
 ✅ **File Management**
 - Photo upload for attendance (max 10MB)
@@ -85,7 +95,7 @@ Perfect for companies with remote and office-based employees who need reliable a
 ## 🛠️ Tech Stack
 
 ### Programming & Framework
-- **Language:** Go 1.23
+- **Language:** Go 1.25
 - **Web Framework:** Gin 1.9.1
 - **Validation:** go-playground/validator/v10
 - **Authentication:** golang-jwt/jwt/v5
@@ -119,7 +129,7 @@ Perfect for companies with remote and office-based employees who need reliable a
 ### Prerequisites
 
 - Docker & Docker Compose (recommended)
-- Or: Go 1.23, PostgreSQL 16, Redis 7, MinIO
+- Or: Go 1.25, PostgreSQL 16, Redis 7, MinIO
 
 ### Using Docker (Recommended)
 
@@ -187,7 +197,7 @@ docker-compose down -v
 brew install go postgresql redis minio
 
 # Ubuntu/Debian
-sudo apt install golang-1.23 postgresql redis-server
+sudo apt install golang-1.25 postgresql redis-server
 
 # Windows (using chocolatey)
 choco install golang postgresql redis
@@ -200,8 +210,10 @@ choco install golang postgresql redis
 createdb takota_db
 createuser takota --password
 
-# Run migrations
+# Run migrations (optional - the app also runs embedded migrations automatically on startup)
 psql -U takota -d takota_db -f migrations/001_initial_schema.sql
+psql -U takota -d takota_db -f migrations/002_add_sign_status.sql
+psql -U takota -d takota_db -f migrations/003_add_display_address.sql
 ```
 
 #### 3. Setup Redis
@@ -300,6 +312,7 @@ go build -o takota-api ./cmd/api
    - User submits location + optional photo
    - GPS validation against office radius
    - File uploaded to S3/MinIO
+   - Coordinates reverse-geocoded into a display address (OpenStreetMap Nominatim)
    - Record created in PostgreSQL
 
 3. **Absence:**
@@ -307,6 +320,19 @@ go build -o takota-api ./cmd/api
    - Document uploaded to S3/MinIO
    - Admin approval workflow initiated
    - Status tracked in PostgreSQL
+
+### Database Migrations
+
+Migrations are plain SQL files in `migrations/` (e.g. `001_initial_schema.sql`). They are embedded into the binary with `//go:embed` and applied automatically on startup by `pkg/migrator`:
+
+- A `schema_migrations` table records every applied version.
+- Each `*.sql` file runs once, in version order, inside a transaction (a failure rolls back completely).
+- Files must be idempotent (`IF NOT EXISTS`, `DROP ... IF EXISTS`, `ON CONFLICT DO NOTHING`, ...) so the runner is safe against databases that were migrated manually.
+- New changes go into `00N_<description>.sql`; already-applied migrations are never edited.
+
+### Timezone Handling
+
+The application timezone is read from `TIMEZONE_APP` (falls back to `TIMEZONE`, then UTC). It is used for the greeting widget (`GetGreetingTime`) and is passed to PostgreSQL via the DSN `TimeZone` setting, so the greeting and day boundaries match the users' local time even if the server is deployed elsewhere.
 
 ---
 
@@ -373,6 +399,7 @@ Create `.env` file in `src/` directory with the following variables:
 PORT=8080                        # API port (default: 8080)
 APP_ENV=development              # Environment: development/production
 GIN_MODE=debug                   # Gin logging: debug/release
+TIMEZONE_APP=Asia/Jakarta        # App timezone for greetings/timestamps (fallback: TIMEZONE, then UTC)
 ```
 
 #### Database Configuration
@@ -506,6 +533,7 @@ JWT_SECRET=generate-strong-random-key
 DB_SSL_MODE=require
 S3_ENDPOINT=aws.s3.amazonaws.com  # or your S3 provider
 REDIS_URL=redis://production-redis-host:6379
+TIMEZONE_APP=Asia/Jakarta         # choose the timezone of your users
 ```
 
 #### Step 2: Build Docker Images
@@ -633,7 +661,10 @@ src/
 │   └── jwt/
 │       └── jwt.go                     # JWT utilities
 ├── migrations/
-│   └── 001_initial_schema.sql         # Database schema
+│   ├── migrations.go                   # Embeds *.sql so migrations run automatically
+│   ├── 001_initial_schema.sql          # Database schema + seed users
+│   ├── 002_add_sign_status.sql         # sign_status column
+│   └── 003_add_display_address.sql     # display_address column (reverse geocoding)
 ├── testing/                           # Test files
 │   ├── test_comprehensive_final.sh
 │   ├── test_docker.sh
@@ -816,8 +847,8 @@ For issues, questions, or suggestions:
 - Security verified
 - Documentation complete
 
-**Last Updated:** 2026-07-07  
-**Version:** 1.0.0
+**Last Updated:** 2026-08-01  
+**Version:** 1.1.0
 
 ---
 

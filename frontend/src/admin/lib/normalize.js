@@ -83,6 +83,7 @@ export function normalizeAttendance(raw) {
     latitude: firstDefined(raw.latitude, raw.lat),
     longitude: firstDefined(raw.longitude, raw.lng, raw.long),
     location: firstDefined(raw.location, raw.address),
+    displayAddress: firstDefined(raw.display_address, raw.displayAddress),
     photoUrl: firstDefined(raw.photo, raw.photo_url, raw.image, raw.file),
     raw,
   }

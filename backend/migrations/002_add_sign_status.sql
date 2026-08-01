@@ -4,7 +4,7 @@
 
 -- Add sign_status column to attendance table
 ALTER TABLE attendance 
-ADD COLUMN sign_status VARCHAR(20) DEFAULT NULL;
+ADD COLUMN IF NOT EXISTS sign_status VARCHAR(20) DEFAULT NULL;
 
 -- Create index for sign_status queries
 CREATE INDEX IF NOT EXISTS idx_attendance_sign_status ON attendance(sign_status);
