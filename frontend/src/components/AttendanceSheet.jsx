@@ -15,7 +15,7 @@ export default function AttendanceSheet({ open, onOpenChange, onPickAttendance, 
           <button
             type="button"
             onClick={onPickAttendance}
-            className="mb-2.5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
+            className="mb-2.5 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
           >
             Attendance
           </button>
@@ -23,7 +23,7 @@ export default function AttendanceSheet({ open, onOpenChange, onPickAttendance, 
           <button
             type="button"
             onClick={onPickAbsence}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
           >
             Absence
           </button>
@@ -32,7 +32,7 @@ export default function AttendanceSheet({ open, onOpenChange, onPickAttendance, 
           <button
             type="button"
             onClick={onPickPhotos}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
           >
             Photos
           </button>

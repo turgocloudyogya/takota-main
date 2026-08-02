@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Drawer } from 'vaul'
 import { Icon } from '@gravity-ui/uikit'
-import { ChevronLeft, ChevronDown, Files, Xmark, PaperPlane } from '@gravity-ui/icons'
+import { ChevronDown, Files, Xmark, PaperPlane } from '@gravity-ui/icons'
+import BackButton from '../components/BackButton.jsx'
 import { submitAbsence } from '../lib/api.js'
 
 // The 2 choices shown under "Select a reason", per design.
@@ -103,8 +104,8 @@ export default function Absence() {
 
   if (submitted) {
     return (
-      <main className="flex min-h-screen w-full justify-center px-6 pt-8 md:items-center md:pt-0">
-        <div className="flex w-full max-w-md flex-col items-center pt-24 text-center md:pt-0">
+      <main className="flex min-h-screen w-full items-center justify-center px-6">
+        <div className="flex w-full max-w-md flex-col items-center text-center">
           <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-orange-100">
             <Icon data={PaperPlane} size={32} className="text-orange-500" />
           </div>
@@ -118,105 +119,99 @@ export default function Absence() {
   }
 
   return (
-    <main className="flex min-h-screen w-full justify-center px-5 pb-10 pt-8 md:items-center md:pt-0">
-      <div className="w-full max-w-md">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-sm font-medium text-neutral-700"
-        >
-          <Icon data={ChevronLeft} size={18} />
-          Absence
-        </button>
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col">
+      <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
+        <BackButton label="Absence" />
+        <span className="h-8 w-8 shrink-0" />
+      </header>
 
-        <div className="mt-16">
-          <p className="text-sm text-neutral">
-            Please explain why you are not present at this time
-          </p>
+      <div className="flex flex-1 flex-col justify-center px-6 py-6">
+        <p className="text-sm text-neutral">
+          Please explain why you are not present at this time
+        </p>
 
-          <textarea
-            value={reasonText}
-            onChange={(e) => setReasonText(e.target.value)}
-            placeholder="Enter the reason for your absence…"
-            rows={5}
-            className="mt-3 w-full resize-none rounded-xl bg-neutral-100 px-4 py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral"
-          />
+        <textarea
+          value={reasonText}
+          onChange={(e) => setReasonText(e.target.value)}
+          placeholder="Enter the reason for your absence…"
+          rows={5}
+          className="mt-3 w-full resize-none rounded-xl bg-neutral-100 px-4 py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral"
+        />
 
-          <input ref={fileInputRef} type="file" onChange={handleFilePick} className="hidden" />
+        <input ref={fileInputRef} type="file" onChange={handleFilePick} className="hidden" />
 
-          {file ? (
-            <div className="relative mt-3 flex flex-col items-center justify-center gap-2 rounded-xl bg-orange-100 px-4 py-6 cursor-pointer">
-              <button
-                type="button"
-                onClick={handleRemoveFile}
-                aria-label="Remove attachment"
-                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-white shadow-sm cursor-pointer"
-              >
-                <Icon data={Xmark} size={14} />
-              </button>
-              <Icon data={Files} size={28} className="text-neutral-700" />
-              <p className="w-full text-center text-xs text-neutral-700 truncate overflow-hidden">
-                {file.name}
-                <br />
-                {getFileExt(file.name)} · {formatFileSize(file.size)}
-              </p>
-            </div>
-          ) : (
+        {file ? (
+          <div className="relative mt-3 flex flex-col items-center justify-center gap-2 rounded-xl bg-orange-100 px-4 py-6 cursor-pointer">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl bg-neutral-100 px-4 py-6 cursor-pointer"
+              onClick={handleRemoveFile}
+              aria-label="Remove attachment"
+              className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-white shadow-sm cursor-pointer"
             >
-              <Icon data={Files} size={28} className="text-neutral-400" />
-              <span className="text-center text-xs text-neutral">
-                Attach only 1 relevant photo or document (optional)
-              </span>
+              <Icon data={Xmark} size={14} />
             </button>
-          )}
-
-          <div className="relative z-20 mt-3">
-            <button
-              type="button"
-              onClick={() => setReasonOpen((v) => !v)}
-              className="flex w-full items-center gap-2 rounded-xl bg-neutral-100 px-4 py-3 text-left text-sm text-neutral-900 cursor-pointer"
-            >
-              <Icon
-                data={ChevronDown}
-                size={14}
-                className={`shrink-0 text-neutral transition-transform ${reasonOpen ? 'rotate-180' : ''}`}
-              />
-              {reasonType ? reasonType.label : 'Select a reason'}
-            </button>
-
-            {reasonOpen && (
-              <div className="absolute inset-x-0 top-full z-30 mt-1 flex flex-col overflow-hidden rounded-xl shadow-lg">
-                {REASON_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleSelectReasonType(option)}
-                    className={`w-full px-4 py-3 text-left text-sm transition cursor-pointer ${
-                      reasonType?.value === option.value
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-neutral-100 text-neutral-900 hover:bg-orange-500 hover:text-white'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            <Icon data={Files} size={28} className="text-neutral-700" />
+            <p className="w-full text-center text-xs text-neutral-700 truncate overflow-hidden">
+              {file.name}
+              <br />
+              {getFileExt(file.name)} · {formatFileSize(file.size)}
+            </p>
           </div>
-
+        ) : (
           <button
             type="button"
-            onClick={handleTakeAbsence}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] cursor-pointer"
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl bg-neutral-100 px-4 py-6 cursor-pointer"
           >
-            <Icon data={PaperPlane} size={16} />
-            Take Absence!
+            <Icon data={Files} size={28} className="text-neutral-400" />
+            <span className="text-center text-xs text-neutral">
+              Attach only 1 relevant photo or document (optional)
+            </span>
           </button>
+        )}
+
+        <div className="relative z-20 mt-3">
+          <button
+            type="button"
+            onClick={() => setReasonOpen((v) => !v)}
+            className="flex w-full items-center gap-2 rounded-xl bg-neutral-100 px-4 py-3 text-left text-sm text-neutral-900 cursor-pointer"
+          >
+            <Icon
+              data={ChevronDown}
+              size={14}
+              className={`shrink-0 text-neutral transition-transform ${reasonOpen ? 'rotate-180' : ''}`}
+            />
+            {reasonType ? reasonType.label : 'Select a reason'}
+          </button>
+
+          {reasonOpen && (
+            <div className="absolute inset-x-0 top-full z-30 mt-1 flex flex-col overflow-hidden rounded-xl shadow-lg">
+              {REASON_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSelectReasonType(option)}
+                  className={`w-full px-4 py-3 text-left text-sm transition cursor-pointer ${
+                    reasonType?.value === option.value
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-neutral-100 text-neutral-900 hover:bg-orange-500 hover:text-white'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        <button
+          type="button"
+          onClick={handleTakeAbsence}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] cursor-pointer"
+        >
+          <Icon data={PaperPlane} size={16} />
+          Take Absence!
+        </button>
       </div>
 
       <Drawer.Root
@@ -241,7 +236,7 @@ export default function Absence() {
               type="button"
               onClick={handleConfirmAbsence}
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-80"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-80"
             >
               {submitting ? (
                 <>

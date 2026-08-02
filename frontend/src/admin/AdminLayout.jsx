@@ -15,6 +15,7 @@ import {
 } from '@gravity-ui/icons'
 import { getSession, isAdminSession } from './lib/session.js'
 import * as api from './lib/api.js'
+import { ConfirmDialog } from '../components/Modals.jsx'
 
 // Signature mark: a location pin with a check — the app's whole job is
 // "confirm this person is here, right now," so the brand mark says exactly
@@ -157,6 +158,7 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const [session] = useState(() => getSession())
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [logoutOpen, setLogoutOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
@@ -177,9 +179,13 @@ export default function AdminLayout() {
     return <Navigate to="/" replace />
   }
 
-  async function handleLogout() {
+  function handleLogout() {
+    setLogoutOpen(true)
+  }
+
+  async function handleConfirmLogout() {
     await api.logout()
-    toast.info("Berhasil keluar!")
+    toast.info('Berhasil keluar!')
     navigate('/', { replace: true })
   }
 
@@ -322,6 +328,17 @@ export default function AdminLayout() {
           <Outlet />
         </div>
       </main>
+
+      <ConfirmDialog
+        open={logoutOpen}
+        onOpenChange={setLogoutOpen}
+        title="Are you sure you want to log out?"
+        description="Your session will be ended and you'll return to the login page."
+        confirmLabel="Logout"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={handleConfirmLogout}
+      />
     </div>
   )
 }

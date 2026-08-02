@@ -18,7 +18,11 @@ import AdminReports from './admin/pages/AdminReports.jsx'
 
 // Validates the JWT through GET /api/all/info on every route change.
 // Invalid sessions are sent back to "/"; valid sessions sitting on "/"
-// are forwarded to the backend-provided redirect_home.
+// are forwarded to the backend-provided redirect_home. Also enforces
+// role-based access: admins may only use /admin pages, regular users may
+// only use the user pages (/main, /attendance, /absence, /photos).
+const USER_ONLY_PATHS = ['/main', '/attendance', '/absence', '/photos']
+
 function AuthGate() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -38,8 +42,20 @@ function AuthGate() {
         return
       }
 
-      if (result.valid === true && location.pathname === '/') {
-        navigate(result.redirectHome, { replace: true })
+      if (result.valid === true) {
+        const isAdmin = result.role === 'admin'
+        const onUserPage = USER_ONLY_PATHS.includes(location.pathname)
+        const onAdminPage = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
+
+        // Admins must not land on user pages; users must not land on /admin.
+        if ((isAdmin && onUserPage) || (!isAdmin && onAdminPage)) {
+          navigate(isAdmin ? '/admin' : '/main', { replace: true })
+          return
+        }
+
+        if (location.pathname === '/') {
+          navigate(result.redirectHome, { replace: true })
+        }
       }
     }
     run()

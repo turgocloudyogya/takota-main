@@ -8,7 +8,7 @@ import { unwrapList, normalizeAbsence } from '../lib/normalize.js'
 import { parseApiDate } from '../lib/dateWindow.js'
 import { Toolbar, PagerFooter } from '../components/ListChrome.jsx'
 import { OptionChip, SignChip } from '../components/StatusChip.jsx'
-import { ConfirmDialog } from '../components/Modals.jsx'
+import { ConfirmDialog } from '../../components/Modals.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 

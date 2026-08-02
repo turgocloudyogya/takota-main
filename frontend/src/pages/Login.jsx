@@ -93,6 +93,7 @@ export default function Login() {
           <Icon data={At} size={16} className="shrink-0 text-neutral" />
           <input
             type="text"
+            required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Username"
@@ -105,6 +106,7 @@ export default function Login() {
           <Icon data={Key} size={16} className="shrink-0 text-neutral" />
           <input
             type={showPassword ? 'text' : 'password'}
+            required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"

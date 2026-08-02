@@ -98,7 +98,7 @@ export default function AdminPhotos() {
               ))}
             </div>
             {/* Fade gradient */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent via-[70%] to-neutral-50" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-neutral-50" />
           </div>
 
           {/* Empty message */}

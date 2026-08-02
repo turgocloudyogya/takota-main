@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Button, Card } from '@heroui/react'
+import { Button, Card, Label, ListBox, Select } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
 import { FileArrowDown } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { downloadBlob } from '../lib/download.js'
-import { SelectInput } from '../components/FormField.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
 // Backend expects an English month name (e.g. "august") in the ?month query
@@ -69,20 +68,49 @@ export default function AdminReports() {
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <SelectInput label="Bulan" value={month} onChange={(e) => setMonth(e.target.value)}>
-            {MONTHS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </SelectInput>
-          <SelectInput label="Bahasa" value={lang} onChange={(e) => setLang(e.target.value)}>
-            {LANGUAGES.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </SelectInput>
+          <Select
+            selectedKey={month}
+            onSelectionChange={(key) => setMonth(String(key))}
+            fullWidth
+          >
+            <Label>Bulan</Label>
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {MONTHS.map((m) => (
+                  <ListBox.Item key={m.id} id={m.id} textValue={m.label}>
+                    <Label>{m.label}</Label>
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+
+          <Select
+            selectedKey={lang}
+            onSelectionChange={(key) => setLang(String(key))}
+            fullWidth
+          >
+            <Label>Bahasa</Label>
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {LANGUAGES.map((l) => (
+                  <ListBox.Item key={l.id} id={l.id} textValue={l.label}>
+                    <Label>{l.label}</Label>
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
         </div>
 
         <Button

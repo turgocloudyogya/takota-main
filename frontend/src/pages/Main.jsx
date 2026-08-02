@@ -2,10 +2,11 @@ import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Clock } from '@gravity-ui/icons'
-import { getUserHome } from '../lib/api.js'
+import { ArrowRightFromSquare, Paperclip } from '@gravity-ui/icons'
+import { getUserHome, logout } from '../lib/api.js'
 import AbsenceCard from '../components/AbsenceCard.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
+import { ConfirmDialog } from '../components/Modals.jsx'
 
 const GREETING_LABELS = {
   morning: 'Good Morning',
@@ -44,10 +45,24 @@ function formatFullDate(timestamp) {
   return `${day}/${month}/${year}`
 }
 
+function formatNow(date) {
+  return date.toLocaleString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function Main() {
   const navigate = useNavigate()
   const [greeting, setGreeting] = useState(useGreeting())
   const [sheetOpen, setSheetOpen] = useState(false)
+
+  const [now, setNow] = useState(new Date())
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [userName, setUserName] = useState('')
@@ -159,6 +174,21 @@ export default function Main() {
     }
   }, [])
 
+  // Realtime clock for the header
+  useEffect(() => {
+    const intervalId = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(intervalId)
+  }, [])
+
+  function handleLogoutClick() {
+    setConfirmOpen(true)
+  }
+
+  async function handleConfirmLogout() {
+    await logout()
+    navigate('/', { replace: true })
+  }
+
   function handlePickAttendance() {
     setSheetOpen(false)
     navigate('/attendance')
@@ -176,9 +206,11 @@ export default function Main() {
 
   if (loading) {
     return (
-      <main className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-20">
+      <main className="mx-auto min-h-screen w-full max-w-md px-6">
         <div className="animate-pulse">
-          <div className="h-8 w-64 rounded bg-neutral-200" />
+          <div className="py-4 pt-8">
+            <div className="h-8 w-64 rounded bg-neutral-200" />
+          </div>
           
           <section className="mt-6">
             <div className="mb-2 h-4 w-16 rounded bg-neutral-200" />
@@ -198,10 +230,25 @@ export default function Main() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-5 pb-28 pt-20">
-      <h1 className="text-xl font-bold text-neutral-900">
-        {greeting}, {userName} <span aria-hidden>👋</span>
-      </h1>
+    <main className="mx-auto min-h-screen w-full max-w-md px-6">
+      <header className="flex items-start justify-between gap-4 py-4 pt-8">
+        <div>
+          <h1 className="text-xl font-bold leading-tight text-neutral-900">
+            {greeting}, {userName} <span aria-hidden>👋</span>
+          </h1>
+          <small className="mt-1 block text-xs text-neutral">{formatNow(now)}</small>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleLogoutClick}
+          aria-label="Logout"
+          title="Logout"
+          className="flex cursor-pointer h-9 w-9 shrink-0 items-center justify-center rounded-full text-danger transition hover:bg-danger/10 active:scale-[0.96]"
+        >
+          <Icon data={ArrowRightFromSquare} size={18} />
+        </button>
+      </header>
 
       <section className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral">Today</h2>
@@ -232,9 +279,9 @@ export default function Main() {
       <button
         type="button"
         onClick={() => setSheetOpen(true)}
-        className="fixed inset-x-0 bottom-6 z-30 mx-auto flex w-fit items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition active:scale-[0.97]"
+        className="fixed inset-x-0 bottom-6 z-30 mx-auto flex w-fit cursor-pointer items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition active:scale-[0.97]"
       >
-        <Icon data={Clock} size={16} />
+        <Icon data={Paperclip} size={16} />
         Attendance
       </button>
 
@@ -244,6 +291,17 @@ export default function Main() {
         onPickAttendance={handlePickAttendance}
         onPickAbsence={handlePickAbsence}
         onPickPhotos={handlePickPhotos}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Are you sure you want to log out?"
+        description="Your session will be ended and you'll return to the login page."
+        confirmLabel="Logout"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={handleConfirmLogout}
       />
     </main>
   )

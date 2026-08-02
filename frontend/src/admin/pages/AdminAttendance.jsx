@@ -7,7 +7,7 @@ import * as api from '../lib/api.js'
 import { unwrapList, normalizeAttendance } from '../lib/normalize.js'
 import { parseApiDate } from '../lib/dateWindow.js'
 import { Toolbar, PagerFooter } from '../components/ListChrome.jsx'
-import { ConfirmDialog } from '../components/Modals.jsx'
+import { ConfirmDialog } from '../../components/Modals.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
@@ -222,7 +222,6 @@ export default function AdminAttendance() {
                         <span className="text-neutral-700">
                           {row.displayAddress ? (
                             <span className="inline-flex items-center gap-1">
-                              <Icon data={MapPin} size={13} className="text-neutral" />
                               {row.displayAddress}
                             </span>
                           ) : row.location ? (

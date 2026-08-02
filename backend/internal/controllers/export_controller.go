@@ -10,6 +10,7 @@ import (
 
 	"github.com/carakan/takota/internal/models"
 	"github.com/carakan/takota/internal/utils"
+	"github.com/carakan/takota/pkg/s3"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,6 +22,9 @@ type ExportData struct {
 	Date            string
 	AbsenceType     string
 	AbsenceReason   string
+	Location        string
+	PhotoFile       string
+	DocumentFile    string
 }
 
 // ExportAttendance exports attendance data to CSV
@@ -67,13 +71,13 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 	var exportData []ExportData
 	for i, att := range attendances {
 		data := ExportData{
-			No:              i + 1,
-			Name:            att.User.Nickname,
-			Attendance:      att.Type,
-			Time:            att.CreatedAt.Format("15:04:05"),
-			Date:            att.CreatedAt.Format("2006-01-02"),
-			AbsenceType:     "",
-			AbsenceReason:   "",
+			No:            i + 1,
+			Name:          att.User.Nickname,
+			Attendance:    att.Type,
+			Time:          att.CreatedAt.Format("15:04:05"),
+			Date:          att.CreatedAt.Format("2006-01-02"),
+			AbsenceType:   "",
+			AbsenceReason: "",
 		}
 
 		if att.Type == "absence" {
@@ -83,6 +87,19 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 			if att.Reason != nil {
 				data.AbsenceReason = *att.Reason
 			}
+			if att.File != nil {
+				data.DocumentFile = s3.BucketOpenURL(*att.File)
+			}
+		}
+
+		// Location as a Google Maps link when coordinates are present
+		if att.Latitude != nil && att.Longitude != nil {
+			data.Location = utils.GenerateGoogleMapsLink(*att.Latitude, *att.Longitude)
+		}
+
+		// Attendance photo public URL when present
+		if att.Photo != nil {
+			data.PhotoFile = s3.BucketOpenURL(*att.Photo)
 		}
 
 		exportData = append(exportData, data)
@@ -96,9 +113,9 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 	// Write headers based on language
 	var headers []string
 	if lang == "id" {
-		headers = []string{"No", "Nama", "Kehadiran", "Waktu", "Tanggal", "Jenis Ketidakhadiran", "Alasan Izin"}
+		headers = []string{"No", "Nama", "Kehadiran", "Waktu", "Tanggal", "Jenis Ketidakhadiran", "Alasan Izin", "Lokasi", "File Foto", "Dokumen"}
 	} else {
-		headers = []string{"No", "Name", "Attendance", "Time", "Date", "Absence Type", "Absence Reason"}
+		headers = []string{"No", "Name", "Attendance", "Time", "Date", "Absence Type", "Absence Reason", "Location", "Photo File", "Document"}
 	}
 	writer.Write(headers)
 
@@ -112,6 +129,9 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 			data.Date,
 			data.AbsenceType,
 			data.AbsenceReason,
+			data.Location,
+			data.PhotoFile,
+			data.DocumentFile,
 		}
 		writer.Write(record)
 	}

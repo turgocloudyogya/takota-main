@@ -54,6 +54,13 @@ Backend:
 
 ## Recent Changes
 
+- **Enriched CSV export** — the admin report export now includes three new columns: **Location** (a Google Maps link built from the stored coordinates), **Photo File** (public URL of the attendance photo), and **Document** (public URL of the absence supporting document, when present). Headers are localized for English and Indonesian.
+- **HeroUI Select for report filters** — the Month and Language pickers on the admin reports page now use the HeroUI `Select` component instead of a native `<select>`, matching the rest of the UI.
+- **Role-based frontend routing guards** — the `AuthGate` component now enforces roles client-side in addition to the backend middleware: admins who land on user pages (`/main`, `/attendance`, `/absence`, `/photos`) are redirected to `/admin`, and non-admins who open `/admin` are redirected to `/main`.
+- **Camera capture & freeze at "Take Attendance!"** — the attendance page now requests camera permission automatically on mount, and pressing "Take Attendance!" captures and freezes the current frame at full sensor resolution. The uploaded photo reflects the exact moment the button was pressed, and canceling the confirmation dialog discards the frame and resumes the live camera.
+- **Photo gallery hover info** — hovering a photo in the user gallery now shows a `dd/mm/yyyy hh:mm • by <nickname>` overlay with the timestamp and the user who uploaded it.
+- **User home header** — the home page now shows a live clock next to the greeting and a logout button with a confirmation dialog, alongside a shared `BackButton` component and unified headers across the user pages.
+- **Admin logout confirmation** — the admin sidebar logout now asks for confirmation before ending the session.
 - **Automatic database migrations** — the SQL files in `backend/migrations/` are embedded into the backend binary and applied automatically on every startup. Applied migrations are tracked in the `schema_migrations` table, the backend waits for PostgreSQL to become reachable before migrating, and every migration file is idempotent so existing databases upgrade cleanly.
 - **Human-readable attendance location (`display_address`)** — when a user submits attendance, the GPS coordinates are reverse-geocoded through OpenStreetMap Nominatim (a Go port of the former `tmp/get-location.js` sample) and stored in the new `display_address` column. It is shown on the user home and in the admin attendance list.
 - **Timezone-aware greetings** — a new `TIMEZONE_APP` variable (falls back to `TIMEZONE`, then to UTC) controls the greeting shown by the API and the PostgreSQL session timezone, so the app greets users correctly (e.g. "Good Morning" at 07:00 WIB) even when deployed in a different timezone.

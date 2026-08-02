@@ -33,7 +33,7 @@ export default function PhotoPreviewModal({ photo, onClose }) {
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-neutral-900 shadow-md transition active:scale-[0.94]"
+                className="absolute -right-2 -top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-neutral-900 shadow-md transition active:scale-[0.94]"
               >
                 <Icon data={Xmark} size={14} />
               </button>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@heroui/react'
 import { toast } from 'sonner'
-import { AppModal } from './Modals.jsx'
+import { AppModal } from '../../components/Modals.jsx'
 import { TextInput, PasswordInput, SelectInput, ToggleField } from './FormField.jsx'
 import * as api from '../lib/api.js'
 

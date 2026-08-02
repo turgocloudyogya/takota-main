@@ -1,5 +1,7 @@
 // API client for user pages (Main, Attendance, Absence, Photos)
 
+import { clearSession } from './authGate.js'
+
 const API_BASE = localStorage.getItem('api-base-url') || ''
 
 function getToken() {
@@ -88,6 +90,17 @@ async function request(path, { method = 'GET', body, isFormData = false } = {}) 
 }
 
 export { setToken }
+
+export async function logout() {
+  try {
+    await request('/api/auth/logout', { method: 'POST' })
+  } catch {
+    // Best-effort: even if the server is unreachable, always clear the local
+    // session so the user isn't locked in a logout loop.
+  } finally {
+    clearSession()
+  }
+}
 
 // ---------------------------------------------------------------------------
 // User API Endpoints

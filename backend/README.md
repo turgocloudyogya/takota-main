@@ -61,7 +61,7 @@ Perfect for companies with remote and office-based employees who need reliable a
 - Complete user management (CRUD)
 - Attendance record viewing and deletion
 - Absence approval workflow
-- Data export to CSV (English & Indonesian)
+- Data export to CSV (English & Indonesian), including location, photo, and document columns
 - User search and filtering
 
 ✅ **Location-Based Features**
@@ -369,6 +369,8 @@ PATCH  /api/admin/absence            Sign/approve absence
 
 GET    /api/admin/export             Export attendance data to CSV
 ```
+
+`GET /api/admin/export` returns a semicolon-separated CSV file (`?lang=id|en`). The default (Indonesian) columns are `No, Nama, Kehadiran, Waktu, Tanggal, Jenis Ketidakhadiran, Alasan Izin, Lokasi, File Foto, Dokumen`; the English columns are `No, Name, Attendance, Time, Date, Absence Type, Absence Reason, Location, Photo File, Document`. `Lokasi`/`Location` is a Google Maps link generated from the stored coordinates, `File Foto`/`Photo File` is the public URL of the attendance photo, and `Dokumen`/`Document` is the public URL of the absence supporting document (both left empty when no file is attached).
 
 ### Global Endpoints (Protected - Any Role)
 
@@ -879,8 +881,8 @@ For issues, questions, or suggestions:
 - Security verified
 - Documentation complete
 
-**Last Updated:** 2026-08-01  
-**Version:** 1.1.0
+**Last Updated:** 2026-08-02  
+**Version:** 1.2.0
 
 ---
 
