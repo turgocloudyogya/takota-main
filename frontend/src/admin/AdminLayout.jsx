@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import {
   House,
@@ -178,6 +179,7 @@ export default function AdminLayout() {
 
   async function handleLogout() {
     await api.logout()
+    toast.info("Berhasil keluar!")
     navigate('/', { replace: true })
   }
 
@@ -246,7 +248,7 @@ export default function AdminLayout() {
             type="button"
             onClick={handleLogout}
             aria-label={collapsed ? 'Keluar' : undefined}
-            className={`group relative flex items-center rounded-xl text-sm font-medium text-danger transition hover:bg-danger/10 ${
+            className={`group cursor-pointer relative flex items-center rounded-xl text-sm font-medium text-danger transition hover:bg-danger/10 ${
               collapsed ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
             }`}
           >

@@ -145,17 +145,17 @@ export default function Absence() {
           <input ref={fileInputRef} type="file" onChange={handleFilePick} className="hidden" />
 
           {file ? (
-            <div className="relative mt-3 flex flex-col items-center justify-center gap-2 rounded-xl bg-orange-100 px-4 py-6">
+            <div className="relative mt-3 flex flex-col items-center justify-center gap-2 rounded-xl bg-orange-100 px-4 py-6 cursor-pointer">
               <button
                 type="button"
                 onClick={handleRemoveFile}
                 aria-label="Remove attachment"
-                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-white shadow-sm"
+                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-white shadow-sm cursor-pointer"
               >
                 <Icon data={Xmark} size={14} />
               </button>
               <Icon data={Files} size={28} className="text-neutral-700" />
-              <p className="text-center text-xs text-neutral-700">
+              <p className="w-full text-center text-xs text-neutral-700 truncate overflow-hidden">
                 {file.name}
                 <br />
                 {getFileExt(file.name)} · {formatFileSize(file.size)}
@@ -165,7 +165,7 @@ export default function Absence() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl bg-neutral-100 px-4 py-6"
+              className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl bg-neutral-100 px-4 py-6 cursor-pointer"
             >
               <Icon data={Files} size={28} className="text-neutral-400" />
               <span className="text-center text-xs text-neutral">
@@ -178,7 +178,7 @@ export default function Absence() {
             <button
               type="button"
               onClick={() => setReasonOpen((v) => !v)}
-              className="flex w-full items-center gap-2 rounded-xl bg-neutral-100 px-4 py-3 text-left text-sm text-neutral-900"
+              className="flex w-full items-center gap-2 rounded-xl bg-neutral-100 px-4 py-3 text-left text-sm text-neutral-900 cursor-pointer"
             >
               <Icon
                 data={ChevronDown}
@@ -195,7 +195,7 @@ export default function Absence() {
                     key={option.value}
                     type="button"
                     onClick={() => handleSelectReasonType(option)}
-                    className={`w-full px-4 py-3 text-left text-sm transition ${
+                    className={`w-full px-4 py-3 text-left text-sm transition cursor-pointer ${
                       reasonType?.value === option.value
                         ? 'bg-orange-500 text-white'
                         : 'bg-neutral-100 text-neutral-900 hover:bg-orange-500 hover:text-white'
@@ -211,7 +211,7 @@ export default function Absence() {
           <button
             type="button"
             onClick={handleTakeAbsence}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] cursor-pointer"
           >
             <Icon data={PaperPlane} size={16} />
             Take Absence!

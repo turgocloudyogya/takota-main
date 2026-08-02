@@ -72,9 +72,9 @@ func GetGreetingTitle(name string) string {
 	return fmt.Sprintf("%s, %s 👋", greeting, name)
 }
 
-// GenerateGoogleMapsEmbed generates Google Maps embed URL
-func GenerateGoogleMapsEmbed(latitude, longitude string) string {
-	return fmt.Sprintf("https://maps.google.com/maps?q=%s,%s&z=15&output=embed", latitude, longitude)
+// GenerateGoogleMapsLink generates a Google Maps link that opens in the Maps app or web
+func GenerateGoogleMapsLink(latitude, longitude string) string {
+	return fmt.Sprintf("https://www.google.com/maps/search/?api=1&query=%s,%s", latitude, longitude)
 }
 
 // ParseFloat64 safely parses string to float64

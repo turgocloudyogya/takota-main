@@ -1,14 +1,17 @@
 package controllers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/carakan/takota/internal/models"
 	"github.com/carakan/takota/internal/utils"
+	"github.com/carakan/takota/pkg/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type UserListResponse struct {
@@ -273,10 +276,46 @@ func (ctrl *AdminController) DeleteUser(c *gin.Context) {
 		}
 	}
 
-	// Delete user (will cascade delete attendances)
-	if err := ctrl.DB.Delete(&user).Error; err != nil {
+	// Collect S3 object keys from the records that will be deleted so their
+	// files can be removed from storage too.
+	var files []string
+	var userAttendance []models.Attendance
+	if err := ctrl.DB.Select("photo", "file").Where("user_id = ?", uid).
+		Find(&userAttendance).Error; err == nil {
+		for _, rec := range userAttendance {
+			if rec.Photo != nil {
+				files = append(files, *rec.Photo)
+			}
+			if rec.File != nil {
+				files = append(files, *rec.File)
+			}
+		}
+	}
+
+	// Delete the user together with all of their attendance/absence records.
+	// Records that this user signed/verified are kept, but their verifier is
+	// cleared (becomes "unknown") so signed history is never lost.
+	if err := ctrl.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Attendance{}).
+			Where("verify_by = ?", uid).
+			Update("verify_by", nil).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", uid).
+			Delete(&models.Attendance{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&models.User{}, "id = ?", uid).Error
+	}); err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Failed to delete user", "DB_ERROR")
 		return
+	}
+
+	// Remove orphaned files from S3 (best effort, failures are logged by s3).
+	for _, key := range files {
+		if key != "" {
+			s3.DeleteFile(context.Background(), key)
+		}
 	}
 
 	utils.RespondSuccess(c, http.StatusOK, gin.H{

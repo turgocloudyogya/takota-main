@@ -217,25 +217,40 @@ export default function AdminAttendance() {
                       {row.username && <p className="text-xs text-neutral">{row.username}</p>}
                     </td>
                     <td className="px-4 py-3 text-neutral-700">{formatDateTime(row.dateRaw)}</td>
-                    <td className="px-4 py-3 text-neutral-700">
-                      {row.displayAddress ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Icon data={MapPin} size={13} className="text-neutral" />
-                          {row.displayAddress}
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-neutral-700">
+                          {row.displayAddress ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Icon data={MapPin} size={13} className="text-neutral" />
+                              {row.displayAddress}
+                            </span>
+                          ) : row.location ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Icon data={MapPin} size={13} className="text-neutral" />
+                              {row.location}
+                            </span>
+                          ) : row.latitude && row.longitude ? (
+                            <span className="inline-flex items-center gap-1 text-xs">
+                              <Icon data={MapPin} size={13} className="text-neutral" />
+                              {Number(row.latitude).toFixed(4)}, {Number(row.longitude).toFixed(4)}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
                         </span>
-                      ) : row.location ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Icon data={MapPin} size={13} className="text-neutral" />
-                          {row.location}
-                        </span>
-                      ) : row.latitude && row.longitude ? (
-                        <span className="inline-flex items-center gap-1 text-xs">
-                          <Icon data={MapPin} size={13} className="text-neutral" />
-                          {Number(row.latitude).toFixed(4)}, {Number(row.longitude).toFixed(4)}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
+                        {row.mapsUrl && (
+                          <a
+                            href={row.mapsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Buka lokasi di Google Maps"
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Icon data={MapPin} size={14} />
+                          </a>
+                        )}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {row.photoUrl ? (

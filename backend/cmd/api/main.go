@@ -133,6 +133,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			admin.GET("/attendances", adminCtrl.ListAttendances)
 			admin.GET("/absences", adminCtrl.ListAbsences)
 			admin.DELETE("/attendance", adminCtrl.DeleteAttendance)
+			admin.DELETE("/absence/:absence_id", adminCtrl.DeleteAbsence)
 			admin.PATCH("/absence", adminCtrl.SignatureAbsence)
 
 			// User management

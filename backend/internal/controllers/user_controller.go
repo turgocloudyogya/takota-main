@@ -114,10 +114,18 @@ func (ctrl *UserController) Home(c *gin.Context) {
 		if abs.Option != nil {
 			item.Option = *abs.Option
 		}
-		if abs.VerifyBy != nil && abs.Verifier != nil {
+		if abs.SignStatus != nil {
+			username := "unknown"
+			var userID string
+			if abs.VerifyBy != nil && abs.Verifier != nil {
+				username = abs.Verifier.Username
+				userID = abs.Verifier.ID.String()
+			} else if abs.VerifyBy != nil {
+				userID = abs.VerifyBy.String()
+			}
 			item.Verify = &VerifierInfo{
-				UserID:     abs.Verifier.ID.String(),
-				Username:   abs.Verifier.Username,
+				UserID:     userID,
+				Username:   username,
 				SignStatus: abs.SignStatus,
 			}
 		}
@@ -193,8 +201,8 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 		photoPath = &objectKey
 	}
 
-	// Generate Google Maps embed
-	gmapsEmbed := utils.GenerateGoogleMapsEmbed(req.Latitude, req.Longitude)
+	// Generate Google Maps link
+	gmapsLink := utils.GenerateGoogleMapsLink(req.Latitude, req.Longitude)
 
 	// Resolve human-readable address (best-effort, does not block submission)
 	displayAddress, geoErr := utils.ReverseGeocode(req.Latitude, req.Longitude)
@@ -210,7 +218,7 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 		Latitude:       &req.Latitude,
 		Longitude:      &req.Longitude,
 		Photo:          photoPath,
-		GmapsEmbed:     &gmapsEmbed,
+		GmapsEmbed:     &gmapsLink,
 		DisplayAddress: displayAddress,
 		CreatedAt:      time.Now().UTC(),
 		UpdatedAt:      time.Now().UTC(),

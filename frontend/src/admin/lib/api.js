@@ -55,13 +55,28 @@ function buildQuery(params) {
 async function extractErrorMessage(response) {
   try {
     const data = await response.clone().json()
-    return (
-      data?.message ||
-      data?.error ||
-      data?.errors?.[0]?.message ||
-      (typeof data === 'string' ? data : null) ||
-      `Permintaan gagal (${response.status})`
-    )
+    if (data && typeof data === 'object') {
+      // Backend error envelope: { error: { status, message, code } }
+      if (data.error && typeof data.error === 'object') {
+        return (
+          data.error.message ||
+          data.error.code ||
+          `Permintaan gagal (${response.status})`
+        )
+      }
+      // Validation errors list: { errors: [{ message }] }
+      if (Array.isArray(data.errors) && data.errors.length) {
+        const first = data.errors[0]
+        if (first && typeof first === 'object') {
+          return first.message || JSON.stringify(first)
+        }
+        return String(first)
+      }
+      if (typeof data.message === 'string') return data.message
+      if (typeof data.error === 'string') return data.error
+    }
+    if (typeof data === 'string') return data
+    return `Permintaan gagal (${response.status})`
   } catch {
     try {
       const text = await response.text()

@@ -73,6 +73,7 @@ export function normalizeAttendance(raw) {
     name: firstDefined(
       raw.nickname,
       raw.name,
+      raw.user?.name,
       raw.user?.nickname,
       raw.callname,
       raw.username,
@@ -84,6 +85,11 @@ export function normalizeAttendance(raw) {
     longitude: firstDefined(raw.longitude, raw.lng, raw.long),
     location: firstDefined(raw.location, raw.address),
     displayAddress: firstDefined(raw.display_address, raw.displayAddress),
+    mapsUrl:
+      firstDefined(raw.gmaps_embed, raw.gmaps_url, raw.maps_url) ||
+      (raw.latitude && raw.longitude
+        ? `https://www.google.com/maps/search/?api=1&query=${raw.latitude},${raw.longitude}`
+        : ''),
     photoUrl: firstDefined(raw.photo, raw.photo_url, raw.image, raw.file),
     raw,
   }
@@ -115,6 +121,7 @@ export function normalizeAbsence(raw) {
     name: firstDefined(
       raw.nickname,
       raw.name,
+      raw.user?.name,
       raw.user?.nickname,
       raw.callname,
       raw.username,

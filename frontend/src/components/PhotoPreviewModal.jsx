@@ -49,7 +49,7 @@ export default function PhotoPreviewModal({ photo, onClose }) {
                   const hours = d.getHours()
                   const minutes = d.getMinutes().toString().padStart(2, '0')
                   return `${month}/${day}/${year} ${hours}:${minutes}`
-                })() : ''} • By @{photo.username || 'user'}
+                })() : ''} • oleh @{photo.username || 'user'}
               </p>
             </div>
           </motion.div>

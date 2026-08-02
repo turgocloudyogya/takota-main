@@ -48,9 +48,11 @@ type PhotosResponse struct {
 }
 
 type PhotoItem struct {
-	ID          string `json:"id"`
-	URL         string `json:"url"`
-	Description string `json:"description"`
+	ID          string        `json:"id"`
+	URL         string        `json:"url"`
+	Description string        `json:"description"`
+	Timestamp   string        `json:"timestamp"`
+	User        *ListItemUser `json:"user"`
 }
 
 // GetInfo returns global user info with validation check
@@ -170,6 +172,8 @@ func (ctrl *AllController) GetPhotos(c *gin.Context) {
 			ID:          att.ID.String(),
 			URL:         photoURL,
 			Description: description,
+			Timestamp:   att.CreatedAt.Format(time.RFC3339),
+			User:        buildListItemUser(att.User),
 		})
 	}
 

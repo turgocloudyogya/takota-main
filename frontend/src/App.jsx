@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
 import { checkAuth, clearSession } from './lib/authGate.js'
 import Login from './pages/Login.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
@@ -32,6 +32,7 @@ function AuthGate() {
       if (result.valid === false) {
         clearSession()
         if (location.pathname !== '/') {
+          toast.error("Unvalid session, please login!")
           navigate('/', { replace: true })
         }
         return

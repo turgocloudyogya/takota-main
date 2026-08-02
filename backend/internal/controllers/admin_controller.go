@@ -26,14 +26,15 @@ type AttendanceListResponse struct {
 }
 
 type AttendanceListItem struct {
-	ID             string `json:"id"`
-	UserID         string `json:"user_id"`
-	Photo          string `json:"photo"`
-	GmapsEmbed     string `json:"gmaps_embed"`
-	DisplayAddress string `json:"display_address"`
-	Latitude       string `json:"latitude"`
-	Longitude      string `json:"longitude"`
-	Timestamp      string `json:"timestamp"`
+	ID             string        `json:"id"`
+	UserID         string        `json:"user_id"`
+	User           *ListItemUser `json:"user"`
+	Photo          string        `json:"photo"`
+	GmapsEmbed     string        `json:"gmaps_embed"`
+	DisplayAddress string        `json:"display_address"`
+	Latitude       string        `json:"latitude"`
+	Longitude      string        `json:"longitude"`
+	Timestamp      string        `json:"timestamp"`
 }
 
 type AbsenceListResponse struct {
@@ -44,11 +45,17 @@ type AbsenceListResponse struct {
 type AbsenceListItem struct {
 	ID        string        `json:"id"`
 	UserID    string        `json:"user_id"`
+	User      *ListItemUser `json:"user"`
 	File      string        `json:"file"`
 	Reason    string        `json:"reason"`
 	Option    string        `json:"option"`
 	Verify    *VerifyDetail `json:"verify"`
 	Timestamp string        `json:"timestamp"`
+}
+
+type ListItemUser struct {
+	Username string `json:"username"`
+	Name     string `json:"name"`
 }
 
 type VerifyDetail struct {
@@ -92,7 +99,10 @@ func (ctrl *AdminController) ListAttendances(c *gin.Context) {
 	}
 
 	var attendances []models.Attendance
-	query.Order("attendance.created_at DESC").Limit(limit + 1).Find(&attendances)
+	query.Order("attendance.created_at DESC").
+		Limit(limit + 1).
+		Preload("User").
+		Find(&attendances)
 
 	// Check if there are more results
 	hasMore := len(attendances) > limit
@@ -133,6 +143,7 @@ func (ctrl *AdminController) ListAttendances(c *gin.Context) {
 		items = append(items, AttendanceListItem{
 			ID:             att.ID.String(),
 			UserID:         att.UserID.String(),
+			User:           buildListItemUser(att.User),
 			Photo:          photoURL,
 			GmapsEmbed:     gmapsEmbed,
 			DisplayAddress: displayAddress,
@@ -183,6 +194,7 @@ func (ctrl *AdminController) ListAbsences(c *gin.Context) {
 	query.Order("attendance.created_at DESC").
 		Limit(limit + 1).
 		Preload("Verifier").
+		Preload("User").
 		Find(&absences)
 
 	// Check if there are more results
@@ -212,10 +224,18 @@ func (ctrl *AdminController) ListAbsences(c *gin.Context) {
 		}
 
 		var verify *VerifyDetail
-		if abs.VerifyBy != nil && abs.Verifier != nil {
+		if abs.SignStatus != nil {
+			username := "unknown"
+			var userID string
+			if abs.VerifyBy != nil && abs.Verifier != nil {
+				username = abs.Verifier.Username
+				userID = abs.Verifier.ID.String()
+			} else if abs.VerifyBy != nil {
+				userID = abs.VerifyBy.String()
+			}
 			verify = &VerifyDetail{
-				UserID:     abs.Verifier.ID.String(),
-				Username:   abs.Verifier.Username,
+				UserID:     userID,
+				Username:   username,
 				SignStatus: abs.SignStatus,
 			}
 		}
@@ -223,6 +243,7 @@ func (ctrl *AdminController) ListAbsences(c *gin.Context) {
 		items = append(items, AbsenceListItem{
 			ID:        abs.ID.String(),
 			UserID:    abs.UserID.String(),
+			User:      buildListItemUser(abs.User),
 			File:      fileURL,
 			Reason:    reason,
 			Option:    option,
@@ -278,6 +299,55 @@ func (ctrl *AdminController) DeleteAttendance(c *gin.Context) {
 
 	utils.RespondSuccess(c, http.StatusOK, gin.H{
 		"message": "Attendance deleted successfully",
+	})
+}
+
+// buildListItemUser maps a user record to the compact user object exposed in lists
+func buildListItemUser(u models.User) *ListItemUser {
+	if u.ID == uuid.Nil {
+		return nil
+	}
+	return &ListItemUser{
+		Username: u.Username,
+		Name:     u.Nickname,
+	}
+}
+
+// DeleteAbsence deletes an absence record by its ID path parameter
+func (ctrl *AdminController) DeleteAbsence(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("absence_id"))
+	if err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Data not found", utils.ErrDataNotFound)
+		return
+	}
+
+	// Find absence
+	var absence models.Attendance
+	if err := ctrl.DB.Where("id = ?", id).First(&absence).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Data not found", utils.ErrDataNotFound)
+		return
+	}
+
+	// Only absence records can be deleted via this endpoint
+	if absence.Type != "absence" {
+		utils.RespondError(c, http.StatusNotFound, "Data not found", utils.ErrDataNotFound)
+		return
+	}
+
+	// Delete file from S3 if exists
+	if absence.File != nil {
+		ctx := context.Background()
+		s3.DeleteFile(ctx, *absence.File)
+	}
+
+	// Delete absence
+	if err := ctrl.DB.Delete(&absence).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to delete", "DB_ERROR")
+		return
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"message": "Absence deleted successfully",
 	})
 }
 

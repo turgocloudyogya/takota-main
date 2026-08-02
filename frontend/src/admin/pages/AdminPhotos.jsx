@@ -35,9 +35,9 @@ export default function AdminPhotos() {
         const mappedPhotos = data.data.map((photo) => ({
           id: photo.id,
           url: photo.url,
-          date: photo.created_at || '',
-          nickname: photo.nickname || 'Siswa',
-          username: photo.nickname || 'Siswa', // For modal compatibility
+          date: photo.timestamp || photo.created_at || '',
+          nickname: photo.user?.name || 'Siswa',
+          username: photo.user?.username || 'Siswa', // For modal compatibility
         }))
         
         if (isLoadingMore) {
@@ -129,11 +129,14 @@ export default function AdminPhotos() {
                 />
                 <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/0 to-transparent p-2 opacity-0 transition duration-150 group-hover:opacity-100">
                   <p className="truncate text-[11px] font-medium text-white">
-                    {photo.date ? new Date(photo.date).toLocaleDateString('id-ID', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                    }) : ''} • {photo.nickname}
+                    {photo.date ? (() => {
+                      const d = new Date(photo.date)
+                      const month = String(d.getMonth() + 1).padStart(2, '0')
+                      const day = String(d.getDate()).padStart(2, '0')
+                      const hours = String(d.getHours()).padStart(2, '0')
+                      const minutes = String(d.getMinutes()).padStart(2, '0')
+                      return `${day}/${month}/${d.getFullYear()} ${hours}:${minutes}`
+                    })() : ''} • oleh {photo.nickname}
                   </p>
                 </div>
               </button>
