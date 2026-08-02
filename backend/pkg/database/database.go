@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/carakan/takota/internal/config"
-	"github.com/carakan/takota/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -36,12 +35,18 @@ func InitDB(cfg *config.Config) error {
 	// Connect to database with retry so the container can start before
 	// Postgres is ready and then run migrations automatically once it is up.
 	const maxAttempts = 15
-	connectAttempts := 0
-	for {
-		connectAttempts++
+	var sqlDB *sql.DB
+	for connectAttempts := 1; ; connectAttempts++ {
+		// Close any pool created by a previous (failed) attempt so we never
+		// leak connections or leave multiple pgx pools hitting the same backend.
+		if DB != nil {
+			if prev, err := DB.DB(); err == nil {
+				_ = prev.Close()
+			}
+		}
+
 		DB, err = gorm.Open(postgres.Open(dsn), gormConfig)
 		if err == nil {
-			var sqlDB *sql.DB
 			sqlDB, err = DB.DB()
 			if err == nil {
 				err = sqlDB.Ping()
@@ -62,21 +67,7 @@ func InitDB(cfg *config.Config) error {
 
 	log.Println("✓ Database connected successfully")
 
-	// Auto migrate models (optional, for development)
-	if cfg.Server.AppEnv != "production" {
-		if err := AutoMigrate(); err != nil {
-			log.Printf("Warning: Auto migration failed: %v", err)
-		}
-	}
-
 	return nil
-}
-
-func AutoMigrate() error {
-	return DB.AutoMigrate(
-		&models.User{},
-		&models.Attendance{},
-	)
 }
 
 func CloseDB() error {

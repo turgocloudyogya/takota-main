@@ -37,6 +37,7 @@ type DatabaseConfig struct {
 	SSLKey         string
 	MaxConnections int
 	MaxIdleConns   int
+	QueryExecMode  string
 }
 
 type RedisConfig struct {
@@ -102,6 +103,10 @@ func LoadConfig() (*Config, error) {
 			SSLKey:         getEnv("DB_SSL_KEY", ""),
 			MaxConnections: getEnvAsInt("DB_MAX_CONNECTIONS", 25),
 			MaxIdleConns:   getEnvAsInt("DB_MAX_IDLE_CONNECTIONS", 10),
+			// cache_describe avoids pgx's named server-side prepared statements
+			// (stmtcache_*) which can break behind a connection pooler and cause
+			// "prepared statement ... already exists (SQLSTATE 42P05)" at startup.
+			QueryExecMode: getEnv("DB_QUERY_EXEC_MODE", "cache_describe"),
 		},
 		Redis: RedisConfig{
 			URL:      getEnv("REDIS_URL", ""),
@@ -176,7 +181,7 @@ func getEnvAsFloat(key string, defaultValue float64) float64 {
 
 func (c *Config) GetDSN() string {
 	return fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s default_query_exec_mode=%s",
 		c.Database.Host,
 		c.Database.User,
 		c.Database.Password,
@@ -184,5 +189,6 @@ func (c *Config) GetDSN() string {
 		c.Database.Port,
 		c.Database.SSLMode,
 		c.App.Timezone,
+		c.Database.QueryExecMode,
 	)
 }

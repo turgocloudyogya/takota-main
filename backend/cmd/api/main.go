@@ -15,6 +15,7 @@ import (
 	"github.com/carakan/takota/pkg/database"
 	"github.com/carakan/takota/pkg/redis"
 	"github.com/carakan/takota/pkg/s3"
+	"github.com/carakan/takota/pkg/seed"
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,6 +40,11 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 	log.Println("✓ Database migrations completed")
+
+	// Seed default users (admin + test user) when the users table is empty
+	if err := seed.Run(database.GetDB()); err != nil {
+		log.Fatalf("Failed to seed users: %v", err)
+	}
 
 	// Initialize Redis
 	if err := redis.InitRedis(cfg); err != nil {

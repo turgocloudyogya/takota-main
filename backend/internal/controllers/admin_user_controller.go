@@ -189,7 +189,19 @@ func (ctrl *AdminController) UpdateUser(c *gin.Context) {
 	if req.Callname != "" {
 		user.Callname = req.Callname
 	}
-	if req.Type != "" {
+	if req.Type != "" && req.Type != user.Type {
+		// The database must always keep at least one admin: never demote the last admin.
+		if user.Type == "admin" && req.Type != "admin" {
+			var adminCount int64
+			if err := ctrl.DB.Model(&models.User{}).Where("type = ?", "admin").Count(&adminCount).Error; err != nil {
+				utils.RespondError(c, http.StatusInternalServerError, "Failed to update user", "DB_ERROR")
+				return
+			}
+			if adminCount <= 1 {
+				utils.RespondError(c, http.StatusBadRequest, "Cannot demote the last admin, at least one admin must remain", utils.ErrCannotDemoteLastAdmin)
+				return
+			}
+		}
 		user.Type = req.Type
 	}
 	if req.Password != "" {
@@ -229,6 +241,36 @@ func (ctrl *AdminController) DeleteUser(c *gin.Context) {
 	if err := ctrl.DB.Where("id = ?", uid).First(&user).Error; err != nil {
 		utils.RespondError(c, http.StatusNotFound, "User not found", utils.ErrUserNotFound)
 		return
+	}
+
+	// An admin cannot delete their own account.
+	if currentUserID := c.GetString("user_id"); currentUserID != "" && currentUserID == user.ID.String() {
+		utils.RespondError(c, http.StatusBadRequest, "You cannot delete your own account", utils.ErrCannotDeleteSelf)
+		return
+	}
+
+	// Keep the last user in the database: never allow deleting the only account.
+	var totalCount int64
+	if err := ctrl.DB.Model(&models.User{}).Count(&totalCount).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to delete user", "DB_ERROR")
+		return
+	}
+	if totalCount <= 1 {
+		utils.RespondError(c, http.StatusBadRequest, "Cannot delete the last user, at least one user must remain", utils.ErrCannotDeleteLastUser)
+		return
+	}
+
+	// The remaining account must always be an admin: never delete the last admin.
+	if user.Type == "admin" {
+		var adminCount int64
+		if err := ctrl.DB.Model(&models.User{}).Where("type = ?", "admin").Count(&adminCount).Error; err != nil {
+			utils.RespondError(c, http.StatusInternalServerError, "Failed to delete user", "DB_ERROR")
+			return
+		}
+		if adminCount <= 1 {
+			utils.RespondError(c, http.StatusBadRequest, "Cannot delete the last admin, at least one admin must remain", utils.ErrCannotDeleteLastAdmin)
+			return
+		}
 	}
 
 	// Delete user (will cascade delete attendances)
