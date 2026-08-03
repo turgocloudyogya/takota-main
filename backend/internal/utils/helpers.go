@@ -20,6 +20,23 @@ func appLocation() *time.Location {
 	return time.UTC
 }
 
+// AppLocation returns the configured application timezone, falling back to UTC.
+func AppLocation() *time.Location {
+	return appLocation()
+}
+
+// GMTOffset returns the configured application timezone offset as an
+// ISO-style string, e.g. "+07:00" for Asia/Jakarta or "-05:00" for America/New_York.
+func GMTOffset() string {
+	_, offset := Now().Zone()
+	sign := "+"
+	if offset < 0 {
+		sign = "-"
+		offset = -offset
+	}
+	return fmt.Sprintf("%s%02d:%02d", sign, offset/3600, (offset%3600)/60)
+}
+
 // Now returns the current time in the configured application timezone.
 func Now() time.Time {
 	return time.Now().In(appLocation())
@@ -40,7 +57,7 @@ func CheckPasswordHash(password, hash string) bool {
 // GetGreetingTime returns greeting based on the configured app timezone
 func GetGreetingTime() string {
 	hour := Now().Hour()
-	
+
 	if hour >= 5 && hour < 12 {
 		return "morning"
 	} else if hour >= 12 && hour < 17 {
@@ -55,7 +72,7 @@ func GetGreetingTime() string {
 func GetGreetingTitle(name string) string {
 	timeOfDay := GetGreetingTime()
 	var greeting string
-	
+
 	switch timeOfDay {
 	case "morning":
 		greeting = "Good Morning"
@@ -68,7 +85,7 @@ func GetGreetingTitle(name string) string {
 	default:
 		greeting = "Hello"
 	}
-	
+
 	return fmt.Sprintf("%s, %s 👋", greeting, name)
 }
 
@@ -91,7 +108,7 @@ func GetMonthNumber(monthName string) int {
 		"february": 2, "feb": 2,
 		"march": 3, "mar": 3,
 		"april": 4, "apr": 4,
-		"may": 5,
+		"may":  5,
 		"june": 6, "jun": 6,
 		"july": 7, "jul": 7,
 		"august": 8, "aug": 8,
@@ -100,7 +117,7 @@ func GetMonthNumber(monthName string) int {
 		"november": 11, "nov": 11,
 		"december": 12, "dec": 12,
 	}
-	
+
 	if month, ok := months[monthName]; ok {
 		return month
 	}

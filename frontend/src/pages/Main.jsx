@@ -6,6 +6,7 @@ import { ArrowRightFromSquare, Paperclip } from '@gravity-ui/icons'
 import { getUserHome, logout } from '../lib/api.js'
 import AbsenceCard from '../components/AbsenceCard.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
+import ThemeToggle from '../components/ThemeToggle.jsx'
 import { ConfirmDialog } from '../components/Modals.jsx'
 
 const GREETING_LABELS = {
@@ -46,13 +47,14 @@ function formatFullDate(timestamp) {
 }
 
 function formatNow(date) {
-  return date.toLocaleString('id-ID', {
+  return date.toLocaleString('en-US', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
   })
 }
 
@@ -129,7 +131,7 @@ export default function Main() {
             }
             
             // Use reason as title
-            const title = item.reason || (item.option === 'sick' ? 'Izin karena sakit' : 'Izin')
+            const title = item.reason || (item.option === 'sick' ? 'Leave because sick' : 'Leave')
             
             return {
               id: item.id || Math.random().toString(),
@@ -206,22 +208,22 @@ export default function Main() {
 
   if (loading) {
     return (
-      <main className="mx-auto min-h-screen w-full max-w-md px-6">
+      <main className="mx-auto min-h-dvh w-full max-w-md px-6">
         <div className="animate-pulse">
           <div className="py-4 pt-8">
-            <div className="h-8 w-64 rounded bg-neutral-200" />
+            <div className="h-8 w-64 rounded bg-neutral-200 dark:bg-neutral-700" />
           </div>
           
           <section className="mt-6">
-            <div className="mb-2 h-4 w-16 rounded bg-neutral-200" />
-            <div className="h-20 w-full rounded-xl bg-neutral-200" />
+            <div className="mb-2 h-4 w-16 rounded bg-neutral-200 dark:bg-neutral-700" />
+            <div className="h-20 w-full rounded-xl bg-neutral-200 dark:bg-neutral-700" />
           </section>
 
           <section className="mt-6">
-            <div className="mb-2 h-4 w-20 rounded bg-neutral-200" />
+            <div className="mb-2 h-4 w-20 rounded bg-neutral-200 dark:bg-neutral-700" />
             <div className="flex flex-col gap-2">
-              <div className="h-20 w-full rounded-xl bg-neutral-200" />
-              <div className="h-20 w-full rounded-xl bg-neutral-200" />
+              <div className="h-20 w-full rounded-xl bg-neutral-200 dark:bg-neutral-700" />
+              <div className="h-20 w-full rounded-xl bg-neutral-200 dark:bg-neutral-700" />
             </div>
           </section>
         </div>
@@ -230,39 +232,42 @@ export default function Main() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-6">
+    <main className="mx-auto min-h-dvh w-full max-w-md px-6">
       <header className="flex items-start justify-between gap-4 py-4 pt-8">
         <div>
-          <h1 className="text-xl font-bold leading-tight text-neutral-900">
+          <h1 className="text-xl font-bold leading-tight text-neutral-900 dark:text-neutral-100">
             {greeting}, {userName} <span aria-hidden>👋</span>
           </h1>
-          <small className="mt-1 block text-xs text-neutral">{formatNow(now)}</small>
+          <small className="mt-1 block text-xs text-neutral dark:text-neutral-400">{formatNow(now)}</small>
         </div>
 
-        <button
-          type="button"
-          onClick={handleLogoutClick}
-          aria-label="Logout"
-          title="Logout"
-          className="flex cursor-pointer h-9 w-9 shrink-0 items-center justify-center rounded-full text-danger transition hover:bg-danger/10 active:scale-[0.96]"
-        >
-          <Icon data={ArrowRightFromSquare} size={18} />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <ThemeToggle className="h-9 w-9 rounded-full" />
+          <button
+            type="button"
+            onClick={handleLogoutClick}
+            aria-label="Logout"
+            title="Logout"
+            className="flex cursor-pointer h-9 w-9 shrink-0 items-center justify-center rounded-full text-danger transition hover:bg-danger/10 active:scale-[0.96]"
+          >
+            <Icon data={ArrowRightFromSquare} size={18} />
+          </button>
+        </div>
       </header>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-medium text-neutral">Today</h2>
+        <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Today</h2>
         {todayStatus ? (
           <AbsenceCard {...todayStatus} />
         ) : (
-          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8">
-            <p className="text-sm text-neutral">No attendance status yet</p>
+          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8 dark:bg-neutral-800/60">
+            <p className="text-sm text-neutral dark:text-neutral-400">No attendance status yet</p>
           </div>
         )}
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-sm font-medium text-neutral">Absence</h2>
+        <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Absence</h2>
         {absenceList.length > 0 ? (
           <div className="flex flex-col gap-2">
             {absenceList.map((item) => (
@@ -270,8 +275,8 @@ export default function Main() {
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8">
-            <p className="text-sm text-neutral">There is no absence list</p>
+          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8 dark:bg-neutral-800/60">
+            <p className="text-sm text-neutral dark:text-neutral-400">There is no absence list</p>
           </div>
         )}
       </section>

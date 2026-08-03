@@ -133,7 +133,7 @@ func LoadConfig() (*Config, error) {
 			ExpiryHours: getEnvAsInt("JWT_EXPIRY_HOURS", 24),
 		},
 		App: AppConfig{
-			MaxLoginAttempts:         getEnvAsInt("MAX_LOGIN_ATTEMPTS", 5),
+			MaxLoginAttempts:         getEnvAsInt("MAX_LOGIN_ATTEMPTS", 10),
 			LoginLockDurationMinutes: getEnvAsInt("LOGIN_LOCK_DURATION_MINUTES", 5),
 			Timezone:                 getEnv("TIMEZONE_APP", getEnv("TIMEZONE", "UTC")),
 		},

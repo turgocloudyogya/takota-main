@@ -54,6 +54,10 @@ COPY --from=backend-build /out/takota-api /usr/local/bin/takota-api
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Production defaults (overridable at runtime via docker run -e or compose)
+ENV APP_ENV=production \
+    GIN_MODE=release
+
 # Health check goes through nginx -> backend /health, so it only reports
 # healthy when both nginx and the API are responding.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

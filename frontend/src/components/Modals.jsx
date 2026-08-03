@@ -19,7 +19,7 @@ export function AppModal({ open, onOpenChange, size = 'md', title, description, 
               <Modal.Header>
                 {title && <Modal.Heading>{title}</Modal.Heading>}
                 {description && (
-                  <p className="mt-1 text-sm text-neutral">{description}</p>
+                  <p className="mt-1 text-sm text-neutral dark:text-neutral-400">{description}</p>
                 )}
                 <Modal.CloseTrigger />
               </Modal.Header>
@@ -36,10 +36,10 @@ export function AppModal({ open, onOpenChange, size = 'md', title, description, 
 export function ConfirmDialog({
   open,
   onOpenChange,
-  title = 'Konfirmasi',
+  title = 'Confirmation',
   description,
-  confirmLabel = 'Ya, lanjutkan',
-  cancelLabel = 'Batal',
+  confirmLabel = 'Yes, continue',
+  cancelLabel = 'Cancel',
   danger = false,
   loading = false,
   onConfirm,
@@ -59,7 +59,7 @@ export function ConfirmDialog({
             onPress={onConfirm}
             isDisabled={loading}
           >
-            {loading ? 'Memproses…' : confirmLabel}
+            {loading ? 'Processing…' : confirmLabel}
           </Button>
         </div>
       }
@@ -71,8 +71,8 @@ export function ConfirmDialog({
           </span>
         )}
         <div>
-          <p className="text-sm font-semibold text-neutral-900">{title}</p>
-          {description && <p className="mt-1 text-sm text-neutral">{description}</p>}
+          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{title}</p>
+          {description && <p className="mt-1 text-sm text-neutral dark:text-neutral-400">{description}</p>}
         </div>
       </div>
     </AppModal>

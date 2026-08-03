@@ -22,7 +22,7 @@ export default function AdminUsers() {
   const [pageIndex, setPageIndex] = useState(0)
   const [lastIds, setLastIds] = useState([''])
   const [hasNext, setHasNext] = useState(false)
-  const [typeFilter, setTypeFilter] = useState('all') // 'all' | 'user' | 'admin' — view-only split of the current page
+  const [typeFilter, setTypeFilter] = useState('all') // 'all' | 'user' | 'admin' - view-only split of the current page
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
@@ -43,7 +43,7 @@ export default function AdminUsers() {
     return items.filter((u) => (typeFilter === 'admin' ? u.type === 'admin' : u.type !== 'admin'))
   }, [items, typeFilter])
 
-  const filterNoun = typeFilter === 'admin' ? 'admin' : typeFilter === 'user' ? 'siswa' : 'pengguna'
+  const filterNoun = typeFilter === 'admin' ? 'admin' : typeFilter === 'user' ? 'student' : 'user'
 
   // Use refs to store latest values for polling
   const pageIndexRef = useRef(pageIndex)
@@ -86,7 +86,7 @@ export default function AdminUsers() {
       } catch (err) {
         // Only show error toast if not polling
         if (!isPolling) {
-          toast.error(err.message || 'Gagal memuat data pengguna.')
+          toast.error(err.message || 'Failed to load user data.')
         }
       } finally {
         if (!isPolling) {
@@ -118,7 +118,7 @@ export default function AdminUsers() {
           })
         }
       } catch (err) {
-        if (!cancelled) toast.error(err.message || 'Gagal memuat data pengguna.')
+        if (!cancelled) toast.error(err.message || 'Failed to load user data.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -179,11 +179,11 @@ export default function AdminUsers() {
     setDeleting(true)
     try {
       await api.deleteUser(deleteTarget.id)
-      toast.success(`Akun ${deleteTarget.username} berhasil dihapus.`)
+      toast.success(`Account ${deleteTarget.username} deleted successfully.`)
       setDeleteTarget(null)
       handleRefresh()
     } catch (err) {
-      toast.error(err.message || 'Gagal menghapus akun.')
+      toast.error(err.message || 'Failed to delete account.')
     } finally {
       setDeleting(false)
     }
@@ -193,17 +193,17 @@ export default function AdminUsers() {
     <div className="flex flex-col gap-5">
       <PageHeader
         icon={Persons}
-        eyebrow="Data Pengguna"
+        eyebrow="User Data"
         title="Users"
-        description="Kelola akun pengguna (siswa & admin) untuk aplikasi presensi Takota — tambah, ubah, atau hapus akun."
+        description="Manage user accounts (students & admins) for the Takota attendance app, add, edit, or delete accounts."
       />
 
       <SegmentedFilter
         value={typeFilter}
         onChange={setTypeFilter}
         options={[
-          { key: 'all', label: 'Semua', count: typeCounts.all, icon: Layers, tone: 'neutral' },
-          { key: 'user', label: 'Siswa', count: typeCounts.user, icon: Person, tone: 'neutral' },
+          { key: 'all', label: 'All', count: typeCounts.all, icon: Layers, tone: 'neutral' },
+          { key: 'user', label: 'Students', count: typeCounts.user, icon: Person, tone: 'neutral' },
           { key: 'admin', label: 'Admin', count: typeCounts.admin, icon: ShieldKeyhole, tone: 'accent' },
         ]}
       />
@@ -213,11 +213,11 @@ export default function AdminUsers() {
         onSearchChange={setSearchInput}
         onSearchSubmit={handleSearchSubmit}
         onRefresh={handleRefresh}
-        placeholder="Cari nama atau username…"
+        placeholder="Search name or username…"
         actions={
           <Button variant="primary" size="sm" onPress={openCreate}>
             <Icon data={PersonPlus} size={15} />
-            Tambah {typeFilter === 'admin' ? 'Admin' : typeFilter === 'user' ? 'Siswa' : 'Pengguna'}
+            Add {typeFilter === 'admin' ? 'Admin' : typeFilter === 'user' ? 'Student' : 'User'}
           </Button>
         }
       />
@@ -225,19 +225,19 @@ export default function AdminUsers() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral">
+            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">
               <tr>
-                <th className="px-4 py-3">Nama</th>
+                <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Username</th>
-                <th className="px-4 py-3">Tipe</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-app-border/10">
+            <tbody className="divide-y divide-app-border/10 dark:divide-white/10">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-neutral">
-                    Memuat data…
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-neutral dark:text-neutral-400">
+                    Loading data…
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
@@ -246,28 +246,28 @@ export default function AdminUsers() {
                     <EmptyState
                       label={
                         items.length === 0
-                          ? 'Belum ada data pengguna'
-                          : `Tidak ada akun ${filterNoun} di halaman ini`
+                          ? 'No user data yet'
+                          : `No ${filterNoun} accounts on this page`
                       }
                     />
                   </td>
                 </tr>
               ) : (
                 filteredItems.map((user) => (
-                  <tr key={user.id} className="hover:bg-neutral-50/60">
+                  <tr key={user.id} className="hover:bg-neutral-50/60 dark:hover:bg-white/5">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-neutral-900">{user.nickname}</p>
+                      <p className="font-medium text-neutral-900 dark:text-neutral-100">{user.nickname}</p>
                       {user.callname && user.callname !== user.nickname && (
-                        <p className="text-xs text-neutral">{user.callname}</p>
+                        <p className="text-xs text-neutral dark:text-neutral-400">{user.callname}</p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-neutral-700">{user.username}</td>
+                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{user.username}</td>
                     <td className="px-4 py-3">
                       <TypeChip type={user.type} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1.5">
-                        <Button variant="ghost" size="sm" isIconOnly onPress={() => openEdit(user)} aria-label="Ubah">
+                        <Button variant="ghost" size="sm" isIconOnly onPress={() => openEdit(user)} aria-label="Edit">
                           <Icon data={Pencil} size={14} />
                         </Button>
                         <Button
@@ -275,7 +275,7 @@ export default function AdminUsers() {
                           size="sm"
                           isIconOnly
                           onPress={() => setDeleteTarget(user)}
-                          aria-label="Hapus"
+                          aria-label="Delete"
                           className="text-danger"
                         >
                           <Icon data={TrashBin} size={14} />
@@ -298,8 +298,8 @@ export default function AdminUsers() {
             loading={loading}
             countLabel={
               typeFilter === 'all'
-                ? `Halaman ${pageIndex + 1} · ${items.length} pengguna ditampilkan`
-                : `Halaman ${pageIndex + 1} · ${filteredItems.length} dari ${items.length} pengguna (${filterNoun})`
+                ? `Page ${pageIndex + 1} · ${items.length} users shown`
+                : `Page ${pageIndex + 1} · ${filteredItems.length} of ${items.length} users (${filterNoun})`
             }
           />
         </div>
@@ -316,13 +316,13 @@ export default function AdminUsers() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title={`Hapus akun ${deleteTarget?.type === 'admin' ? 'admin' : 'siswa'}?`}
+        title={`Delete ${deleteTarget?.type === 'admin' ? 'admin' : 'student'} account?`}
         description={
           deleteTarget
-            ? `Akun "${deleteTarget.nickname}" (${deleteTarget.username}) akan dihapus permanen dan tidak dapat dikembalikan.`
+            ? `The account "${deleteTarget.nickname}" (${deleteTarget.username}) will be permanently deleted and cannot be recovered.`
             : ''
         }
-        confirmLabel="Hapus"
+        confirmLabel="Delete"
         danger
         loading={deleting}
         onConfirm={handleDelete}

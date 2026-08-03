@@ -5,6 +5,11 @@
 @import "@fontsource/geist-sans/600.css";
 @import "@fontsource/geist-sans/700.css";
 
+/* Class-based dark mode: the `dark` class is toggled on <html> by the
+   ThemeProvider (src/lib/theme.jsx). This custom variant is what lets every
+   utility below use `dark:` variants. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
@@ -34,10 +39,24 @@ body,
   background-color: #ffffff;
 }
 
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   background-color: #ffffff;
+}
+
+.dark,
+.dark body,
+.dark #root {
+  background-color: #0a0a0a;
 }
 
 /* Sonner toaster: keep it centered top, tuned to the brand palette */
@@ -54,7 +73,17 @@ body {
   --error-text: #7a1116;
 }
 
-/* HeroUI v3 theme tokens — remapped to the brand palette above (unlayered
+.dark {
+  --normal-bg: #171717;
+  --normal-border: rgba(255, 255, 255, 0.12);
+  --normal-text: #e5e5e5;
+  --success-bg: rgba(0, 188, 125, 0.14);
+  --success-text: #6ee7b7;
+  --error-bg: rgba(251, 44, 54, 0.14);
+  --error-text: #fca5a5;
+}
+
+/* HeroUI v3 theme tokens - remapped to the brand palette above (unlayered
    CSS, so this always wins over @heroui/styles' own `@layer theme` values).
    Any HeroUI component's derived hover/soft shades recompute automatically
    from these via color-mix(), so this is the only place to touch. */
@@ -75,12 +104,31 @@ body {
   border-radius: 1.125rem !important;
   /* Replacing color-mix(in oklch) with rgba for html2canvas compatibility */
   border: 1px solid rgba(125, 125, 143, 0.12);
-  box-shadow:
-    0 1px 2px rgba(125, 125, 143, 0.08),
-    0 8px 20px -12px rgba(125, 125, 143, 0.30);
 }
 
-/* Signature: a slow "presence" pulse used sparingly — the sidebar mark and
+.dark .card {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Recharts: axis ticks, gridlines and the hover tooltip are hard-coded to
+   light-mode colors inside SVG, so nudge them for dark mode here. */
+.dark .recharts-text {
+  fill: #a3a3a3;
+}
+.dark .recharts-default-tooltip {
+  background-color: #1c1c1c !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  border-radius: 0.75rem;
+}
+.dark .recharts-default-tooltip .recharts-tooltip-item {
+  color: #e5e5e5;
+}
+.dark .recharts-cartesian-axis-line,
+.dark .recharts-cartesian-axis-tick-line {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+
+/* Signature: a slow "presence" pulse used sparingly - the sidebar mark and
    the live "today" indicator on the dashboard. Ties the brand mark back to
    the product's actual job: confirming someone checked in, right now. */
 @keyframes presence-pulse {

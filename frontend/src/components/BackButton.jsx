@@ -24,7 +24,7 @@ export default function BackButton({ label, to, onClick, className = '' }) {
       <button
         type="button"
         onClick={handleClick}
-        className={`inline-flex cursor-pointer items-center gap-1 rounded-full py-1.5 pr-3 pl-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 active:scale-[0.97] ${className}`}
+        className={`inline-flex cursor-pointer items-center gap-1 rounded-full py-1.5 pr-3 pl-1.5 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 hover:text-neutral-900 active:scale-[0.97] dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 ${className}`}
       >
         <Icon data={ChevronLeft} size={18} />
         {label}
@@ -37,7 +37,7 @@ export default function BackButton({ label, to, onClick, className = '' }) {
       type="button"
       onClick={handleClick}
       aria-label="Back"
-      className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-neutral-900 transition hover:bg-neutral-100 active:scale-[0.94] ${className}`}
+      className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-neutral-900 transition hover:bg-neutral-100 active:scale-[0.94] dark:text-neutral-100 dark:hover:bg-neutral-800 ${className}`}
     >
       <Icon data={ChevronLeft} size={20} />
     </button>

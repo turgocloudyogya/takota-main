@@ -61,7 +61,7 @@ async function extractErrorMessage(response) {
         return (
           data.error.message ||
           data.error.code ||
-          `Permintaan gagal (${response.status})`
+          `Request failed (${response.status})`
         )
       }
       // Validation errors list: { errors: [{ message }] }
@@ -76,13 +76,13 @@ async function extractErrorMessage(response) {
       if (typeof data.error === 'string') return data.error
     }
     if (typeof data === 'string') return data
-    return `Permintaan gagal (${response.status})`
+    return `Request failed (${response.status})`
   } catch {
     try {
       const text = await response.text()
-      return text || `Permintaan gagal (${response.status})`
+      return text || `Request failed (${response.status})`
     } catch {
-      return `Permintaan gagal (${response.status})`
+      return `Request failed (${response.status})`
     }
   }
 }
@@ -112,7 +112,7 @@ async function request(path, { method = 'GET', params, body, auth = true, raw = 
     })
   } catch {
     throw new ApiError(
-      `Tidak dapat menghubungi server (${getBaseUrl()}). Periksa koneksi atau pastikan backend berjalan.`
+      `Cannot reach the server (${getBaseUrl()}). Check your connection or make sure the backend is running.`
     )
   }
 
@@ -161,7 +161,7 @@ export async function login(username, password) {
   })
   const token = pickToken(json)
   if (!token) {
-    throw new ApiError('Login berhasil tetapi token tidak ditemukan pada respons server.')
+    throw new ApiError('Login succeeded but no token was found in the server response.')
   }
   setToken(token)
   return token
@@ -190,7 +190,7 @@ export async function changePassword({ currentPassword, newPassword, repeatPassw
 }
 
 // ---------------------------------------------------------------------------
-// Admin — Users
+// Admin - Users
 // ---------------------------------------------------------------------------
 
 export async function listUsers({ limit = 50, lastId = '', search = '' } = {}) {
@@ -230,7 +230,7 @@ export async function deleteUser(id) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin — Attendance
+// Admin - Attendance
 // ---------------------------------------------------------------------------
 
 export async function listAttendance({ limit = 50, lastId = '', search = '' } = {}) {
@@ -242,7 +242,7 @@ export async function deleteAttendance(id) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin — Absence
+// Admin - Absence
 // ---------------------------------------------------------------------------
 
 export async function listAbsence({ limit = 50, lastId = '', search = '' } = {}) {
@@ -258,18 +258,18 @@ export async function deleteAbsence(id) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin — Export
+// Admin - Export
 // ---------------------------------------------------------------------------
 
-export async function exportAttendanceServer({ month, lang = 'id' } = {}) {
+export async function exportAttendanceServer({ month, year, lang = 'en' } = {}) {
   const response = await request('/api/admin/export', {
-    params: { month, lang },
+    params: { month, year, lang },
     raw: true,
   })
   const blob = await response.blob()
   const disposition = response.headers.get('content-disposition') || ''
   const match = disposition.match(/filename="?([^";]+)"?/i)
-  const filename = match?.[1] || `rekap-presensi-${month || 'export'}.csv`
+  const filename = match?.[1] || `attendance-report-${month || 'export'}.csv`
   return { blob, filename }
 }
 

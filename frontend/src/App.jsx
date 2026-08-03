@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { checkAuth, clearSession } from './lib/authGate.js'
+import { useTheme } from './lib/useTheme.js'
 import Login from './pages/Login.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import Main from './pages/Main.jsx'
@@ -15,6 +16,22 @@ import AdminAttendance from './admin/pages/AdminAttendance.jsx'
 import AdminAbsence from './admin/pages/AdminAbsence.jsx'
 import AdminPhotos from './admin/pages/AdminPhotos.jsx'
 import AdminReports from './admin/pages/AdminReports.jsx'
+
+// Page title map: pathname → browser tab title
+const PAGE_TITLES = {
+  '/': 'Login • Absensi',
+  '/change-password': 'Change Password • Absensi',
+  '/main': 'Home • Absensi',
+  '/attendance': 'Attendance • Absensi',
+  '/absence': 'Absence • Absensi',
+  '/photos': 'Photos • Absensi',
+  '/admin/dashboard': 'Dashboard • Takota Admin',
+  '/admin/users': 'Users • Takota Admin',
+  '/admin/attendance': 'Attendance • Takota Admin',
+  '/admin/absence': 'Leave & Sick • Takota Admin',
+  '/admin/photos': 'Photo Gallery • Takota Admin',
+  '/admin/reports': 'Reports & Export • Takota Admin',
+}
 
 // Validates the JWT through GET /api/all/info on every route change.
 // Invalid sessions are sent back to "/"; valid sessions sitting on "/"
@@ -68,10 +85,18 @@ function AuthGate() {
 }
 
 export default function App() {
+  const { theme } = useTheme()
+  const location = useLocation()
+
+  // Update browser tab title based on current route
+  useEffect(() => {
+    document.title = PAGE_TITLES[location.pathname] || 'Absensi'
+  }, [location.pathname])
+
   return (
     <>
       {/* Error / status messages, centered top, per spec */}
-      <Toaster position="top-center" richColors closeButton />
+      <Toaster position="top-center" richColors closeButton theme={theme} />
 
       <AuthGate />
 

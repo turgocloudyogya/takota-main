@@ -52,8 +52,8 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 	if redis.Enabled {
 		isLocked, err := redis.IsAccountLocked(ctx, req.Username)
 		if err == nil && isLocked {
-			utils.RespondError(c, http.StatusBadRequest, 
-				"Your account has been locked for 5 minutes. Please try again later", 
+			utils.RespondError(c, http.StatusTooManyRequests, 
+				fmt.Sprintf("Account locked due to too many failed attempts. Please wait %d minutes before trying again", ctrl.Config.App.LoginLockDurationMinutes), 
 				utils.ErrUserLockLogin)
 			return
 		}
@@ -81,18 +81,18 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 					// Lock account
 					lockDuration := time.Duration(ctrl.Config.App.LoginLockDurationMinutes) * time.Minute
 					redis.LockAccount(ctx, req.Username, lockDuration)
-					utils.RespondError(c, http.StatusBadRequest, 
-						"Your account has been locked for 5 minutes. Please try again later", 
+					utils.RespondError(c, http.StatusTooManyRequests, 
+						fmt.Sprintf("Too many failed attempts. Account locked for %d minutes. Please try again later", ctrl.Config.App.LoginLockDurationMinutes), 
 						utils.ErrUserLockLogin)
 					return
 				}
-				utils.RespondError(c, http.StatusBadRequest, 
-					fmt.Sprintf("Incorrect password, you have %d more attempts left", remaining), 
+				utils.RespondError(c, http.StatusUnauthorized, 
+					fmt.Sprintf("Incorrect password. %d attempts remaining before account lockout", remaining), 
 					utils.ErrUserTryAgain)
 				return
 			}
 		}
-		utils.RespondError(c, http.StatusBadRequest, "Incorrect password", utils.ErrUserTryAgain)
+		utils.RespondError(c, http.StatusUnauthorized, "Incorrect password", utils.ErrUserTryAgain)
 		return
 	}
 

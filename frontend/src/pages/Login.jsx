@@ -19,7 +19,7 @@ async function loginAPI(username, password) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.message || 'Login gagal. Periksa username dan password.')
+    throw new Error(errorData.message || 'Login failed. Check your username and password.')
   }
 
   return response.json()
@@ -36,7 +36,7 @@ export default function Login() {
     e.preventDefault()
 
     if (!username.trim() || !password.trim()) {
-      toast.error('Username dan password wajib diisi.')
+      toast.error('Username and password are required.')
       return
     }
 
@@ -57,10 +57,10 @@ export default function Login() {
       const redirectPath = data.redirect || (data.login_as === 'admin' ? '/admin' : '/main')
       
       if (redirectPath === '/chpw') {
-        toast.info('Anda harus mengganti password terlebih dahulu.')
+        toast.info('You must change your password first.')
         navigate('/change-password', { replace: true })
       } else {
-        toast.success(`Selamat datang, ${username}!`)
+        toast.success(`Welcome, ${username}!`)
         
         // Redirect based on backend response or role
         if (data.login_as === 'admin') {
@@ -70,27 +70,27 @@ export default function Login() {
         }
       }
     } catch (err) {
-      toast.error(err.message || 'Login gagal. Periksa koneksi atau alamat API.')
+      toast.error(err.message || 'Login failed. Check your connection or API address.')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
       <div className="mb-8 flex flex-col items-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral/15">
-          <Icon data={Person} size={32} className="text-neutral" />
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral/15 dark:bg-white/10">
+          <Icon data={Person} size={32} className="text-neutral dark:text-neutral-300" />
         </div>
-        <h1 className="text-xl font-bold text-neutral-900">Takota Login</h1>
-        <p className="mt-2 max-w-[260px] text-center text-sm text-neutral">
-          Masuk dengan akun Anda. Admin akan diarahkan ke dashboard admin, user ke halaman presensi.
+        <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Takota Login</h1>
+        <p className="mt-2 max-w-[260px] text-center text-sm text-neutral dark:text-neutral-400">
+          Log in with your account. Admins are directed to the admin dashboard, users to the attendance page.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="flex items-center gap-2 rounded-xl  bg-neutral-50 px-3.5 py-3">
-          <Icon data={At} size={16} className="shrink-0 text-neutral" />
+        <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
+          <Icon data={At} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
           <input
             type="text"
             required
@@ -98,12 +98,12 @@ export default function Login() {
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Username"
             autoComplete="username"
-            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral"
+            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
           />
         </label>
 
-        <label className="flex items-center gap-2 rounded-xl  bg-neutral-50 px-3.5 py-3">
-          <Icon data={Key} size={16} className="shrink-0 text-neutral" />
+        <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
+          <Icon data={Key} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
           <input
             type={showPassword ? 'text' : 'password'}
             required
@@ -111,13 +111,13 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             autoComplete="current-password"
-            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral"
+            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
           />
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
             aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="shrink-0 text-neutral"
+            className="shrink-0 text-neutral dark:text-neutral-400"
           >
             <Icon data={showPassword ? EyeSlash : Eye} size={16} />
           </button>
@@ -127,7 +127,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
+          className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white cursor-pointer transition active:scale-[0.98] disabled:opacity-60"
         >
           {submitting ? 'Logging in…' : 'Login'}
         </button>

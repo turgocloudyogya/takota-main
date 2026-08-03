@@ -1,13 +1,23 @@
 # Takota Architecture
 
+> **AI Agents**: Before making any change, read [RULES.md](./RULES.md) for mandatory security and safety rules. All work must follow the checkpoint system described in [CHECKPOINT.md](./CHECKPOINT.md).
+
 ## Overview
 
 Takota is a monorepo attendance and absence management application. Employees check in with GPS location validation and an optional photo, submit leave/sick requests with supporting documents, and admins manage users, review records, approve absences, and export data.
 
 Two deployable parts:
 
-- `frontend/` — React 19 single-page application built with Vite, Tailwind CSS, Gravity UI, and Hero UI.
-- `backend/` — Go API built with Gin, GORM, PostgreSQL, Redis (optional), and S3-compatible storage.
+- `frontend/`: React 19 single-page application built with Vite, Tailwind CSS, Gravity UI, and Hero UI.
+- `backend/`: Go API built with Gin, GORM, PostgreSQL, Redis (optional), and S3-compatible storage.
+
+Key documentation:
+
+- `AGENTS.md`: Contribution rules for humans and AI agents
+- `ARCHITECTURE.md`: This file - system architecture reference
+- `RULES.md`: Mandatory rules for AI agents
+- `CHECKPOINT.md`: Work completion tracking system
+- `.checkpoint/`: Checkpoint files for completed work
 
 In production the built frontend and the Go backend run inside a single Nginx image. A supervisor entrypoint runs both processes and exits the container if either one dies, so the orchestrator restarts a healthy app instead of serving a half-started one.
 
@@ -22,9 +32,9 @@ In production the built frontend and the Go backend run inside a single Nginx im
                                      │ /api/*
                                      ▼
               ┌──────────────────────────────────────────────────┐
-              │             Go API (Gin, port 8080)             │
-              │  Middleware: API key → JWT → role → pwd-change  │
-              │  Controllers: auth, user, admin, export, all    │
+              │             Go API (Gin, port 8080)              │
+              │  Middleware: API key -> JWT -> role -> pwd-change│
+              │  Controllers: auth, user, admin, export, all     │
               └───────┬──────────────┬──────────────┬────────────┘
                       │              │              │
                       ▼              ▼              ▼
@@ -43,7 +53,7 @@ In production the built frontend and the Go backend run inside a single Nginx im
 ### Layers
 
 ```
-cmd/api/                Entry point: load config → connect DB → run migrations → routes → serve
+cmd/api/                Entry point: load config -> connect DB -> run migrations -> routes -> serve
 internal/config/        Env-based configuration loader (Server, DB, Redis, S3, JWT, App, Upload)
 internal/models/        GORM models: User, Attendance
 internal/controllers/   HTTP handlers:
@@ -66,9 +76,9 @@ migrations/             Versioned, idempotent SQL files (embedded at build time)
 ### Startup Sequence
 
 1. Load configuration from environment variables (`config.LoadConfig`).
-2. Connect to PostgreSQL, **retrying until it is reachable** (15 attempts × 3 s) so the container can start before the DB is ready.
-3. **Run automatic migrations** — `pkg/migrator` creates `schema_migrations`, then applies each pending `migrations/*.sql` file in version order inside a transaction. Migrations are idempotent, so previously-migrated databases upgrade cleanly.
-4. Initialize Redis (optional — the app continues if it is down) and the S3 client (required).
+2. Connect to PostgreSQL, **retrying until it is reachable** (15 attempts x 3 s) so the container can start before the DB is ready.
+3. **Run automatic migrations** - `pkg/migrator` creates `schema_migrations`, then applies each pending `migrations/*.sql` file in version order inside a transaction. Migrations are idempotent, so previously-migrated databases upgrade cleanly.
+4. Initialize Redis (optional - the app continues if it is down) and the S3 client (required).
 5. Start the Gin server with the route table below.
 
 ### Request Flow
@@ -110,7 +120,7 @@ Any authenticated role
 1. Validate `latitude`/`longitude` (required) and optional photo (type + size limits).
 2. Upload the photo to S3 if present; get a signed URL for display.
 3. Generate the Google Maps embed URL from the coordinates.
-4. **Reverse-geocode** the coordinates through OpenStreetMap Nominatim (`utils.ReverseGeocode`) into a human-readable `display_address` (best effort — never blocks submission).
+4. **Reverse-geocode** the coordinates through OpenStreetMap Nominatim (`utils.ReverseGeocode`) into a human-readable `display_address` (best effort - never blocks submission).
 5. Persist the attendance row and return its id.
 
 ## Frontend Architecture
@@ -143,8 +153,8 @@ src/
 
 `App.jsx` defines the routes. An `AuthGate` component validates the JWT on every route change by calling `GET /api/all/info`:
 
-- Invalid session → `clearSession()` and redirect to `/` (login).
-- Valid session on `/` → forwarded to the backend-provided `redirect_home` (`/main` for users, `/admin` for admins).
+- Invalid session -> `clearSession()` and redirect to `/` (login).
+- Valid session on `/` -> forwarded to the backend-provided `redirect_home` (`/main` for users, `/admin` for admins).
 - `redirect_home` values are enforced server-side by the `RequireRole` middlewares, so an admin hitting `/main` gets pushed to `/admin` by the gate.
 
 ### Home (Main.jsx)
@@ -156,7 +166,7 @@ src/
 
 ## Database Schema
 
-PostgreSQL with the `uuid-ossp` extension. All migrations live in `backend/migrations/` and run automatically on startup (see Backend → Startup Sequence).
+PostgreSQL with the `uuid-ossp` extension. All migrations live in `backend/migrations/` and run automatically on startup (see Backend -> Startup Sequence).
 
 ### users
 
@@ -180,7 +190,7 @@ Seed users: `admin` and `user001` (created with `ON CONFLICT (username) DO NOTHI
 | Column          | Type        | Notes                                        |
 | --------------- | ----------- | -------------------------------------------- |
 | id              | uuid        | PK                                           |
-| user_id         | uuid        | FK → users, cascade delete                   |
+| user_id         | uuid        | FK -> users, cascade delete                  |
 | type            | varchar(20) | `attendance` or `absence`                    |
 | option          | varchar(20) | absence option (e.g. sick/permit)            |
 | reason          | text        | absence reason                               |
@@ -189,7 +199,7 @@ Seed users: `admin` and `user001` (created with `ON CONFLICT (username) DO NOTHI
 | latitude / longitude | varchar(50) | GPS coordinates (attendance)            |
 | gmaps_embed     | text        | Google Maps embed URL                        |
 | display_address | text        | reverse-geocoded address (attendance)        |
-| verify_by       | uuid        | FK → users (admin who approved), set null    |
+| verify_by       | uuid        | FK -> users (admin who approved), set null   |
 | sign_status     | varchar(20) | `allow` / `reject` / NULL (pending)          |
 | created_at / updated_at | timestamptz | maintained by a trigger            |
 
@@ -201,7 +211,7 @@ Created by `pkg/migrator`: `version` (PK) and `applied_at`. Records which SQL fi
 
 ### Authentication
 
-1. `POST /api/auth` validates username/password (bcrypt) and respects the login-attempt lockout.
+1. `POST /api/auth` validates username/password (bcrypt) and respects the login-attempt lockout (10 attempts, 5-minute lockout).
 2. Issues a JWT (HS256, `JWT_EXPIRY_HOURS`) plus an `auth_id`; `auth_id` is stored (Redis if enabled, otherwise PostgreSQL).
 3. `AuthMiddleware` verifies the JWT and re-validates the `auth_id` on each request so logout invalidates existing tokens.
 4. Users with `change_as_login = true` are forced through `ChangePassword` before accessing app routes.
@@ -225,8 +235,8 @@ Created by `pkg/migrator`: `version` (PK) and `applied_at`. Records which SQL fi
 
 The multi-stage `Dockerfile`:
 
-1. Builds the frontend (`npm run build`) → static assets.
-2. Builds the backend with `CGO_ENABLED=0` (`go build ./cmd/api`) → static binary, with migrations embedded.
+1. Builds the frontend (`npm run build`) -> static assets.
+2. Builds the backend with `CGO_ENABLED=0` (`go build ./cmd/api`) -> static binary, with migrations embedded.
 3. Final image: `nginx:1.27-alpine` + `tzdata` (for timezone lookups) + the frontend assets + backend binary + `docker/entrypoint.sh`.
 
 ### Runtime
@@ -238,4 +248,13 @@ The multi-stage `Dockerfile`:
 
 ### Environment
 
-All configuration is env-driven (see `backend/.env.example`). Key groups: `PORT`/`APP_ENV`/`GIN_MODE`/`TIMEZONE_APP`, `DB_*`, `REDIS_*`, `S3_*` (+ CloudFront), `JWT_*`, `MAX_LOGIN_ATTEMPTS`, `LOGIN_LOCK_DURATION_MINUTES`, file size limits. Never commit real values — only placeholders in `.env.example`.
+All configuration is env-driven (see `backend/.env.example`). Key groups: `PORT`/`APP_ENV`/`GIN_MODE`/`TIMEZONE_APP`, `DB_*`, `REDIS_*`, `S3_*` (+ CloudFront), `JWT_*`, `MAX_LOGIN_ATTEMPTS`, `LOGIN_LOCK_DURATION_MINUTES`, file size limits. Never commit real values - only placeholders in `.env.example`.
+
+## Security
+
+See [RULES.md](./RULES.md) for mandatory security rules. Key points:
+
+- Never hardcode credentials in code or documentation
+- Use placeholder values for all configuration examples
+- Never commit `.env` files - only `.env.example` with placeholders
+- Review all changes for credential exposure before committing

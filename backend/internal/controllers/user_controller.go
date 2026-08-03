@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -50,7 +51,7 @@ type AbsenceItem struct {
 type VerifierInfo struct {
 	UserID     string  `json:"user_id"`
 	Username   string  `json:"username"`
-	SignStatus *string `json:"sign_status"` // allow, reject, atau null (pending)
+	SignStatus *string `json:"sign_status"` // allow, reject, or null (pending)
 }
 
 type AttendanceRequest struct {
@@ -77,9 +78,9 @@ func (ctrl *UserController) Home(c *gin.Context) {
 
 	// Build greeting widget
 	greetingWidget := GreetingWidget{
-		Name:  user.Callname,
+		Name:  user.Nickname,
 		Time:  utils.GetGreetingTime(),
-		Title: utils.GetGreetingTitle(user.Callname),
+		Title: utils.GetGreetingTitle(user.Nickname),
 	}
 
 	// Get today's attendance
@@ -164,7 +165,7 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 	err := ctrl.DB.Where("user_id = ? AND type = ? AND DATE(created_at) = DATE(?)", uid, "attendance", today).
 		First(&existingAttendance).Error
 	if err == nil {
-		// User sudah absen hari ini
+		// User has already submitted attendance today
 		utils.RespondError(c, http.StatusBadRequest, "You have already submitted attendance today", "ATTENDANCE_ALREADY_SUBMITTED")
 		return
 	} else if err != nil && err.Error() != "record not found" {
@@ -181,13 +182,15 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 		// Validate file type
 		contentType := fileHeader.Header.Get("Content-Type")
 		if !s3.ValidateFileType(contentType, s3.GetAllowedAttendanceTypes()) {
-			utils.RespondError(c, http.StatusBadRequest, "Invalid file format", utils.ErrInvalidFileFormat)
+			utils.RespondError(c, http.StatusBadRequest, "Invalid file format. Allowed formats: JPG, JPEG, PNG", utils.ErrInvalidFileFormat)
 			return
 		}
 
 		// Validate file size
 		if !s3.ValidateFileSize(fileHeader.Size, ctrl.Config.FileUpload.MaxAttendanceFileSizeMB) {
-			utils.RespondError(c, http.StatusBadRequest, "File size exceeds limit", utils.ErrInvalidFileFormat)
+			utils.RespondError(c, http.StatusBadRequest, 
+				fmt.Sprintf("Photo file size exceeds maximum limit of %d MB", ctrl.Config.FileUpload.MaxAttendanceFileSizeMB), 
+				utils.ErrInvalidFileFormat)
 			return
 		}
 
@@ -258,7 +261,7 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 	err := ctrl.DB.Where("user_id = ? AND type = ? AND DATE(created_at) = DATE(?)", uid, "attendance", today).
 		First(&attendanceToday).Error
 	if err == nil {
-		// User sudah absen normal hari ini, tidak boleh ngajuin perizinan
+		// User already has normal attendance today, cannot submit absence
 		utils.RespondError(c, http.StatusBadRequest, "Cannot submit absence after normal attendance", "CANNOT_SUBMIT_ABSENCE_AFTER_ATTENDANCE")
 		return
 	} else if err != nil && err.Error() != "record not found" {
@@ -271,7 +274,7 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 	err = ctrl.DB.Where("user_id = ? AND type = ? AND verify_by IS NULL", uid, "absence").
 		First(&pendingAbsence).Error
 	if err == nil {
-		// User masih punya perizinan yang pending (belum di-verify)
+		// User still has a pending absence that has not been verified
 		utils.RespondError(c, http.StatusBadRequest, "You have pending absence verification, cannot submit new request", "PENDING_ABSENCE_VERIFICATION")
 		return
 	} else if err != nil && err.Error() != "record not found" {
@@ -288,13 +291,15 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 		// Validate file type
 		contentType := fileHeader.Header.Get("Content-Type")
 		if !s3.ValidateFileType(contentType, s3.GetAllowedAbsenceTypes()) {
-			utils.RespondError(c, http.StatusBadRequest, "Invalid file format", utils.ErrInvalidFileFormat)
+			utils.RespondError(c, http.StatusBadRequest, "Invalid file format. Allowed formats: PDF, DOC, DOCX", utils.ErrInvalidFileFormat)
 			return
 		}
 
 		// Validate file size
 		if !s3.ValidateFileSize(fileHeader.Size, ctrl.Config.FileUpload.MaxAbsenceFileSizeMB) {
-			utils.RespondError(c, http.StatusBadRequest, "File size exceeds limit", utils.ErrInvalidFileFormat)
+			utils.RespondError(c, http.StatusBadRequest, 
+				fmt.Sprintf("Document file size exceeds maximum limit of %d MB", ctrl.Config.FileUpload.MaxAbsenceFileSizeMB), 
+				utils.ErrInvalidFileFormat)
 			return
 		}
 

@@ -38,7 +38,7 @@ export function parseApiDate(value) {
 /**
  * Counts working days (Senin–Sabtu, i.e. everything except Minggu/Sunday)
  * between two 'yyyy-MM-dd' date-key strings, inclusive on both ends. Used
- * only to preview how many pages a recap will produce — the server does
+ * only to preview how many pages a recap will produce - the server does
  * the authoritative chunking.
  */
 export function countWorkingDays(startDateKey, endDateKey) {

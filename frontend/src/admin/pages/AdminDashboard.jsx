@@ -31,16 +31,16 @@ const SAMPLE_LIMIT = 150
 const TREND_DAYS = 14
 
 const PIE_COLORS = {
-  Sakit: 'var(--color-warning)',
-  Izin: 'var(--color-primary)',
-  Menunggu: 'var(--color-neutral)',
-  Ditolak: 'var(--color-danger)',
+  Present: 'var(--color-success)',
+  'Leave or Sick': 'var(--color-primary)',
+  Alpha: 'var(--color-danger)',
 }
 
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [studentCount, setStudentCount] = useState(null)
   const [studentCapped, setStudentCapped] = useState(false)
+  const [students, setStudents] = useState([])
   const [attendance, setAttendance] = useState([])
   const [absence, setAbsence] = useState([])
 
@@ -58,9 +58,10 @@ export default function AdminDashboard() {
         if (cancelled) return
 
         const users = unwrapList(usersJson, 'users').map(normalizeUser).filter(Boolean)
-        const students = users.filter((u) => u.type !== 'admin')
-        setStudentCount(students.length)
-        setStudentCapped(students.length >= SAMPLE_LIMIT)
+        const studentList = users.filter((u) => u.type !== 'admin')
+        setStudents(studentList)
+        setStudentCount(studentList.length)
+        setStudentCapped(studentList.length >= SAMPLE_LIMIT)
 
         const attendanceRows = unwrapList(attendanceJson, 'attendances')
           .map(normalizeAttendance)
@@ -70,7 +71,7 @@ export default function AdminDashboard() {
         const absenceRows = unwrapList(absenceJson, 'absences').map(normalizeAbsence).filter(Boolean)
         setAbsence(absenceRows)
       } catch (err) {
-        if (!cancelled) toast.error(err.message || 'Gagal memuat ringkasan dashboard.')
+        if (!cancelled) toast.error(err.message || 'Failed to load the dashboard summary.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -92,9 +93,6 @@ export default function AdminDashboard() {
 
   const pendingCount = useMemo(() => absence.filter((row) => row.sign === 'pending').length, [absence])
 
-  // Distinct students with at least one attendance row today (not just a
-  // row count, so a student who checks in and out twice isn't counted
-  // twice). Used to figure out who's still missing for the day.
   const presentTodayCount = useMemo(() => {
     const todayKey = toDateKey(new Date())
     const ids = new Set()
@@ -105,8 +103,20 @@ export default function AdminDashboard() {
     return ids.size
   }, [attendance])
 
-  const notCheckedInCount = studentCount == null ? null : Math.max(studentCount - presentTodayCount, 0)
+  // Count students who submitted leave/sick today (should NOT be counted as "not checked in")
+  const leaveTodayCount = useMemo(() => {
+    const todayKey = toDateKey(new Date())
+    const ids = new Set()
+    absence.forEach((row) => {
+      const d = parseApiDate(row.dateRaw)
+      if (d && toDateKey(d) === todayKey && row.userId != null) ids.add(row.userId)
+    })
+    return ids.size
+  }, [absence])
 
+  const notCheckedInCount = studentCount == null ? null : Math.max(studentCount - presentTodayCount - leaveTodayCount, 0)
+
+  // Trend data: for each day, count Present, Leave, and Alpha (not checked in)
   const trendData = useMemo(() => {
     const buckets = new Map()
     const today = new Date()
@@ -117,92 +127,122 @@ export default function AdminDashboard() {
       d.setDate(d.getDate() - i)
       buckets.set(toDateKey(d), {
         key: toDateKey(d),
-        label: d.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }),
-        Hadir: 0,
+        label: d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit' }),
+        Present: 0,
+        Leave: 0,
       })
     }
 
+    // Count distinct students with attendance per day
     attendance.forEach((row) => {
       const d = parseApiDate(row.dateRaw)
       if (!d) return
       const key = toDateKey(d)
-      if (buckets.has(key)) buckets.get(key).Hadir += 1
+      if (buckets.has(key)) buckets.get(key).Present += 1
     })
+
+    // Count distinct students with absence per day
+    const absenceByDay = new Map()
+    absence.forEach((row) => {
+      const d = parseApiDate(row.dateRaw)
+      if (!d) return
+      const key = toDateKey(d)
+      if (!absenceByDay.has(key)) absenceByDay.set(key, new Set())
+      if (row.userId) absenceByDay.get(key).add(row.userId)
+    })
+    absenceByDay.forEach((ids, key) => {
+      if (buckets.has(key)) buckets.get(key).Leave = ids.size
+    })
+
+    // For today, compute Alpha = total students - Present - Leave
+    const todayKey = toDateKey(new Date())
+    if (buckets.has(todayKey) && studentCount != null) {
+      const todayBucket = buckets.get(todayKey)
+      todayBucket.Alpha = Math.max(studentCount - todayBucket.Present - todayBucket.Leave, 0)
+    }
 
     return Array.from(buckets.values())
-  }, [attendance])
+  }, [attendance, absence, studentCount])
 
+  // Pie chart: today's status breakdown (always show, even if zero)
   const pieData = useMemo(() => {
-    let sakit = 0
-    let izin = 0
-    let pending = 0
-    let ditolak = 0
+    const todayKey = toDateKey(new Date())
 
-    absence.forEach((row) => {
-      if (row.sign === 'pending') pending += 1
-      else if (row.sign === 'allow') {
-        if (row.isSick) sakit += 1
-        else izin += 1
-      } else if (row.sign === 'deny') ditolak += 1
+    // Present today
+    const presentIds = new Set()
+    attendance.forEach((row) => {
+      const d = parseApiDate(row.dateRaw)
+      if (d && toDateKey(d) === todayKey && row.userId != null) presentIds.add(row.userId)
     })
+    const present = presentIds.size
+
+    // Leave today (absence submitted today)
+    const leaveIds = new Set()
+    absence.forEach((row) => {
+      const d = parseApiDate(row.dateRaw)
+      if (d && toDateKey(d) === todayKey && row.userId != null) leaveIds.add(row.userId)
+    })
+    const leave = leaveIds.size
+
+    // Alpha = total students - present - leave
+    const alpha = studentCount != null ? Math.max(studentCount - present - leave, 0) : 0
 
     return [
-      { name: 'Sakit', value: sakit },
-      { name: 'Izin', value: izin },
-      { name: 'Menunggu', value: pending },
-      { name: 'Ditolak', value: ditolak },
-    ].filter((d) => d.value > 0)
-  }, [absence])
+      { name: 'Present', value: present },
+      { name: 'Leave or Sick', value: leave },
+      { name: 'Alpha', value: alpha },
+    ]
+  }, [attendance, absence, studentCount])
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         icon={House}
-        eyebrow="Ringkasan"
+        eyebrow="Summary"
         title="Dashboard"
-        description="Ringkasan presensi dan pengajuan izin siswa Takota."
+        description="Attendance and leave/absence submissions summary for Takota students."
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Total Siswa"
-          value={loading ? '—' : `${studentCount}${studentCapped ? '+' : ''}`}
+          label="Total Students"
+          value={loading ? '-' : `${studentCount}${studentCapped ? '+' : ''}`}
           icon={Persons}
           tone="primary"
         />
         <StatCard
-          label="Hadir Hari Ini"
-          value={loading ? '—' : todayCount}
+          label="Present Today"
+          value={loading ? '-' : todayCount}
           icon={Clock}
           tone="success"
-          hint={`dari ${attendance.length} data terbaru`}
+          hint={`out of ${attendance.length} recent records`}
         />
         <StatCard
-          label="Izin Menunggu"
-          value={loading ? '—' : pendingCount}
+          label="Pending Leave"
+          value={loading ? '-' : pendingCount}
           icon={FileCheck}
           tone="warning"
-          hint="perlu ditinjau"
+          hint="needs review"
         />
         <StatCard
-          label="Belum Presensi Hari Ini"
-          value={loading ? '—' : notCheckedInCount}
+          label="Not Checked In Today"
+          value={loading ? '-' : notCheckedInCount}
           icon={PersonXmark}
           tone="danger"
-          hint={`dari ${studentCount}${studentCapped ? '+' : ''} siswa terdaftar`}
+          hint={`out of ${studentCount}${studentCapped ? '+' : ''} registered students`}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm font-semibold text-neutral-900">Tren Kehadiran 14 Hari Terakhir</p>
-            <span className="flex items-center gap-1.5 text-xs text-neutral">
+            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Attendance Trend - Last 14 Days</p>
+            <span className="flex items-center gap-1.5 text-xs text-neutral dark:text-neutral-400">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="presence-pulse absolute inset-0 rounded-full bg-primary" />
                 <span className="relative h-full w-full rounded-full bg-primary" />
               </span>
-              Hari ini
+              Today
             </span>
           </div>
           <div className="h-64 w-full">
@@ -212,63 +252,143 @@ export default function AdminDashboard() {
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={1} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={28} />
                 <Tooltip />
-                <Bar dataKey="Hadir" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                <Legend verticalAlign="bottom" height={30} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="Present" fill="var(--color-success)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Leave" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Alpha" fill="var(--color-danger)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
 
         <Card className="p-4">
-          <p className="mb-4 text-sm font-semibold text-neutral-900">Distribusi Pengajuan</p>
-          {pieData.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-sm text-neutral">
-              Belum ada data pengajuan
-            </div>
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
-                    {pieData.map((entry) => (
-                      <Cell key={entry.name} fill={PIE_COLORS[entry.name]} />
-                    ))}
-                  </Pie>
-                  <Legend verticalAlign="bottom" height={30} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <p className="mb-4 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Today's Status</p>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                  {pieData.map((entry) => (
+                    <Cell key={entry.name} fill={PIE_COLORS[entry.name]} />
+                  ))}
+                </Pie>
+                <Legend verticalAlign="bottom" height={30} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </Card>
       </div>
 
       <Card className="p-4">
-        <p className="mb-3 text-sm font-semibold text-neutral-900">Aktivitas Presensi Terbaru</p>
-        <div className="flex flex-col divide-y divide-app-border/10">
-          {attendance.slice(0, 6).map((row) => (
-            <div key={row.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success/10 text-xs font-bold text-success">
-                  {(row.name || row.username || '?')[0]?.toUpperCase()}
+        <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">No Action Today</p>
+        <div className="flex flex-col divide-y divide-app-border/10 dark:divide-white/10">
+          {(() => {
+            const todayKey = toDateKey(new Date())
+            const presentToday = new Set()
+            attendance.forEach((row) => {
+              const d = parseApiDate(row.dateRaw)
+              if (d && toDateKey(d) === todayKey && row.userId != null) presentToday.add(row.userId)
+            })
+            const leaveToday = new Set()
+            absence.forEach((row) => {
+              const d = parseApiDate(row.dateRaw)
+              if (d && toDateKey(d) === todayKey && row.userId != null) leaveToday.add(row.userId)
+            })
+            const noAction = students.filter((s) => !presentToday.has(s.id) && !leaveToday.has(s.id))
+            if (noAction.length === 0) {
+              return <p className="py-4 text-center text-sm text-neutral dark:text-neutral-400">All students have checked in or submitted leave today</p>
+            }
+            return noAction.map((student) => (
+              <div key={student.id} className="flex items-center gap-3 py-2.5 text-sm">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger/10 text-xs font-bold text-danger">
+                  {(student.nickname || student.username || '?')[0]?.toUpperCase()}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-neutral-900">{row.name || '—'}</p>
-                  <p className="truncate text-xs text-neutral">{row.username}</p>
+                  <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{student.nickname || '-'}</p>
+                  <p className="truncate text-xs text-neutral dark:text-neutral-400">{student.username}</p>
                 </div>
               </div>
-              <p className="shrink-0 text-xs text-neutral">
-                {parseApiDate(row.dateRaw)?.toLocaleString('id-ID', {
-                  day: '2-digit',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                }) || '—'}
-              </p>
-            </div>
-          ))}
-          {!loading && attendance.length === 0 && (
-            <p className="py-4 text-center text-sm text-neutral">Belum ada aktivitas presensi</p>
-          )}
+            ))
+          })()}
+        </div>
+      </Card>
+
+      <Card className="p-4">
+        <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Recent Activity</p>
+        <div className="flex flex-col divide-y divide-app-border/10 dark:divide-white/10">
+          {(() => {
+            // Combine attendance and absence into a single activity list
+            const activities = []
+
+            // Add attendance entries (green)
+            attendance.slice(0, 10).forEach((row) => {
+              activities.push({
+                id: row.id,
+                name: row.name,
+                username: row.username,
+                dateRaw: row.dateRaw,
+                type: 'attendance',
+              })
+            })
+
+            // Add absence entries (yellow)
+            absence.slice(0, 10).forEach((row) => {
+              activities.push({
+                id: row.id,
+                name: row.name,
+                username: row.username,
+                dateRaw: row.dateRaw,
+                type: 'absence',
+                isSick: row.isSick,
+              })
+            })
+
+            // Sort by date descending
+            activities.sort((a, b) => {
+              const dateA = parseApiDate(a.dateRaw)
+              const dateB = parseApiDate(b.dateRaw)
+              if (!dateA || !dateB) return 0
+              return dateB - dateA
+            })
+
+            // Take only the 6 most recent
+            const recentActivities = activities.slice(0, 6)
+
+            if (recentActivities.length === 0) {
+              return <p className="py-4 text-center text-sm text-neutral dark:text-neutral-400">No activity yet</p>
+            }
+
+            return recentActivities.map((activity) => {
+              const isAttendance = activity.type === 'attendance'
+              const bgColor = isAttendance ? 'bg-success/10' : 'bg-warning/10'
+              const textColor = isAttendance ? 'text-success' : 'text-warning'
+              const label = isAttendance ? 'Present' : (activity.isSick ? 'Sick' : 'Leave')
+
+              return (
+                <div key={activity.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${bgColor} text-xs font-bold ${textColor}`}>
+                      {(activity.name || activity.username || '?')[0]?.toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{activity.name || '-'}</p>
+                      <p className="truncate text-xs text-neutral dark:text-neutral-400">
+                        {activity.username} - {label}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="shrink-0 text-xs text-neutral dark:text-neutral-400">
+                    {parseApiDate(activity.dateRaw)?.toLocaleString('en-US', {
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }) || '-'}
+                  </p>
+                </div>
+              )
+            })
+          })()}
         </div>
       </Card>
     </div>

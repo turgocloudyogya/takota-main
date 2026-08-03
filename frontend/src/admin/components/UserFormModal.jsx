@@ -18,7 +18,7 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
   const isEdit = Boolean(user)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
-  const typeLabel = form.type === 'admin' ? 'Admin' : 'Siswa'
+  const typeLabel = form.type === 'admin' ? 'Admin' : 'Student'
 
   // Reset the form whenever the modal transitions from closed -> open, so a
   // freshly-opened "add" form is always blank and a freshly-opened "edit"
@@ -62,12 +62,12 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
     // Detailed validation with specific error messages
     if (!form.nickname.trim()) {
       console.error('Validation failed: nickname empty')
-      toast.error('Nama panggilan wajib diisi.')
+      toast.error('Nickname is required.')
       return
     }
     if (!form.username.trim()) {
       console.error('Validation failed: username empty')
-      toast.error('Username wajib diisi.')
+      toast.error('Username is required.')
       return
     }
     
@@ -75,21 +75,21 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
     const usernameRegex = /^[a-zA-Z0-9_]+$/
     if (!usernameRegex.test(form.username.trim())) {
       console.error('Validation failed: username format invalid')
-      toast.error('Username hanya boleh berisi huruf, angka, dan underscore (_).')
+      toast.error('Username can only contain letters, numbers, and underscores (_).')
       return
     }
     
     // Password validation for new users
     if (!isEdit && !form.password.trim()) {
       console.error('Validation failed: password empty for new user')
-      toast.error('Password wajib diisi untuk akun baru.')
+      toast.error('Password is required for a new account.')
       return
     }
     
     // Password length validation if password is provided
     if (form.password.trim() && form.password.trim().length < 6) {
       console.error('Validation failed: password too short')
-      toast.error('Password minimal 6 karakter.')
+      toast.error('Password must be at least 6 characters.')
       return
     }
 
@@ -117,12 +117,12 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
         console.log('Calling updateUser API...')
         await api.updateUser(user.id, payload)
         console.log('updateUser success')
-        toast.success(`Data ${typeLabel.toLowerCase()} berhasil diperbarui.`)
+        toast.success(`Data for the ${typeLabel.toLowerCase()} was updated successfully.`)
       } else {
         console.log('Calling createUser API...')
         const result = await api.createUser(payload)
         console.log('createUser success:', result)
-        toast.success(`${typeLabel} baru berhasil ditambahkan.`)
+        toast.success(`New ${typeLabel.toLowerCase()} added successfully.`)
       }
       onSaved?.()
       onOpenChange(false)
@@ -134,7 +134,7 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
         stack: err.stack
       })
       // More detailed error message
-      const errorMsg = err.message || `Gagal menyimpan data ${typeLabel.toLowerCase()}.`
+      const errorMsg = err.message || `Failed to save the ${typeLabel.toLowerCase()} data.`
       toast.error(errorMsg)
     } finally {
       setSaving(false)
@@ -145,56 +145,56 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
     <AppModal
       open={open}
       onOpenChange={onOpenChange}
-      title={isEdit ? `Ubah Data ${typeLabel}` : `Tambah ${typeLabel}`}
-      description={isEdit ? `Memperbarui akun ${user?.username}` : `Buat akun ${typeLabel.toLowerCase()} baru untuk presensi.`}
+      title={isEdit ? `Edit ${typeLabel} Data` : `Add ${typeLabel}`}
+      description={isEdit ? `Updating the account for ${user?.username}` : `Create a new ${typeLabel.toLowerCase()} account for attendance.`}
       footer={
         <div className="flex w-full justify-end gap-2">
           <Button variant="ghost" onPress={() => onOpenChange(false)} isDisabled={saving}>
-            Batal
+            Cancel
           </Button>
           <Button variant="primary" onPress={handleSubmit} isDisabled={saving}>
-            {saving ? 'Menyimpan…' : isEdit ? 'Simpan Perubahan' : `Tambah ${typeLabel}`}
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : `Add ${typeLabel}`}
           </Button>
         </div>
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <TextInput
-          label="Nama Panggilan"
-          placeholder="cth. Ahnaf"
+          label="Nickname"
+          placeholder="e.g. Ahnaf"
           value={form.nickname}
           onChange={(e) => setField('nickname', e.target.value)}
         />
         <TextInput
-          label="Nama Lengkap"
-          placeholder="cth. Ahnaf Farras"
+          label="Full Name"
+          placeholder="e.g. Ahnaf Farras"
           value={form.callname}
           onChange={(e) => setField('callname', e.target.value)}
         />
         <TextInput
           label="Username"
-          placeholder="cth. user001"
+          placeholder="e.g. user001"
           value={form.username}
           onChange={(e) => setField('username', e.target.value)}
           autoComplete="off"
         />
         <PasswordInput
-          label={isEdit ? 'Password Baru (opsional)' : 'Password'}
-          placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Password akun'}
+          label={isEdit ? 'New Password (optional)' : 'Password'}
+          placeholder={isEdit ? 'Leave blank to keep unchanged' : 'Account password'}
           value={form.password}
           onChange={(e) => setField('password', e.target.value)}
           autoComplete="new-password"
         />
         <SelectInput
-          label="Tipe Akun"
+          label="Account Type"
           value={form.type}
           onChange={(e) => setField('type', e.target.value)}
         >
-          <option value="user">Siswa</option>
+          <option value="user">Student</option>
           <option value="admin">Admin</option>
         </SelectInput>
         <ToggleField
-          label="Wajib ganti password saat login pertama"
+          label="Require password change on first login"
           checked={form.changeAsLogin}
           onChange={(v) => setField('changeAsLogin', v)}
         />

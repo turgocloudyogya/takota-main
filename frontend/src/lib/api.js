@@ -57,7 +57,7 @@ async function request(path, { method = 'GET', body, isFormData = false } = {}) 
     })
   } catch {
     throw new ApiError(
-      `Tidak dapat menghubungi server (${API_BASE}). Periksa koneksi.`,
+      `Cannot reach the server (${API_BASE}). Please check your connection.`,
       0
     )
   }

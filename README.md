@@ -47,24 +47,24 @@ Backend:
 │   └── migrations/        SQL schema and seed data
 ├── nginx/default.conf     Nginx config (frontend + /api proxy)
 ├── Dockerfile             Multi-stage build (frontend + backend)
-├── AGENT.md               Contribution rules for humans and AI agents
+├── AGENTS.md              Contribution rules for humans and AI agents
 ├── ARCHITECTURE.md        System architecture reference
 └── .github/workflows/     CI/CD (PR checks, build, test, publish)
 ```
 
 ## Recent Changes
 
-- **Enriched CSV export** — the admin report export now includes three new columns: **Location** (a Google Maps link built from the stored coordinates), **Photo File** (public URL of the attendance photo), and **Document** (public URL of the absence supporting document, when present). Headers are localized for English and Indonesian.
-- **HeroUI Select for report filters** — the Month and Language pickers on the admin reports page now use the HeroUI `Select` component instead of a native `<select>`, matching the rest of the UI.
-- **Role-based frontend routing guards** — the `AuthGate` component now enforces roles client-side in addition to the backend middleware: admins who land on user pages (`/main`, `/attendance`, `/absence`, `/photos`) are redirected to `/admin`, and non-admins who open `/admin` are redirected to `/main`.
-- **Camera capture & freeze at "Take Attendance!"** — the attendance page now requests camera permission automatically on mount, and pressing "Take Attendance!" captures and freezes the current frame at full sensor resolution. The uploaded photo reflects the exact moment the button was pressed, and canceling the confirmation dialog discards the frame and resumes the live camera.
-- **Photo gallery hover info** — hovering a photo in the user gallery now shows a `dd/mm/yyyy hh:mm • by <nickname>` overlay with the timestamp and the user who uploaded it.
-- **User home header** — the home page now shows a live clock next to the greeting and a logout button with a confirmation dialog, alongside a shared `BackButton` component and unified headers across the user pages.
-- **Admin logout confirmation** — the admin sidebar logout now asks for confirmation before ending the session.
-- **Automatic database migrations** — the SQL files in `backend/migrations/` are embedded into the backend binary and applied automatically on every startup. Applied migrations are tracked in the `schema_migrations` table, the backend waits for PostgreSQL to become reachable before migrating, and every migration file is idempotent so existing databases upgrade cleanly.
-- **Human-readable attendance location (`display_address`)** — when a user submits attendance, the GPS coordinates are reverse-geocoded through OpenStreetMap Nominatim (a Go port of the former `tmp/get-location.js` sample) and stored in the new `display_address` column. It is shown on the user home and in the admin attendance list.
-- **Timezone-aware greetings** — a new `TIMEZONE_APP` variable (falls back to `TIMEZONE`, then to UTC) controls the greeting shown by the API and the PostgreSQL session timezone, so the app greets users correctly (e.g. "Good Morning" at 07:00 WIB) even when deployed in a different timezone.
-- **Container supervision & auth gate** — the Docker image runs the backend and Nginx under a supervisor entrypoint, so if either process dies the container exits and the orchestrator restarts it instead of serving a half-running app. `/api/all/info` is now protected by a token check.
+- **Enriched CSV export**: the admin report export now includes three new columns: **Location** (a Google Maps link built from the stored coordinates), **Photo File** (public URL of the attendance photo), and **Document** (public URL of the absence supporting document, when present). Headers are localized for English and Indonesian.
+- **HeroUI Select for report filters**: the Month and Language pickers on the admin reports page now use the HeroUI `Select` component instead of a native `<select>`, matching the rest of the UI.
+- **Role-based frontend routing guards**: the `AuthGate` component now enforces roles client-side in addition to the backend middleware: admins who land on user pages (`/main`, `/attendance`, `/absence`, `/photos`) are redirected to `/admin`, and non-admins who open `/admin` are redirected to `/main`.
+- **Camera capture & freeze at "Take Attendance!"**: the attendance page now requests camera permission automatically on mount, and pressing "Take Attendance!" captures and freezes the current frame at full sensor resolution. The uploaded photo reflects the exact moment the button was pressed, and canceling the confirmation dialog discards the frame and resumes the live camera.
+- **Photo gallery hover info**: hovering a photo in the user gallery now shows a `dd/mm/yyyy hh:mm - by <nickname>` overlay with the timestamp and the user who uploaded it.
+- **User home header**: the home page now shows a live clock next to the greeting and a logout button with a confirmation dialog, alongside a shared `BackButton` component and unified headers across the user pages.
+- **Admin logout confirmation**: the admin sidebar logout now asks for confirmation before ending the session.
+- **Automatic database migrations**: the SQL files in `backend/migrations/` are embedded into the backend binary and applied automatically on every startup. Applied migrations are tracked in the `schema_migrations` table, the backend waits for PostgreSQL to become reachable before migrating, and every migration file is idempotent so existing databases upgrade cleanly.
+- **Human-readable attendance location (`display_address`)**: when a user submits attendance, the GPS coordinates are reverse-geocoded through OpenStreetMap Nominatim (a Go port of the former `tmp/get-location.js` sample) and stored in the new `display_address` column. It is shown on the user home and in the admin attendance list.
+- **Timezone-aware greetings**: a new `TIMEZONE_APP` variable (falls back to `TIMEZONE`, then to UTC) controls the greeting shown by the API and the PostgreSQL session timezone, so the app greets users correctly (e.g. "Good Morning" at 07:00 WIB) even when deployed in a different timezone.
+- **Container supervision & auth gate**: the Docker image runs the backend and Nginx under a supervisor entrypoint, so if either process dies the container exits and the orchestrator restarts it instead of serving a half-running app. `/api/all/info` is now protected by a token check.
 
 ## Getting Started with Docker
 
@@ -222,15 +222,42 @@ All backend settings are read from environment variables. Copy `backend/.env.exa
 | Variable | Description | Default |
 | --- | --- | --- |
 | `PORT` | Backend port | `8080` |
-| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | PostgreSQL connection | - |
+| `APP_ENV` | Environment: development/production | `development` |
+| `GIN_MODE` | Gin logging mode: debug/release | `debug` |
+| `DB_HOST` | PostgreSQL host | - |
+| `DB_PORT` | PostgreSQL port | `5432` |
+| `DB_USER` | Database user | - |
+| `DB_PASSWORD` | Database password | - |
+| `DB_NAME` | Database name | - |
 | `DB_SSL_MODE` | PostgreSQL SSL mode | `disable` |
-| `REDIS_URL` | Redis connection (optional) | empty |
-| `S3_ENDPOINT` | S3 compatible endpoint | empty (uses AWS) |
-| `S3_ACCESS_KEY`, `S3_SECRET_KEY` | S3 credentials | - |
+| `DB_SSL_ENABLE` | Enable DB SSL | `false` |
+| `DB_SSL_CA` | DB SSL CA certificate | - |
+| `DB_SSL_CERT` | DB SSL client certificate | - |
+| `DB_SSL_KEY` | DB SSL client key | - |
+| `DB_MAX_CONNECTIONS` | Connection pool size | `25` |
+| `DB_MAX_IDLE_CONNECTIONS` | Max idle connections | `10` |
+| `DB_QUERY_EXEC_MODE` | pgx query mode | `cache_describe` |
+| `REDIS_URL` | Redis connection (optional, leave empty to disable) | empty |
+| `REDIS_PASSWORD` | Redis password (if required) | empty |
+| `REDIS_DB` | Redis database number | `0` |
+| `S3_ENDPOINT` | S3 compatible endpoint (empty for AWS) | empty |
+| `S3_ACCESS_KEY` | S3 access key | - |
+| `S3_SECRET_KEY` | S3 secret key | - |
 | `S3_BUCKET_NAME` | Storage bucket | `takota-bucket` |
-| `S3_USE_SSL`, `S3_USE_PATH_STYLE_ENDPOINT`, `S3_REGION` | S3 connection settings | - |
+| `S3_USE_SSL` | Use SSL for S3 | `false` |
+| `S3_USE_PATH_STYLE_ENDPOINT` | Use path-style S3 endpoint | `true` |
+| `S3_REGION` | S3 region | `us-east-1` |
+| `S3_PUBLIC_HOST` | Custom public host for preview URLs | empty |
+| `S3_USE_CLOUDFRONT` | Enable CloudFront signed URLs | `false` |
+| `CLOUDFRONT_DOMAIN` | CloudFront distribution domain | empty |
+| `CLOUDFRONT_PRIVATE_KEY` | CloudFront private key | empty |
+| `CLOUDFRONT_PUBLIC_KEY_ID` | CloudFront public key ID | empty |
 | `JWT_SECRET` | Token signing secret | - |
 | `JWT_EXPIRY_HOURS` | Token lifetime in hours | `24` |
+| `MAX_LOGIN_ATTEMPTS` | Failed login attempts before lockout | `10` |
+| `LOGIN_LOCK_DURATION_MINUTES` | Account lock duration in minutes | `5` |
+| `MAX_ATTENDANCE_FILE_SIZE_MB` | Photo file size limit | `10` |
+| `MAX_ABSENCE_FILE_SIZE_MB` | Document file size limit | `50` |
 | `TIMEZONE_APP` | App timezone for greetings/timestamps (falls back to `TIMEZONE`, then UTC) | `UTC` |
 
 ## Local Development (without Docker)
@@ -254,15 +281,15 @@ go run ./cmd/api
 
 ## Commit Workflow
 
-All changes are developed on pull-request branches and merged into `main` only after review. **Never commit or push directly to `main`** — every commit must land on a PR branch first.
+All changes are developed on pull-request branches and merged into `main` only after review. **Never commit or push directly to `main`** - every commit must land on a PR branch first.
 
 1. Make sure you are not on `main` (use a branch such as `pr/update-fix-setup` or `feature/<topic>`).
 2. Commit your changes with a descriptive message (`feat:`, `fix:`, `docs:`, `refactor:`, ...).
-3. Run the required checks before pushing (see `AGENT.md`): backend build/vet, frontend build/lint, and a review of `git status`/`git diff` to make sure no secrets or build artifacts are staged.
+3. Run the required checks before pushing (see `AGENTS.md`): backend build/vet, frontend build/lint, and a review of `git status`/`git diff` to make sure no secrets or build artifacts are staged.
 4. Push to your branch and open a Pull Request against `main`.
 5. Merge only after CI passes and the PR has been reviewed.
 
-Commits must never contain secrets (`.env` files, passwords, tokens). See `AGENT.md` for the full set of rules.
+Commits must never contain secrets (`.env` files, passwords, tokens). See `AGENTS.md` for the full set of rules.
 
 ## CI/CD
 

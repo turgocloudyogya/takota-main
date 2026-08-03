@@ -122,8 +122,9 @@ func RequireRole(role string) gin.HandlerFunc {
 	}
 }
 
-// RequirePasswordChanged middleware blocks access if user hasn't changed password
-func RequirePasswordChanged() gin.HandlerFunc {
+// RequirePasswordChanged middleware blocks access if user hasn't changed password.
+// It checks the database value (not just JWT claims) so admin changes take effect immediately.
+func RequirePasswordChanged(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		changeAsLogin, exists := c.Get("change_as_login")
 		if !exists {
@@ -131,13 +132,32 @@ func RequirePasswordChanged() gin.HandlerFunc {
 			return
 		}
 
-		if changeAsLogin.(bool) {
-			utils.RespondError(c, http.StatusForbidden, "Please change your password first", "CHANGE_PASSWORD_REQUIRED")
-			c.Abort()
+		// If JWT says no password change needed, trust it (fast path)
+		if !changeAsLogin.(bool) {
+			c.Next()
 			return
 		}
 
-		c.Next()
+		// JWT says password change needed - verify against database in case
+		// admin has since unchecked the flag via edit user
+		userID, _ := c.Get("user_id")
+		if uid, ok := userID.(string); ok {
+			var user models.User
+			if parsedUID, err := uuid.Parse(uid); err == nil {
+				if db.Where("id = ?", parsedUID).First(&user).Error == nil {
+					// Database is the source of truth - if admin unchecked it, allow access
+					if !user.ChangeAsLogin {
+						// Update the context value so downstream handlers see the corrected value
+						c.Set("change_as_login", false)
+						c.Next()
+						return
+					}
+				}
+			}
+		}
+
+		utils.RespondError(c, http.StatusForbidden, "Please change your password first", "CHANGE_PASSWORD_REQUIRED")
+		c.Abort()
 	}
 }
 

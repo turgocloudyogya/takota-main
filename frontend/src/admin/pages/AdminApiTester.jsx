@@ -15,40 +15,40 @@ import {
 import { TextInput, SelectInput } from '../components/FormField.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
-// Only read-only (GET) endpoints are exposed here — this page exists purely
+// Only read-only (GET) endpoints are exposed here - this page exists purely
 // to let you see what the real backend actually returns, since the Bruno/
 // OpenCollection docs only specify request shapes. Whatever comes back gets
 // run through the same normalizer used by the rest of the dashboard, so you
 // can immediately see whether e.g. "nickname" mapped correctly or came out
-// blank — and if it did come out blank, adjust src/admin/lib/normalize.js
+// blank - and if it did come out blank, adjust src/admin/lib/normalize.js
 // to match your backend's real field names.
 
 const ENDPOINTS = {
   globalInfo: {
-    label: 'Global Info — GET /api/all/info',
+    label: 'Global Info - GET /api/all/info',
     listKeys: [],
     call: () => api.globalInfo(),
   },
   photos: {
-    label: 'Photos / Gallery — GET /api/all/photos',
+    label: 'Photos / Gallery - GET /api/all/photos',
     listKeys: ['photos'],
     normalize: normalizePhoto,
     call: ({ limit, lastId }) => api.listPhotos({ limit, lastId }),
   },
   users: {
-    label: 'List Users — GET /api/admin/users',
+    label: 'List Users - GET /api/admin/users',
     listKeys: ['users'],
     normalize: normalizeUser,
     call: ({ limit, lastId, search }) => api.listUsers({ limit, lastId, search }),
   },
   attendance: {
-    label: 'List Attendance — GET /api/admin/attendances',
+    label: 'List Attendance - GET /api/admin/attendances',
     listKeys: ['attendances'],
     normalize: normalizeAttendance,
     call: ({ limit, lastId, search }) => api.listAttendance({ limit, lastId, search }),
   },
   absence: {
-    label: 'List Absence — GET /api/admin/absences',
+    label: 'List Absence - GET /api/admin/absences',
     listKeys: ['absences'],
     normalize: normalizeAbsence,
     call: ({ limit, lastId, search }) => api.listAbsence({ limit, lastId, search }),
@@ -92,7 +92,7 @@ export default function AdminApiTester() {
       setRaw(json)
       setDetectedArrayKey(detectArrayKey(json))
     } catch (err) {
-      toast.error(err.message || 'Gagal memanggil endpoint.')
+      toast.error(err.message || 'Failed to call the endpoint.')
     } finally {
       setLoading(false)
     }
@@ -100,15 +100,15 @@ export default function AdminApiTester() {
 
   function saveBaseUrl() {
     api.setBaseUrl(baseUrlInput.trim())
-    toast.success('Alamat API disimpan untuk perangkat ini.')
+    toast.success('API URL saved for this device.')
   }
 
   function handleCopy() {
     if (!raw) return
     navigator.clipboard
       .writeText(JSON.stringify(raw, null, 2))
-      .then(() => toast.success('JSON disalin ke clipboard.'))
-      .catch(() => toast.error('Gagal menyalin ke clipboard.'))
+      .then(() => toast.success('JSON copied to clipboard.'))
+      .catch(() => toast.error('Failed to copy to clipboard.'))
   }
 
   const normalizedPreview =
@@ -126,31 +126,29 @@ export default function AdminApiTester() {
       <PageHeader
         icon={CurlyBrackets}
         eyebrow="Developer Tool"
-        title="Uji Respons API"
+        title="Test API Responses"
         description={
           <>
-            Dokumentasi Takota (baik file .zip Bruno maupun file .html opencollection) hanya berisi
-            spesifikasi <em>request</em> — method, url, dan body — sama sekali tidak ada contoh
-            <em> response</em> di dalamnya. Membuka file .html itu di browser hanya menampilkan viewer
-            statis dari spesifikasi yang sama; tidak ada panggilan nyata ke server, jadi tidak mungkin
-            &quot;dijalankan&quot; untuk mengungkap bentuk respons. Untuk itu memang perlu backend yang
-            benar-benar aktif. Panel di bawah ini adalah jalan pintasnya: ia memanggil backend Takota
-            Anda yang sesungguhnya (memakai token admin yang sedang login) dan menampilkan hasil
-            mentahnya apa adanya, disandingkan dengan hasil normalisasi yang dipakai dashboard.
+            The Takota documentation (both the Bruno .zip files and the .html opencollection file) only
+            contains the <em>request</em> specs - method, url, and body - with no <em>response</em> examples
+            at all. Opening the .html file in a browser only shows a static viewer of the same spec; it makes
+            no real calls to the server, so it cannot be &quot;run&quot; to reveal the response shape. For that
+            you really need a running backend. The panel below is the shortcut: it calls your actual Takota
+            backend (using the token of the currently logged-in admin) and shows the raw result as-is, side by
+            side with the normalization result used by the dashboard.
           </>
         }
       >
         {api.isMockMode() && (
           <p className="mt-1 max-w-2xl rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-            Mode Pratinjau aktif — JSON di bawah adalah data contoh dari mock lokal, bukan respons
-            backend asli. Matikan Mode Pratinjau di halaman Admin Login untuk menguji backend
-            sesungguhnya.
+            Preview Mode is active - the JSON below is sample data from the local mock, not a real backend
+            response. Turn off Preview Mode on the Admin Login page to test the actual backend.
           </p>
         )}
       </PageHeader>
 
       <Card className="flex flex-col gap-3 p-4">
-        <p className="text-sm font-semibold text-neutral-900">Alamat Server API</p>
+        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">API Server URL</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <TextInput
             label="Base URL"
@@ -160,12 +158,12 @@ export default function AdminApiTester() {
             className="flex-1"
           />
           <Button variant="outline" onPress={saveBaseUrl}>
-            Simpan
+            Save
           </Button>
         </div>
-        <p className="text-xs text-neutral">
-          Default dokumentasi adalah <code>http://localhost:8080</code>. Ganti ke alamat backend Takota
-          yang benar-benar bisa diakses dari browser Anda, lalu simpan — dipakai di seluruh dashboard.
+        <p className="text-xs text-neutral dark:text-neutral-400">
+          The documentation default is <code>http://localhost:8080</code>. Change it to a Takota backend URL
+          that is actually reachable from your browser, then save - it is used across the whole dashboard.
         </p>
       </Card>
 
@@ -198,7 +196,7 @@ export default function AdminApiTester() {
         {isListEndpoint && (
           <TextInput
             label="search"
-            placeholder="opsional…"
+            placeholder="optional…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -206,23 +204,23 @@ export default function AdminApiTester() {
 
         <Button variant="primary" onPress={handleRun} isDisabled={loading} className="self-start">
           <Icon data={Play} size={14} />
-          {loading ? 'Memanggil…' : 'Jalankan'}
+          {loading ? 'Calling…' : 'Run'}
         </Button>
       </Card>
 
       {raw !== null && (
         <>
           <Card className="flex flex-col gap-2 p-4">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral">
-              <span>Waktu respons: {elapsedMs}ms</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral dark:text-neutral-400">
+              <span>Response time: {elapsedMs}ms</span>
               {isListEndpoint && (
                 <>
                   <span>
-                    Kunci array terdeteksi:{' '}
-                    <strong className="text-neutral-900">{detectedArrayKey || 'tidak ditemukan'}</strong>
+                    Detected array key:{' '}
+                    <strong className="text-neutral-900 dark:text-neutral-100">{detectedArrayKey || 'not found'}</strong>
                   </span>
                   <span>
-                    Cursor (last_id) berikutnya: <strong className="text-neutral-900">{String(cursorPreview) || '(kosong)'}</strong>
+                    Next cursor (last_id): <strong className="text-neutral-900 dark:text-neutral-100">{String(cursorPreview) || '(empty)'}</strong>
                   </span>
                 </>
               )}
@@ -230,12 +228,12 @@ export default function AdminApiTester() {
 
             {isListEndpoint && normalizedPreview.length > 0 && (
               <div className="mt-2 flex flex-col gap-2">
-                <p className="text-xs font-medium text-neutral-600">
-                  Pratinjau setelah dinormalisasi (3 data pertama) — bandingkan dengan JSON mentah di bawah:
+                <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                  Preview after normalization (first 3 rows), compare with the raw JSON below:
                 </p>
-                <div className="overflow-x-auto rounded-xl border border-app-border/15">
+                <div className="overflow-x-auto rounded-xl border border-app-border/15 dark:border-white/10">
                   <table className="w-full min-w-[480px] text-left text-xs">
-                    <thead className="bg-neutral-50 text-neutral">
+                    <thead className="bg-neutral-50 text-neutral dark:bg-neutral-800/60 dark:text-neutral-400">
                       <tr>
                         {Object.keys(normalizedPreview[0])
                           .filter((k) => k !== 'raw')
@@ -246,15 +244,15 @@ export default function AdminApiTester() {
                           ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-app-border/10">
+                    <tbody className="divide-y divide-app-border/10 dark:divide-white/10">
                       {normalizedPreview.map((row, i) => (
                         <tr key={i}>
                           {Object.entries(row)
                             .filter(([k]) => k !== 'raw')
                             .map(([k, v]) => (
-                              <td key={k} className="px-3 py-2 text-neutral-700">
+                              <td key={k} className="px-3 py-2 text-neutral-700 dark:text-neutral-300">
                                 {v === undefined || v === null || v === '' ? (
-                                  <span className="text-danger">kosong</span>
+                                  <span className="text-danger">empty</span>
                                 ) : (
                                   String(v)
                                 )}
@@ -265,9 +263,9 @@ export default function AdminApiTester() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-neutral">
-                  Ada kolom yang selalu "kosong"? Berarti nama field asli dari server berbeda — cek JSON mentah di
-                  bawah lalu sesuaikan di <code>src/admin/lib/normalize.js</code>.
+                <p className="text-xs text-neutral dark:text-neutral-400">
+                  A column that is always &quot;empty&quot;? That means the real field name from the server differs - check
+                  the raw JSON below and adjust <code>src/admin/lib/normalize.js</code>.
                 </p>
               </div>
             )}
@@ -275,10 +273,10 @@ export default function AdminApiTester() {
 
           <Card className="flex flex-col gap-2 p-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-neutral-900">JSON Mentah</p>
+              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Raw JSON</p>
               <Button variant="ghost" size="sm" onPress={handleCopy}>
                 <Icon data={Copy} size={13} />
-                Salin
+                Copy
               </Button>
             </div>
             <pre className="max-h-[480px] overflow-auto rounded-xl bg-neutral-900 p-4 text-xs leading-relaxed text-neutral-100">

@@ -8,42 +8,51 @@ import { downloadBlob } from '../lib/download.js'
 import PageHeader from '../components/PageHeader.jsx'
 
 // Backend expects an English month name (e.g. "august") in the ?month query
-// and always uses the current year. lang must be "id" or "en".
+// and a numeric ?year, defaulting to the current month/year.
+const CURRENT_YEAR = new Date().getFullYear()
+
 const MONTHS = [
-  { id: 'january', label: 'Januari' },
-  { id: 'february', label: 'Februari' },
-  { id: 'march', label: 'Maret' },
+  { id: 'january', label: 'January' },
+  { id: 'february', label: 'February' },
+  { id: 'march', label: 'March' },
   { id: 'april', label: 'April' },
-  { id: 'may', label: 'Mei' },
-  { id: 'june', label: 'Juni' },
-  { id: 'july', label: 'Juli' },
-  { id: 'august', label: 'Agustus' },
+  { id: 'may', label: 'May' },
+  { id: 'june', label: 'June' },
+  { id: 'july', label: 'July' },
+  { id: 'august', label: 'August' },
   { id: 'september', label: 'September' },
-  { id: 'october', label: 'Oktober' },
+  { id: 'october', label: 'October' },
   { id: 'november', label: 'November' },
-  { id: 'december', label: 'Desember' },
+  { id: 'december', label: 'December' },
 ]
 
+const YEARS = []
+for (let y = CURRENT_YEAR - 5; y <= CURRENT_YEAR; y += 1) YEARS.push(y)
+
 const LANGUAGES = [
-  { id: 'id', label: 'Bahasa Indonesia' },
   { id: 'en', label: 'English' },
+  { id: 'id', label: 'Indonesia' },
+  { id: 'params', label: 'Params_Database' },
+  { id: 'json', label: 'JSON Structure' },
 ]
 
 export default function AdminReports() {
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()].id)
-  const [lang, setLang] = useState('id')
+  const [year, setYear] = useState(CURRENT_YEAR)
+  const [lang, setLang] = useState('en')
   const [building, setBuilding] = useState(false)
 
   const monthLabel = MONTHS.find((m) => m.id === month)?.label || month
+  const formatLabel = lang === 'json' ? 'JSON' : 'CSV'
 
   async function handleExport() {
     setBuilding(true)
     try {
-      const { blob, filename } = await api.exportAttendanceServer({ month, lang })
+      const { blob, filename } = await api.exportAttendanceServer({ month, year, lang })
       downloadBlob(blob, filename)
-      toast.success(`Rekap ${monthLabel} ${new Date().getFullYear()} berhasil diunduh.`)
+      toast.success(`Report for ${monthLabel} ${year} downloaded successfully.`)
     } catch (err) {
-      toast.error(err.message || 'Gagal mengunduh rekap CSV.')
+      toast.error(err.message || `Failed to download the ${formatLabel} report.`)
     } finally {
       setBuilding(false)
     }
@@ -53,28 +62,29 @@ export default function AdminReports() {
     <div className="flex flex-col gap-5">
       <PageHeader
         icon={FileArrowDown}
-        eyebrow="Laporan"
-        title="Rekap & Unduh"
-        description="Unduh rekap kehadiran seluruh pengguna dalam satu bulan sebagai file CSV, dengan kolom No, Nama, Kehadiran, Waktu, Tanggal, Jenis Ketidakhadiran, dan Alasan Izin."
+        eyebrow="Reports"
+        title="Reports & Export"
+        description="Download the attendance summary for a selected month and year as a CSV file or a JSON array."
       />
 
       <Card className="flex flex-col gap-4 p-4">
         <div>
-          <p className="text-sm font-semibold text-neutral-900">Unduh Rekap Bulanan</p>
-          <p className="text-sm text-neutral">
-            File CSV dipisahkan tanda titik koma (;) sehingga mudah dibuka di aplikasi spreadsheet
-            seperti Microsoft Excel atau Google Sheets.
+          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Download Monthly Report</p>
+          <p className="text-sm text-neutral dark:text-neutral-400">
+            CSV files use semicolons (;) as separators so they open easily in spreadsheet applications
+            such as Microsoft Excel or Google Sheets. The JSON format exports an array of items using
+            the same snake_case field names as Params_Database.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Select
             selectedKey={month}
             onSelectionChange={(key) => setMonth(String(key))}
             fullWidth
           >
-            <Label>Bulan</Label>
-            <Select.Trigger>
+            <Label>Month</Label>
+            <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
               <Select.Value />
               <Select.Indicator />
             </Select.Trigger>
@@ -91,12 +101,34 @@ export default function AdminReports() {
           </Select>
 
           <Select
+            selectedKey={year}
+            onSelectionChange={(key) => setYear(Number(key))}
+            fullWidth
+          >
+            <Label>Year</Label>
+            <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {YEARS.map((y) => (
+                  <ListBox.Item key={y} id={y} textValue={String(y)}>
+                    <Label>{y}</Label>
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+
+          <Select
             selectedKey={lang}
             onSelectionChange={(key) => setLang(String(key))}
             fullWidth
           >
-            <Label>Bahasa</Label>
-            <Select.Trigger>
+            <Label>Language</Label>
+            <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
               <Select.Value />
               <Select.Indicator />
             </Select.Trigger>
@@ -120,7 +152,7 @@ export default function AdminReports() {
           className="self-start"
         >
           <Icon data={FileArrowDown} size={15} />
-          {building ? 'Membuat rekap…' : `Unduh CSV ${monthLabel} ${new Date().getFullYear()}`}
+          {building ? 'Building report…' : `Download ${formatLabel} ${monthLabel} ${year}`}
         </Button>
       </Card>
     </div>

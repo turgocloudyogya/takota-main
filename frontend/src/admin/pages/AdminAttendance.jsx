@@ -10,13 +10,14 @@ import { Toolbar, PagerFooter } from '../components/ListChrome.jsx'
 import { ConfirmDialog } from '../../components/Modals.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
 import PageHeader from '../components/PageHeader.jsx'
+import PhotoPreviewModal from '../../components/PhotoPreviewModal.jsx'
 
 const LIMIT = 15
 
 function formatDateTime(dateRaw) {
   const d = parseApiDate(dateRaw)
-  if (!d) return dateRaw || '—'
-  return d.toLocaleString('id-ID', {
+  if (!d) return dateRaw || '-'
+  return d.toLocaleString('en-US', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -35,6 +36,7 @@ export default function AdminAttendance() {
   const [hasNext, setHasNext] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [activePhoto, setActivePhoto] = useState(null)
 
   // Use refs to store latest values for polling
   const pageIndexRef = useRef(pageIndex)
@@ -76,7 +78,7 @@ export default function AdminAttendance() {
     } catch (err) {
       // Only show error toast if not polling
       if (!isPolling) {
-        toast.error(err.message || 'Gagal memuat data presensi.')
+        toast.error(err.message || 'Failed to load attendance data.')
       }
     } finally {
       if (!isPolling) {
@@ -106,7 +108,7 @@ export default function AdminAttendance() {
           })
         }
       } catch (err) {
-        if (!cancelled) toast.error(err.message || 'Gagal memuat data presensi.')
+        if (!cancelled) toast.error(err.message || 'Failed to load attendance data.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -157,11 +159,11 @@ export default function AdminAttendance() {
     setDeleting(true)
     try {
       await api.deleteAttendance(deleteTarget.id)
-      toast.success('Data presensi berhasil dihapus.')
+      toast.success('Attendance record deleted successfully.')
       setDeleteTarget(null)
       handleRefresh()
     } catch (err) {
-      toast.error(err.message || 'Gagal menghapus data presensi.')
+      toast.error(err.message || 'Failed to delete attendance record.')
     } finally {
       setDeleting(false)
     }
@@ -171,9 +173,9 @@ export default function AdminAttendance() {
     <div className="flex flex-col gap-5">
       <PageHeader
         icon={Clock}
-        eyebrow="Riwayat Kehadiran"
-        title="Presensi"
-        description="Riwayat check-in kehadiran siswa beserta lokasi dan foto absen."
+        eyebrow="Attendance History"
+        title="Attendance"
+        description="Students' attendance check-in history with location and attendance photo."
       />
 
       <Toolbar
@@ -181,61 +183,61 @@ export default function AdminAttendance() {
         onSearchChange={setSearchInput}
         onSearchSubmit={handleSearchSubmit}
         onRefresh={handleRefresh}
-        placeholder="Cari nama atau username…"
+        placeholder="Search name or username…"
       />
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral">
+            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">
               <tr>
-                <th className="px-4 py-3">Nama</th>
-                <th className="px-4 py-3">Waktu</th>
-                <th className="px-4 py-3">Lokasi</th>
-                <th className="px-4 py-3">Foto</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Time</th>
+                <th className="px-4 py-3">Location</th>
+                <th className="px-4 py-3">Photo</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-app-border/10">
+            <tbody className="divide-y divide-app-border/10 dark:divide-white/10">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-neutral">
-                    Memuat data…
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-neutral dark:text-neutral-400">
+                    Loading data…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8">
-                    <EmptyState label="Belum ada data presensi" />
+                    <EmptyState label="No attendance data yet" />
                   </td>
                 </tr>
               ) : (
                 items.map((row) => (
-                  <tr key={row.id} className="hover:bg-neutral-50/60">
+                  <tr key={row.id} className="hover:bg-neutral-50/60 dark:hover:bg-white/5">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-neutral-900">{row.name || '—'}</p>
-                      {row.username && <p className="text-xs text-neutral">{row.username}</p>}
+                      <p className="font-medium text-neutral-900 dark:text-neutral-100">{row.name || '-'}</p>
+                      {row.username && <p className="text-xs text-neutral dark:text-neutral-400">{row.username}</p>}
                     </td>
-                    <td className="px-4 py-3 text-neutral-700">{formatDateTime(row.dateRaw)}</td>
+                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{formatDateTime(row.dateRaw)}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="text-neutral-700">
+                        <span className="text-neutral-700 dark:text-neutral-300">
                           {row.displayAddress ? (
                             <span className="inline-flex items-center gap-1">
                               {row.displayAddress}
                             </span>
                           ) : row.location ? (
                             <span className="inline-flex items-center gap-1">
-                              <Icon data={MapPin} size={13} className="text-neutral" />
+                              <Icon data={MapPin} size={13} className="text-neutral dark:text-neutral-400" />
                               {row.location}
                             </span>
                           ) : row.latitude && row.longitude ? (
                             <span className="inline-flex items-center gap-1 text-xs">
-                              <Icon data={MapPin} size={13} className="text-neutral" />
+                              <Icon data={MapPin} size={13} className="text-neutral dark:text-neutral-400" />
                               {Number(row.latitude).toFixed(4)}, {Number(row.longitude).toFixed(4)}
                             </span>
                           ) : (
-                            '—'
+                            '-'
                           )}
                         </span>
                         {row.mapsUrl && (
@@ -243,8 +245,8 @@ export default function AdminAttendance() {
                             href={row.mapsUrl}
                             target="_blank"
                             rel="noreferrer"
-                            title="Buka lokasi di Google Maps"
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral hover:bg-primary/10 hover:text-primary"
+                            title="Open location in Google Maps"
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral hover:bg-primary/10 hover:text-primary dark:bg-neutral-800 dark:text-neutral-400"
                           >
                             <Icon data={MapPin} size={14} />
                           </a>
@@ -253,16 +255,15 @@ export default function AdminAttendance() {
                     </td>
                     <td className="px-4 py-3">
                       {row.photoUrl ? (
-                        <a
-                          href={row.photoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-neutral-100"
+                        <button
+                          type="button"
+                          onClick={() => setActivePhoto({ url: row.photoUrl, date: row.dateRaw, username: row.username })}
+                          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800"
                         >
-                          <img src={row.photoUrl} alt="Foto absen" className="h-full w-full object-cover" />
-                        </a>
+                          <img src={row.photoUrl} alt="Attendance photo" className="h-full w-full object-cover" />
+                        </button>
                       ) : (
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-neutral">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-neutral dark:bg-neutral-800 dark:text-neutral-400">
                           <Icon data={Camera} size={14} />
                         </span>
                       )}
@@ -274,7 +275,7 @@ export default function AdminAttendance() {
                           size="sm"
                           isIconOnly
                           onPress={() => setDeleteTarget(row)}
-                          aria-label="Hapus"
+                          aria-label="Delete"
                           className="text-danger"
                         >
                           <Icon data={TrashBin} size={14} />
@@ -295,7 +296,7 @@ export default function AdminAttendance() {
             onPrev={handlePrev}
             onNext={handleNext}
             loading={loading}
-            countLabel={`Halaman ${pageIndex + 1} · ${items.length} data ditampilkan`}
+            countLabel={`Page ${pageIndex + 1} · ${items.length} records shown`}
           />
         </div>
       </Card>
@@ -303,13 +304,15 @@ export default function AdminAttendance() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Hapus data presensi?"
-        description="Data presensi ini akan dihapus permanen dan tidak dapat dikembalikan."
-        confirmLabel="Hapus"
+        title="Delete attendance record?"
+        description="This attendance record will be permanently deleted and cannot be restored."
+        confirmLabel="Delete"
         danger
         loading={deleting}
         onConfirm={handleDelete}
       />
+
+      <PhotoPreviewModal photo={activePhoto} onClose={() => setActivePhoto(null)} />
     </div>
   )
 }

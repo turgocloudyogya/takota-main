@@ -28,8 +28,8 @@ export default function Photos() {
             id: photo.id,
             url: photo.url,
             date: photo.timestamp || photo.created_at || '',
-            nickname: photo.user?.name || 'Siswa',
-            username: photo.user?.username || 'Siswa',
+            nickname: photo.user?.name || 'Student',
+            username: photo.user?.username || 'Student',
           }))
           setPhotoList(mappedPhotos)
           setHasMore(Boolean(data.last_id))
@@ -62,8 +62,8 @@ export default function Photos() {
           id: photo.id,
           url: photo.url,
           date: photo.timestamp || photo.created_at || '',
-          nickname: photo.user?.name || 'Siswa',
-          username: photo.user?.username || 'Siswa',
+          nickname: photo.user?.name || 'Student',
+          username: photo.user?.username || 'Student',
         }))
         setPhotoList((prev) => [...prev, ...mappedPhotos])
         setHasMore(Boolean(data.last_id))
@@ -77,7 +77,7 @@ export default function Photos() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md">
+    <main className="mx-auto min-h-dvh w-full max-w-md">
       <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
         <BackButton label="Photos" />
         <span className="h-8 w-8 shrink-0" />
@@ -87,7 +87,7 @@ export default function Photos() {
         {loading ? (
           <div className="mt-2 grid grid-cols-3 gap-px">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="aspect-square animate-pulse bg-neutral-200" />
+              <div key={i} className="aspect-square animate-pulse bg-neutral-200 dark:bg-neutral-700" />
             ))}
           </div>
         ) : photoList.length > 0 ? (
@@ -98,7 +98,7 @@ export default function Photos() {
                   key={photo.id}
                   type="button"
                   onClick={() => setActivePhoto(photo)}
-                  className="group relative cursor-pointer aspect-square overflow-hidden bg-neutral-100"
+                  className="group relative cursor-pointer aspect-square overflow-hidden bg-neutral-100 dark:bg-neutral-800"
                 >
                   <img src={photo.url} alt="" className="h-full w-full object-cover" />
                   <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/0 to-transparent p-2 opacity-0 transition duration-150 group-hover:opacity-100">
@@ -110,7 +110,7 @@ export default function Photos() {
                         const hours = String(d.getHours()).padStart(2, '0')
                         const minutes = String(d.getMinutes()).padStart(2, '0')
                         return `${day}/${month}/${d.getFullYear()} ${hours}:${minutes}`
-                      })() : ''} • oleh {photo.nickname}
+                      })() : ''} • by {photo.nickname}
                     </p>
                   </div>
                 </button>

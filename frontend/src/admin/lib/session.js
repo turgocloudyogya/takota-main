@@ -7,7 +7,7 @@
 //
 // "type" is what distinguishes an admin account ("admin") from a regular
 // student/user account ("user"). We decode it client-side (no signature
-// verification — that's the backend's job) purely to know who is logged in
+// verification - that's the backend's job) purely to know who is logged in
 // and to gate the /admin/* routes to admin accounts.
 
 const TOKEN_KEY = 'takota_admin_token'
@@ -25,7 +25,7 @@ export function setToken(token) {
     if (token) localStorage.setItem(TOKEN_KEY, token)
     else localStorage.removeItem(TOKEN_KEY)
   } catch {
-    // Ignore storage failures (e.g. private browsing) — session just won't persist.
+    // Ignore storage failures (e.g. private browsing) - session just won't persist.
   }
 }
 

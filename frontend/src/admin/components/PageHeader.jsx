@@ -18,8 +18,8 @@ export default function PageHeader({ icon, eyebrow, title, description, actions,
           {eyebrow && (
             <span className="text-[11px] font-semibold tracking-[0.08em] text-primary/70 uppercase">{eyebrow}</span>
           )}
-          <h1 className="text-xl font-bold tracking-tight text-neutral-900">{title}</h1>
-          {description && <p className="max-w-2xl text-sm text-neutral">{description}</p>}
+          <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">{title}</h1>
+          {description && <p className="max-w-2xl text-sm text-neutral dark:text-neutral-400">{description}</p>}
           {children}
         </div>
       </div>

@@ -116,7 +116,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		user := api.Group("/user")
 		user.Use(middlewares.AuthMiddleware(db))
 		user.Use(middlewares.RequireRole("user"))
-		user.Use(middlewares.RequirePasswordChanged())
+		user.Use(middlewares.RequirePasswordChanged(db))
 		{
 			user.GET("/home", userCtrl.Home)
 			user.POST("/attendance", userCtrl.Attendance)
@@ -127,7 +127,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		admin := api.Group("/admin")
 		admin.Use(middlewares.AuthMiddleware(db))
 		admin.Use(middlewares.RequireRole("admin"))
-		admin.Use(middlewares.RequirePasswordChanged())
+		admin.Use(middlewares.RequirePasswordChanged(db))
 		{
 			// Attendance & Absence management
 			admin.GET("/attendances", adminCtrl.ListAttendances)

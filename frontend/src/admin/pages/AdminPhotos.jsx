@@ -36,8 +36,8 @@ export default function AdminPhotos() {
           id: photo.id,
           url: photo.url,
           date: photo.timestamp || photo.created_at || '',
-          nickname: photo.user?.name || 'Siswa',
-          username: photo.user?.username || 'Siswa', // For modal compatibility
+          nickname: photo.user?.name || 'Student',
+          username: photo.user?.username || 'Student', // For modal compatibility
         }))
         
         if (isLoadingMore) {
@@ -52,7 +52,7 @@ export default function AdminPhotos() {
         setHasMore(false)
       }
     } catch (err) {
-      toast.error(err.message || 'Gagal memuat galeri foto.')
+      toast.error(err.message || 'Failed to load the photo gallery.')
       console.error('listPhotos error:', err)
     } finally {
       if (isLoadingMore) {
@@ -73,15 +73,15 @@ export default function AdminPhotos() {
     <div className="flex flex-col gap-5">
       <PageHeader
         icon={Picture}
-        eyebrow="Galeri"
-        title="Foto Presensi"
-        description="Galeri foto yang diupload siswa saat melakukan presensi dengan foto. Klik untuk preview. Foto dihapus otomatis saat data presensinya dihapus."
+        eyebrow="Gallery"
+        title="Attendance Photos"
+        description="Gallery of photos uploaded by students when checking in with a photo. Click to preview. Photos are deleted automatically when the attendance record is deleted."
       />
 
       {loading ? (
         <div className="grid grid-cols-3 gap-px sm:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 15 }).map((_, i) => (
-            <div key={i} className="aspect-square animate-pulse bg-neutral-200" />
+            <div key={i} className="aspect-square animate-pulse bg-neutral-200 dark:bg-neutral-700" />
           ))}
         </div>
       ) : photos.length === 0 ? (
@@ -94,21 +94,21 @@ export default function AdminPhotos() {
           >
             <div className="grid grid-cols-3 gap-px sm:grid-cols-4 lg:grid-cols-5">
               {Array.from({ length: 45 }).map((_, i) => (
-                <div key={i} className="aspect-square bg-neutral-200" />
+                <div key={i} className="aspect-square bg-neutral-200 dark:bg-neutral-800" />
               ))}
             </div>
             {/* Fade gradient */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-neutral-50" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-neutral-50 dark:to-[#0a0a0a]" />
           </div>
 
           {/* Empty message */}
           <div className="relative z-10 -mt-20 flex flex-col items-center px-4 pb-6 text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[20px] bg-neutral-200 text-neutral-900">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[20px] bg-neutral-200 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100">
               <Icon data={Picture} size={28} />
             </div>
-            <h2 className="text-lg font-bold text-neutral-900">Belum ada foto</h2>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-neutral-500">
-              Galeri akan terisi ketika siswa melakukan presensi dengan foto. Semua foto akan tersedia di sini.
+            <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">No photos yet</h2>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+              The gallery fills up when students check in with a photo. All photos will be available here.
             </p>
           </div>
         </div>
@@ -120,11 +120,11 @@ export default function AdminPhotos() {
                 key={photo.id}
                 type="button"
                 onClick={() => setActivePhoto(photo)}
-                className="group relative aspect-square overflow-hidden bg-neutral-100"
+                className="group relative aspect-square overflow-hidden bg-neutral-100 dark:bg-neutral-800"
               >
                 <img 
                   src={photo.url} 
-                  alt={`Foto ${photo.nickname}`} 
+                  alt={`Photo of ${photo.nickname}`} 
                   className="h-full w-full object-cover" 
                 />
                 <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/0 to-transparent p-2 opacity-0 transition duration-150 group-hover:opacity-100">
@@ -136,7 +136,7 @@ export default function AdminPhotos() {
                       const hours = String(d.getHours()).padStart(2, '0')
                       const minutes = String(d.getMinutes()).padStart(2, '0')
                       return `${day}/${month}/${d.getFullYear()} ${hours}:${minutes}`
-                    })() : ''} • oleh {photo.nickname}
+                      })() : ''} • by {photo.nickname}
                   </p>
                 </div>
               </button>
@@ -151,7 +151,7 @@ export default function AdminPhotos() {
                 disabled={loadingMore}
                 className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
               >
-                {loadingMore ? 'Memuat...' : 'Muat Lebih Banyak'}
+                {loadingMore ? 'Loading...' : 'Load More'}
               </button>
             </div>
           )}

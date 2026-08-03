@@ -1,17 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Drawer } from 'vaul'
 import { Icon } from '@gravity-ui/uikit'
-import { ChevronDown, Files, Xmark, PaperPlane } from '@gravity-ui/icons'
+import { Files, Xmark, PaperPlane } from '@gravity-ui/icons'
+import { Label, ListBox, Select, TextArea } from '@heroui/react'
 import BackButton from '../components/BackButton.jsx'
 import { submitAbsence } from '../lib/api.js'
 
 // The 2 choices shown under "Select a reason", per design.
 // Backend expects: 'sick' or 'permission'
 const REASON_OPTIONS = [
-  { value: 'permission', label: 'Absence / Izin' },
-  { value: 'sick', label: 'Sick / Sakit' },
+  { id: 'permission', label: 'Absence / Leave' },
+  { id: 'sick', label: 'Sick' },
 ]
 
 function getFileExt(name = '') {
@@ -32,12 +33,12 @@ export default function Absence() {
 
   const [reasonText, setReasonText] = useState('')
   const [file, setFile] = useState(null)
-  const [reasonOpen, setReasonOpen] = useState(false)
   const [reasonType, setReasonType] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [countdown, setCountdown] = useState(3)
+  const [isDragging, setIsDragging] = useState(false)
 
   // "Absence has been taken!" auto-redirects to home after 3 seconds,
   // counting down 3, 2, 1 in the message as it goes.
@@ -64,10 +65,22 @@ export default function Absence() {
     setFile(null)
   }
 
-  function handleSelectReasonType(option) {
-    setReasonType(option)
-    setReasonOpen(false)
-  }
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const droppedFile = e.dataTransfer.files?.[0]
+    if (droppedFile) setFile(droppedFile)
+  }, [])
 
   function handleTakeAbsence() {
     if (!reasonText.trim()) {
@@ -86,7 +99,7 @@ export default function Absence() {
 
     try {
       await submitAbsence({
-        option: reasonType.value,
+        option: reasonType,
         reason: reasonText.trim(),
         file: file || undefined,
       })
@@ -104,13 +117,13 @@ export default function Absence() {
 
   if (submitted) {
     return (
-      <main className="flex min-h-screen w-full items-center justify-center px-6">
+      <main className="flex min-h-dvh w-full items-center justify-center px-6">
         <div className="flex w-full max-w-md flex-col items-center text-center">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-orange-100">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-orange-100 dark:bg-orange-500/15">
             <Icon data={PaperPlane} size={32} className="text-orange-500" />
           </div>
-          <h1 className="text-xl font-bold text-neutral-900">Absence has been taken!</h1>
-          <p className="mt-2 max-w-[260px] text-center text-sm text-neutral">
+          <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Absence has been taken!</h1>
+          <p className="mt-2 max-w-[260px] text-center text-sm text-neutral dark:text-neutral-400">
             The page will automatically redirect to the home page after {countdown} second
           </p>
         </div>
@@ -119,29 +132,29 @@ export default function Absence() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
         <BackButton label="Absence" />
         <span className="h-8 w-8 shrink-0" />
       </header>
 
-      <div className="flex flex-1 flex-col justify-center px-6 py-6">
-        <p className="text-sm text-neutral">
+      <div className="flex flex-1 flex-col justify-center px-6 py-6 pb-[80px]">
+        <p className="text-sm text-neutral dark:text-neutral-400">
           Please explain why you are not present at this time
         </p>
 
-        <textarea
+        <TextArea
           value={reasonText}
           onChange={(e) => setReasonText(e.target.value)}
           placeholder="Enter the reason for your absence…"
           rows={5}
-          className="mt-3 w-full resize-none rounded-xl bg-neutral-100 px-4 py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral"
+          className="mt-3 w-full resize-none rounded-xl bg-neutral-100 dark:bg-neutral-900 px-4 py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500 shadow-none"
         />
 
         <input ref={fileInputRef} type="file" onChange={handleFilePick} className="hidden" />
 
         {file ? (
-          <div className="relative mt-3 flex flex-col items-center justify-center gap-2 rounded-xl bg-orange-100 px-4 py-6 cursor-pointer">
+          <div className="relative mt-3 flex flex-col items-center justify-center gap-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 px-4 py-6 cursor-pointer">
             <button
               type="button"
               onClick={handleRemoveFile}
@@ -150,8 +163,8 @@ export default function Absence() {
             >
               <Icon data={Xmark} size={14} />
             </button>
-            <Icon data={Files} size={28} className="text-neutral-700" />
-            <p className="w-full text-center text-xs text-neutral-700 truncate overflow-hidden">
+            <Icon data={Files} size={28} className="text-neutral-700 dark:text-neutral-300" />
+            <p className="w-full text-center text-xs text-neutral-700 truncate overflow-hidden dark:text-neutral-300">
               {file.name}
               <br />
               {getFileExt(file.name)} · {formatFileSize(file.size)}
@@ -161,47 +174,44 @@ export default function Absence() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl bg-neutral-100 px-4 py-6 cursor-pointer"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`mt-3 flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition-colors cursor-pointer ${
+              isDragging
+                ? 'border-primary bg-primary/5'
+                : 'border-transparent bg-neutral-100 dark:bg-neutral-900'
+            }`}
           >
-            <Icon data={Files} size={28} className="text-neutral-400" />
-            <span className="text-center text-xs text-neutral">
-              Attach only 1 relevant photo or document (optional)
+            <Icon data={Files} size={28} className={isDragging ? 'text-primary' : 'text-neutral-400 dark:text-neutral-500'} />
+            <span className="text-center text-xs text-neutral dark:text-neutral-400">
+              {isDragging ? 'Drop file here' : 'Attach only 1 relevant photo or document (optional)'}
             </span>
           </button>
         )}
 
-        <div className="relative z-20 mt-3">
-          <button
-            type="button"
-            onClick={() => setReasonOpen((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-xl bg-neutral-100 px-4 py-3 text-left text-sm text-neutral-900 cursor-pointer"
+        <div className="mt-3">
+          <Select
+            selectedKey={reasonType}
+            onSelectionChange={(key) => setReasonType(String(key))}
+            fullWidth
           >
-            <Icon
-              data={ChevronDown}
-              size={14}
-              className={`shrink-0 text-neutral transition-transform ${reasonOpen ? 'rotate-180' : ''}`}
-            />
-            {reasonType ? reasonType.label : 'Select a reason'}
-          </button>
-
-          {reasonOpen && (
-            <div className="absolute inset-x-0 top-full z-30 mt-1 flex flex-col overflow-hidden rounded-xl shadow-lg">
-              {REASON_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => handleSelectReasonType(option)}
-                  className={`w-full px-4 py-3 text-left text-sm transition cursor-pointer ${
-                    reasonType?.value === option.value
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-neutral-100 text-neutral-900 hover:bg-orange-500 hover:text-white'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
+            <Label>Select a reason</Label>
+            <Select.Trigger className="bg-neutral-100 dark:bg-neutral-900 shadow-none">
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {REASON_OPTIONS.map((option) => (
+                  <ListBox.Item key={option.id} id={option.id} textValue={option.label}>
+                    <Label>{option.label}</Label>
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
         </div>
 
         <button
@@ -223,12 +233,12 @@ export default function Absence() {
       >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col rounded-t-2xl bg-white p-5 pb-8 outline-none">
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col rounded-t-2xl bg-white p-5 pb-8 outline-none dark:bg-neutral-900">
             <Drawer.Handle className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-app-border/40" />
-            <Drawer.Title className="mb-2 text-base font-bold text-neutral-900">
+            <Drawer.Title className="mb-2 text-base font-bold text-neutral-900 dark:text-neutral-100">
               Are you sure?
             </Drawer.Title>
-            <p className="mb-4 text-sm text-neutral">
+            <p className="mb-4 text-sm text-neutral dark:text-neutral-400">
               Click "Absence" to submit your current absence, including a file if you upload the
               file for relevant document
             </p>

@@ -6,6 +6,7 @@ import { Check, Xmark, FileText, FileCheck, TrashBin } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { unwrapList, normalizeAbsence } from '../lib/normalize.js'
 import { parseApiDate } from '../lib/dateWindow.js'
+import { downloadFile } from '../../lib/download.js'
 import { Toolbar, PagerFooter } from '../components/ListChrome.jsx'
 import { OptionChip, SignChip } from '../components/StatusChip.jsx'
 import { ConfirmDialog } from '../../components/Modals.jsx'
@@ -16,8 +17,8 @@ const LIMIT = 15
 
 function formatDate(dateRaw) {
   const d = parseApiDate(dateRaw)
-  if (!d) return dateRaw || '—'
-  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+  if (!d) return dateRaw || '-'
+  return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export default function AdminAbsence() {
@@ -72,7 +73,7 @@ export default function AdminAbsence() {
     } catch (err) {
       // Only show error toast if not polling
       if (!isPolling) {
-        toast.error(err.message || 'Gagal memuat data izin.')
+        toast.error(err.message || 'Failed to load leave data.')
       }
     } finally {
       if (!isPolling) {
@@ -102,7 +103,7 @@ export default function AdminAbsence() {
           })
         }
       } catch (err) {
-        if (!cancelled) toast.error(err.message || 'Gagal memuat data izin.')
+        if (!cancelled) toast.error(err.message || 'Failed to load leave data.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -153,11 +154,11 @@ export default function AdminAbsence() {
     setProcessing(true)
     try {
       await api.signAbsence(pendingAction.row.id, pendingAction.sign)
-      toast.success(pendingAction.sign === 'allow' ? 'Pengajuan disetujui.' : 'Pengajuan ditolak.')
+      toast.success(pendingAction.sign === 'allow' ? 'Submission approved.' : 'Submission rejected.')
       setPendingAction(null)
       handleRefresh()
     } catch (err) {
-      toast.error(err.message || 'Gagal memperbarui status pengajuan.')
+      toast.error(err.message || 'Failed to update submission status.')
     } finally {
       setProcessing(false)
     }
@@ -168,11 +169,11 @@ export default function AdminAbsence() {
     setProcessing(true)
     try {
       await api.deleteAbsence(pendingDelete.row.id)
-      toast.success('Pengajuan izin berhasil dihapus.')
+      toast.success('Leave submission deleted successfully.')
       setPendingDelete(null)
       handleRefresh()
     } catch (err) {
-      toast.error(err.message || 'Gagal menghapus pengajuan.')
+      toast.error(err.message || 'Failed to delete submission.')
     } finally {
       setProcessing(false)
     }
@@ -182,9 +183,9 @@ export default function AdminAbsence() {
     <div className="flex flex-col gap-5">
       <PageHeader
         icon={FileCheck}
-        eyebrow="Pengajuan"
-        title="Izin & Sakit"
-        description="Tinjau dan setujui/tolak pengajuan izin atau sakit dari siswa."
+        eyebrow="Submissions"
+        title="Leave & Sick"
+        description="Review and approve/reject students' leave or sick submissions."
       />
 
       <Toolbar
@@ -192,48 +193,48 @@ export default function AdminAbsence() {
         onSearchChange={setSearchInput}
         onSearchSubmit={handleSearchSubmit}
         onRefresh={handleRefresh}
-        placeholder="Cari nama atau username…"
+        placeholder="Search name or username…"
       />
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral">
+            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">
               <tr>
-                <th className="px-4 py-3">Nama</th>
-                <th className="px-4 py-3">Tanggal</th>
-                <th className="px-4 py-3">Jenis</th>
-                <th className="px-4 py-3">Alasan</th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Type</th>
+                <th className="px-4 py-3">Reason</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-app-border/10">
+            <tbody className="divide-y divide-app-border/10 dark:divide-white/10">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-neutral">
-                    Memuat data…
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-neutral dark:text-neutral-400">
+                    Loading data…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8">
-                    <EmptyState label="Belum ada pengajuan izin" />
+                    <EmptyState label="No leave submissions yet" />
                   </td>
                 </tr>
               ) : (
                 items.map((row) => (
-                  <tr key={row.id} className="hover:bg-neutral-50/60">
+                  <tr key={row.id} className="hover:bg-neutral-50/60 dark:hover:bg-white/5">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-neutral-900">{row.name || row.raw?.nickname || '—'}</p>
-                      {row.username && <p className="text-xs text-neutral">{row.username}</p>}
+                      <p className="font-medium text-neutral-900 dark:text-neutral-100">{row.name || row.raw?.nickname || '-'}</p>
+                      {row.username && <p className="text-xs text-neutral dark:text-neutral-400">{row.username}</p>}
                     </td>
-                    <td className="px-4 py-3 text-neutral-700">{formatDate(row.dateRaw)}</td>
+                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{formatDate(row.dateRaw)}</td>
                     <td className="px-4 py-3">
                       <OptionChip isSick={row.isSick} />
                     </td>
-                    <td className="px-4 py-3 max-w-[220px] truncate text-neutral-700" title={row.reason}>
-                      {row.reason || '—'}
+                    <td className="px-4 py-3 max-w-[220px] truncate text-neutral-700 dark:text-neutral-300" title={row.reason}>
+                      {row.reason || '-'}
                     </td>
                     <td className="px-4 py-3">
                       <SignChip sign={row.sign} />
@@ -241,15 +242,14 @@ export default function AdminAbsence() {
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1.5">
                         {row.fileUrl && (
-                          <a
-                            href={row.fileUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100"
-                            aria-label="Lihat lampiran"
+                          <button
+                            type="button"
+                            onClick={() => downloadFile(row.fileUrl, row.fileUrl.split('/').pop() || 'attachment')}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                            aria-label="Download attachment"
                           >
                             <Icon data={FileText} size={14} />
-                          </a>
+                          </button>
                         )}
                         {row.sign === 'pending' ? (
                           <>
@@ -258,7 +258,7 @@ export default function AdminAbsence() {
                               size="sm"
                               isIconOnly
                               className="text-success"
-                              aria-label="Setujui"
+                              aria-label="Approve"
                               onPress={() => setPendingAction({ row, sign: 'allow' })}
                             >
                               <Icon data={Check} size={15} />
@@ -268,7 +268,7 @@ export default function AdminAbsence() {
                               size="sm"
                               isIconOnly
                               className="text-danger"
-                              aria-label="Tolak"
+                              aria-label="Reject"
                               onPress={() => setPendingAction({ row, sign: 'reject' })}
                             >
                               <Icon data={Xmark} size={15} />
@@ -283,14 +283,14 @@ export default function AdminAbsence() {
                                 setPendingAction({ row, sign: row.sign === 'allow' ? 'reject' : 'allow' })
                               }
                             >
-                              Ubah
+                              Change
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               isIconOnly
                               className="text-danger"
-                              aria-label="Hapus"
+                              aria-label="Delete"
                               onPress={() => setPendingDelete({ row })}
                             >
                               <Icon data={TrashBin} size={15} />
@@ -313,7 +313,7 @@ export default function AdminAbsence() {
             onPrev={handlePrev}
             onNext={handleNext}
             loading={loading}
-            countLabel={`Halaman ${pageIndex + 1} · ${items.length} pengajuan ditampilkan`}
+            countLabel={`Page ${pageIndex + 1} · ${items.length} submissions shown`}
           />
         </div>
       </Card>
@@ -321,15 +321,15 @@ export default function AdminAbsence() {
       <ConfirmDialog
         open={Boolean(pendingAction)}
         onOpenChange={(open) => !open && setPendingAction(null)}
-        title={pendingAction?.sign === 'allow' ? 'Setujui pengajuan ini?' : 'Tolak pengajuan ini?'}
+        title={pendingAction?.sign === 'allow' ? 'Approve this submission?' : 'Reject this submission?'}
         description={
           pendingAction
-            ? `Status pengajuan dari "${pendingAction.row.name}" akan diubah menjadi ${
-                pendingAction.sign === 'allow' ? 'Disetujui' : 'Ditolak'
+            ? `The submission status for "${pendingAction.row.name}" will be changed to ${
+                pendingAction.sign === 'allow' ? 'Approved' : 'Rejected'
               }.`
             : ''
         }
-        confirmLabel={pendingAction?.sign === 'allow' ? 'Setujui' : 'Tolak'}
+        confirmLabel={pendingAction?.sign === 'allow' ? 'Approve' : 'Reject'}
         danger={pendingAction?.sign === 'reject'}
         loading={processing}
         onConfirm={handleConfirmAction}
@@ -338,13 +338,13 @@ export default function AdminAbsence() {
       <ConfirmDialog
         open={Boolean(pendingDelete)}
         onOpenChange={(open) => !open && setPendingDelete(null)}
-        title="Hapus pengajuan izin ini?"
+        title="Delete this leave submission?"
         description={
           pendingDelete
-            ? `Pengajuan dari "${pendingDelete.row.name || pendingDelete.row.username}" akan dihapus permanen. Setelah dihapus, status verifikasi tidak bisa diubah lagi.`
+            ? `The submission from "${pendingDelete.row.name || pendingDelete.row.username}" will be permanently deleted. After deletion, the verification status can no longer be changed.`
             : ''
         }
-        confirmLabel="Hapus"
+        confirmLabel="Delete"
         danger={true}
         loading={processing}
         onConfirm={handleConfirmDelete}

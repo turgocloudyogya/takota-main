@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Absensi</title>
+    <script>
+      // Apply the saved/system theme before React paints to avoid a
+      // light-mode flash. Matches src/lib/useTheme.js getInitialTheme().
+      (function () {
+        try {
+          var stored = localStorage.getItem('takota-theme')
+          var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

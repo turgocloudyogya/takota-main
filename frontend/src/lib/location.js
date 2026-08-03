@@ -1,7 +1,7 @@
 // Real device location, reverse-geocoded into a human-readable
 // "City, Regency" label (e.g. "Yogyakarta, Sleman") for the Today
 // attendance card. Uses the browser Geolocation API + OpenStreetMap's
-// free Nominatim reverse-geocoding endpoint — no API key required.
+// free Nominatim reverse-geocoding endpoint - no API key required.
 
 const REVERSE_GEOCODE_URL = 'https://nominatim.openstreetmap.org/reverse'
 
@@ -60,7 +60,7 @@ export async function getCurrentLocationLabel() {
   const parts = pickAddressParts(data.address)
 
   if (parts.length === 0) {
-    // Still real coordinates — just no named place matched.
+    // Still real coordinates - just no named place matched.
     return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
   }
 

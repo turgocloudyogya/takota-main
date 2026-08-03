@@ -9,12 +9,13 @@ import {
   TriangleExclamation,
   PaperPlane,
 } from '@gravity-ui/icons'
+import { Checkbox } from '@heroui/react'
 import BackButton from '../components/BackButton.jsx'
 import { submitAttendance } from '../lib/api.js'
 
 // Browsers only ever show the native permission dialog once. After the user
 // has explicitly blocked a permission, calling the API again just fails
-// silently instead of re-prompting — so we check the current state first and
+// silently instead of re-prompting - so we check the current state first and
 // point the user to their browser settings when it's already blocked.
 async function getPermissionState(name) {
   try {
@@ -34,7 +35,7 @@ export default function Attendance() {
   const [locationStatus, setLocationStatus] = useState(null)
   const [cameraStatus, setCameraStatus] = useState(null)
   const [facingMode, setFacingMode] = useState('environment')
-  const [useCameraTracking, setUseCameraTracking] = useState(true)
+  const [useCameraTracking, setUseCameraTracking] = useState(false)
 
   const [gpsCoords, setGpsCoords] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -103,7 +104,7 @@ export default function Attendance() {
     requestCamera()
     /* eslint-enable react-hooks/set-state-in-effect */
     return () => stopStream()
-    // Only run once on mount — facingMode changes are handled by handleToggleCamera.
+    // Only run once on mount - facingMode changes are handled by handleToggleCamera.
     /* eslint-disable-next-line react-hooks/exhaustive-deps -- permission requests intentionally run once on mount; facingMode changes go through handleToggleCamera. */
   }, [])
 
@@ -224,13 +225,13 @@ export default function Attendance() {
 
   if (submitted) {
     return (
-      <main className="flex min-h-screen w-full items-center justify-center px-6">
+      <main className="flex min-h-dvh w-full items-center justify-center px-6">
         <div className="flex w-full max-w-md flex-col items-center text-center">
-          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral-100">
-            <Icon data={PaperPlane} size={32} className="text-neutral-900" />
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
+            <Icon data={PaperPlane} size={32} className="text-neutral-900 dark:text-neutral-100" />
           </div>
-          <h1 className="text-xl font-bold text-neutral-900">Attendance has been taken!</h1>
-          <p className="mt-2 max-w-[260px] text-center text-sm text-neutral">
+          <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Attendance has been taken!</h1>
+          <p className="mt-2 max-w-[260px] text-center text-sm text-neutral dark:text-neutral-400">
             The page will automatically redirect to the home page after {countdown} second
           </p>
         </div>
@@ -240,7 +241,7 @@ export default function Attendance() {
 
   if (!permissionsChecked) {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-md flex-col">
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
         <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
           <BackButton label="Attendance" />
           <span className="h-8 w-8 shrink-0" />
@@ -248,9 +249,9 @@ export default function Attendance() {
 
         <div className="flex flex-1 flex-col justify-center px-6 py-6">
           <div className="animate-pulse">
-            <div className="aspect-square w-full rounded-2xl bg-neutral-200" />
-            <div className="mt-4 h-4 w-56 max-w-full rounded bg-neutral-200" />
-            <div className="mt-4 h-11 w-full rounded-xl bg-neutral-200" />
+            <div className="aspect-square w-full rounded-2xl bg-neutral-200 dark:bg-neutral-700" />
+            <div className="mt-4 h-4 w-56 max-w-full rounded bg-neutral-200 dark:bg-neutral-700" />
+            <div className="mt-4 h-11 w-full rounded-xl bg-neutral-200 dark:bg-neutral-700" />
           </div>
         </div>
       </main>
@@ -259,7 +260,7 @@ export default function Attendance() {
 
   if (permissionsChecked && !permissionsReady) {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-md flex-col">
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
         <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
           <BackButton label="Attendance" />
           <span className="h-8 w-8 shrink-0" />
@@ -267,11 +268,11 @@ export default function Attendance() {
 
         <div className="flex flex-1 flex-col justify-center px-6 py-6">
           <div className="flex flex-col items-center justify-center text-center">
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-100">
-              <Icon data={TriangleExclamation} size={28} className="text-neutral-900" />
+            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
+              <Icon data={TriangleExclamation} size={28} className="text-neutral-900 dark:text-neutral-100" />
             </div>
-            <h1 className="text-lg font-bold text-neutral-900">Permissions Required</h1>
-            <p className="mt-2 max-w-[280px] text-center text-sm text-neutral">
+            <h1 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Permissions Required</h1>
+            <p className="mt-2 max-w-[280px] text-center text-sm text-neutral dark:text-neutral-400">
               Several permissions are required before you can check in. Please grant them first
             </p>
             <div className="mt-5 flex flex-col items-center gap-2">
@@ -303,13 +304,13 @@ export default function Attendance() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
         <BackButton label="Attendance" />
         <span className="h-8 w-8 shrink-0" />
       </header>
 
-      <div className="flex flex-1 flex-col justify-center px-6 py-6">
+      <div className="flex flex-1 flex-col justify-center px-6 py-6 pb-[80px]">
         {permissionsReady && (
           <div className="mt-6">
             {cameraStatus === 'granted' ? (
@@ -356,14 +357,15 @@ export default function Attendance() {
               </div>
             )}
 
-            <label className="mt-4 flex items-center gap-2 text-sm text-neutral-900">
-              <input
-                type="checkbox"
-                checked={useCameraTracking}
-                onChange={(e) => setUseCameraTracking(e.target.checked)}
-                className="h-4 w-4 rounded accent-primary"
-              />
-              Use the camera for attendance tracking
+            <label className="mt-4 flex items-center gap-2 text-sm text-neutral-900 dark:text-neutral-100">
+              <Checkbox name="use-camera-for-attedance" isSelected={useCameraTracking} onChange={(e) => setUseCameraTracking(e)}>
+                <Checkbox.Content>
+                  <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
+                    <Checkbox.Indicator />
+                  </Checkbox.Control>
+                  Use the camera for attendance tracking
+                </Checkbox.Content>
+              </Checkbox>
             </label>
 
             <button
@@ -384,7 +386,7 @@ export default function Attendance() {
           if (submitting) return
           setConfirmOpen(next)
           if (!next && capturedPhoto) {
-            // Canceled — discard the frozen frame and resume the live camera
+            // Canceled - discard the frozen frame and resume the live camera
             setCapturedPhoto(null)
             setCapturedPreview(null)
             requestCamera()
@@ -393,12 +395,12 @@ export default function Attendance() {
       >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
-          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col rounded-t-2xl bg-white p-5 pb-8 outline-none">
+          <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col rounded-t-2xl bg-white p-5 pb-8 outline-none dark:bg-neutral-900">
             <Drawer.Handle className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-app-border/40" />
-            <Drawer.Title className="mb-2 text-base font-bold text-neutral-900">
+            <Drawer.Title className="mb-2 text-base font-bold text-neutral-900 dark:text-neutral-100">
               Are you sure?
             </Drawer.Title>
-            <p className="mb-4 text-sm text-neutral">
+            <p className="mb-4 text-sm text-neutral dark:text-neutral-400">
               Click "Attendance" to submit your current attendance, including a photo if you
               select the option with a photo
             </p>
@@ -411,7 +413,7 @@ export default function Attendance() {
               {submitting ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                  Submitting…
+                  Submitting...
                 </>
               ) : (
                 'Attendance'

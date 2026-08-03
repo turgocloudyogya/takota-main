@@ -17,17 +17,17 @@ function DotChip({ color = 'default', size = 'sm', children }) {
   )
 }
 
-// Attendance mark chip (V = hadir, S = sakit, I = izin, A = alpha)
+// Attendance mark chip (V = present, S = sick, I = leave, A = alpha)
 const MARK_CONFIG = {
-  V: { label: 'Hadir', color: 'success' },
-  S: { label: 'Sakit', color: 'warning' },
-  I: { label: 'Izin', color: 'accent' },
+  V: { label: 'Present', color: 'success' },
+  S: { label: 'Sick', color: 'warning' },
+  I: { label: 'Leave', color: 'accent' },
   A: { label: 'Alpha', color: 'danger' },
 }
 
 export function MarkChip({ mark, size = 'sm' }) {
   if (!mark) {
-    return <span className="text-xs text-neutral">—</span>
+    return <span className="text-xs text-neutral dark:text-neutral-400">-</span>
   }
   const config = MARK_CONFIG[mark] || { label: mark, color: 'default' }
   return (
@@ -39,12 +39,12 @@ export function MarkChip({ mark, size = 'sm' }) {
 
 // Absence sign/status chip (pending / allow / deny)
 const SIGN_CONFIG = {
-  allow: { label: 'Disetujui', color: 'success' },
-  approved: { label: 'Disetujui', color: 'success' },
-  deny: { label: 'Ditolak', color: 'danger' },
-  reject: { label: 'Ditolak', color: 'danger' },
-  rejected: { label: 'Ditolak', color: 'danger' },
-  pending: { label: 'Menunggu', color: 'warning' },
+  allow: { label: 'Approved', color: 'success' },
+  approved: { label: 'Approved', color: 'success' },
+  deny: { label: 'Rejected', color: 'danger' },
+  reject: { label: 'Rejected', color: 'danger' },
+  rejected: { label: 'Rejected', color: 'danger' },
+  pending: { label: 'Pending', color: 'warning' },
 }
 
 export function SignChip({ sign, size = 'sm' }) {
@@ -57,21 +57,21 @@ export function SignChip({ sign, size = 'sm' }) {
   )
 }
 
-// Sakit/Izin reason-type chip
+// Sick/Leave reason-type chip
 export function OptionChip({ isSick, size = 'sm' }) {
   return (
     <DotChip color={isSick ? 'warning' : 'accent'} size={size}>
-      {isSick ? 'Sakit' : 'Izin'}
+      {isSick ? 'Sick' : 'Leave'}
     </DotChip>
   )
 }
 
-// User type chip (admin / siswa)
+// User type chip (admin / student)
 export function TypeChip({ type, size = 'sm' }) {
   const isAdmin = type === 'admin'
   return (
     <DotChip color={isAdmin ? 'accent' : 'default'} size={size}>
-      {isAdmin ? 'Admin' : 'Siswa'}
+      {isAdmin ? 'Admin' : 'Student'}
     </DotChip>
   )
 }
