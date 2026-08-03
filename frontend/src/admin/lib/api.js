@@ -273,6 +273,34 @@ export async function exportAttendanceServer({ month, year, lang = 'en' } = {}) 
   return { blob, filename }
 }
 
+// Fetches the assembled attendance recap (Doc/Pages/Blocks/Siswa structure)
+// used to render the PDF client-side via attendanceReportHtml.js. Mirrors
+// takota-app's GET /api/admin/export/report-data endpoint.
+export async function fetchAttendanceReportData({
+  startDate,
+  endDate,
+  duName = '',
+  duAddress = '',
+  studentIds = [],
+} = {}) {
+  const response = await request('/api/admin/export/report-data', {
+    params: {
+      start_date: startDate,
+      end_date: endDate,
+      du_name: duName || undefined,
+      du_address: duAddress || undefined,
+      student_ids: studentIds.length > 0 ? studentIds.join(',') : undefined,
+    },
+  })
+
+  // Backend returns PDFTemplateData directly ({ pages: [...] }), but handle
+  // a possible wrapped shape defensively too.
+  if (response?.pages) return response
+  if (response?.data?.pages) return response.data
+  if (response?.data) return response.data
+  return response
+}
+
 // ---------------------------------------------------------------------------
 // All (shared/global)
 // ---------------------------------------------------------------------------

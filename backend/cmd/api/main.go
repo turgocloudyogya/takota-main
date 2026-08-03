@@ -144,6 +144,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 
 			// Export
 			admin.GET("/export", adminCtrl.ExportAttendance)
+			admin.GET("/export/report-data", adminCtrl.ExportAttendanceReportData)
 		}
 
 		// All/Global routes (auth required)
