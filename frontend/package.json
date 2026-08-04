@@ -20,6 +20,8 @@
     "@heroui/styles": "^3.2.2",
     "@heroui/system": "2.4.28",
     "@heroui/theme": "2.4.26",
+    "@nivo/bar": "^0.99.0",
+    "@nivo/pie": "^0.99.0",
     "clsx": "2.1.1",
     "date-fns": "^4.4.0",
     "framer-motion": "12.42.2",

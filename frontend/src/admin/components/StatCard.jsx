@@ -12,7 +12,7 @@ const TONE_STYLES = {
 export default function StatCard({ label, value, icon, tone = 'primary', hint }) {
   const styles = TONE_STYLES[tone] || TONE_STYLES.primary
   return (
-    <Card className="group relative overflow-hidden p-4 transition-shadow">
+    <Card className="group relative overflow-hidden p-4 transition-shadow shadow-none dark:border-neutral-800">
       <span className={`absolute inset-x-0 top-0 h-[3px] ${styles.bar} opacity-70`} aria-hidden="true" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
