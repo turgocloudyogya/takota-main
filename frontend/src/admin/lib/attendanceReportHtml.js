@@ -13,6 +13,12 @@
 
 const REPORT_STYLE_ID = 'attendance-report-print-style'
 
+// Pixel width the report is laid out and measured at, and the width we
+// force html2canvas to capture at (via its `width`/`windowWidth` options)
+// so the two always match -- if they didn't, cell heights measured at one
+// width could mismatch text wrapping at a different capture width.
+const REPORT_WIDTH_PX = 1600
+
 // Adapted from templates/absensi_template.html <style> block. The @page rule
 // is harmless to keep (ignored during on-screen/canvas rendering); actual
 // PDF margins/paper size are applied via html2pdf's own `margin`/`jsPDF`
@@ -29,7 +35,7 @@ const REPORT_STYLE_ID = 'attendance-report-print-style'
 const REPORT_CSS = `
 .attendance-report-root {
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 9.5pt;
+  font-size: 11.5pt;
   color: #000;
 }
 .attendance-report-root .page {
@@ -81,7 +87,7 @@ const REPORT_CSS = `
   height: 100%;
   min-height: 100%;
   box-sizing: border-box;
-  padding: 6pt 3pt;
+  padding: 11pt 3pt;
 }
 
 /* Nama Peserta Didik column: left-aligned text, still vertically centered
@@ -95,17 +101,17 @@ const REPORT_CSS = `
    less vertical padding so they sit "gepeng" (flatter/shorter) compared
    to the taller data rows underneath them. */
 .attendance-report-root table.absensi thead th .cell-inner {
-  padding: 3pt 3pt;
+  padding: 6pt 3pt;
 }
 .attendance-report-root table.absensi thead tr.tanggal-row td .cell-inner {
-  padding: 2pt 3pt;
+  padding: 4pt 3pt;
   font-weight: normal;
 }
 
 .attendance-report-root .ttd-block { margin-top: 10pt; }
 .attendance-report-root .ttd-block p { margin-top: 1pt; margin-bottom: 1pt; }
 .attendance-report-root .ttd-block p.ttd-signature { margin-left: 4cm; margin-top: 4pt; margin-bottom: 1pt; }
-.attendance-report-root .ttd-line { margin-left: 4cm; margin-top: 34pt; border-bottom: 1px dotted #000; width: 6cm; }
+.attendance-report-root .ttd-line { margin-left: 4cm; margin-top: 40pt; border-bottom: 2px dotted #000; width: 6cm; }
 `
 
 function ensureStyleInjected() {
@@ -222,18 +228,51 @@ function buildPagesHtml(doc) {
 export async function downloadAttendanceReportPdf(doc, filename) {
   ensureStyleInjected()
 
-  // Note: this element is intentionally *not* attached to document.body.
-  // html2pdf.js clones whatever we pass to .from() into its own hidden
-  // overlay container (position/visibility handled internally) -- cloneNode
-  // preserves inline styles, so giving this element its own
-  // position:fixed/offset here would leak into that clone and push the
-  // content outside the area actually captured, producing a blank PDF.
   const container = document.createElement('div')
   container.className = 'attendance-report-root'
-  container.style.width = '100%'
   container.style.background = '#fff'
+  container.style.width = `${REPORT_WIDTH_PX}px`
   container.innerHTML = buildPagesHtml(doc)
 
+  // --- Phase 1: measure real cell heights -----------------------------
+  // Temporarily attach with visibility:hidden (not display:none, which
+  // skips layout entirely -- and not position:fixed/absolute with an
+  // off-screen offset, see below) purely so the browser computes real box
+  // sizes, including the height of rowspan'd cells (No, Nama Peserta
+  // Didik, S, I, A). visibility:hidden keeps full layout while skipping
+  // paint, so getBoundingClientRect still reports accurate numbers. We
+  // bake each cell's real height into its .cell-inner wrapper as an
+  // inline style, then immediately detach this measuring host again --
+  // BEFORE html2pdf ever touches the container.
+  //
+  // Earlier versions instead kept the container attached (with
+  // position:fixed/absolute + an off-screen offset) all the way through
+  // the .from()/.save() call below. That conflicts with html2pdf.js's own
+  // internal capture mechanism: it clones whatever `.from()` receives into
+  // its *own* hidden overlay + positioned container appended to
+  // document.body. Having our own manually-positioned live element in the
+  // document at the same time produced a blank/white PDF -- so now the
+  // container is a plain, unattached node by the time html2pdf sees it.
+  const measureHost = document.createElement('div')
+  measureHost.style.position = 'absolute'
+  measureHost.style.top = '0'
+  measureHost.style.left = '0'
+  measureHost.style.visibility = 'hidden'
+  measureHost.style.pointerEvents = 'none'
+  measureHost.appendChild(container)
+  document.body.appendChild(measureHost)
+
+  container.querySelectorAll('table.absensi th, table.absensi td').forEach((cell) => {
+    const inner = cell.querySelector(':scope > .cell-inner')
+    if (inner) inner.style.height = `${cell.clientHeight}px`
+  })
+
+  measureHost.remove() // container is now a plain, detached node again
+
+  // --- Phase 2: generate the PDF ---------------------------------------
+  // Hand the untouched container to html2pdf.js and let it manage its own
+  // attach/clone/cleanup entirely -- we no longer position or attach
+  // anything ourselves here.
   const { default: html2pdf } = await import('html2pdf.js')
   await html2pdf()
     .set({
@@ -247,6 +286,13 @@ export async function downloadAttendanceReportPdf(doc, filename) {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
+        // Force the capture width to match the width we measured cell
+        // heights at (REPORT_WIDTH_PX) -- otherwise html2canvas/html2pdf
+        // may render at a different width than what we laid out and
+        // measured, causing text to wrap differently and the baked-in
+        // pixel heights from Phase 1 to no longer match.
+        width: REPORT_WIDTH_PX,
+        windowWidth: REPORT_WIDTH_PX,
         // html2canvas clones the *entire* document (not just our
         // container) to compute layout/styles. If the app's global CSS
         // uses modern color functions (e.g. Tailwind v4's oklch() theme
