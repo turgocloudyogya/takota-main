@@ -35,7 +35,7 @@ export default function Attendance() {
   const [locationStatus, setLocationStatus] = useState(null)
   const [cameraStatus, setCameraStatus] = useState(null)
   const [facingMode, setFacingMode] = useState('environment')
-  const [useCameraTracking, setUseCameraTracking] = useState(false)
+  const [useCameraTracking, setUseCameraTracking] = useState(true)
 
   const [gpsCoords, setGpsCoords] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
