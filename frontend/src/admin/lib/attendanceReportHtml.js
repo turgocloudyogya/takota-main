@@ -60,8 +60,10 @@ const REPORT_CSS = `
 
 .attendance-report-root table.absensi col.no      { width: 4%; }
 .attendance-report-root table.absensi col.nama    { width: 20%; }
-.attendance-report-root table.absensi col.hari    { width: 5.5%; }
 .attendance-report-root table.absensi col.jumlah  { width: 3.34%; }
+/* col.hari has no fixed width here: the number of day columns is flexible
+   (see WORKING_DAYS in AdminReports.jsx), so its width is computed per
+   block in renderBlock() below and applied as an inline style instead. */
 
 /* Cells themselves carry no padding/vertical-align anymore -- all of that
    moved to .cell-inner below, so centering is explicit and not dependent
@@ -145,8 +147,17 @@ function cellTag(tag, innerHtml, { rowspan, colspan, className } = {}) {
   return `<${tag}${attrs}><div class="cell-inner">${innerHtml}</div></${tag}>`
 }
 
+// Fixed-width columns (No / Nama Peserta Didik / 3x Jumlah) as percentages,
+// matching REPORT_CSS's col.no/col.nama/col.jumlah widths. The remaining
+// width is split evenly across however many "hari" (day) columns this
+// block actually has, so the table always fills 100% width whether it's
+// the default 12 columns or a custom day count (8, 10, 16, ...).
+const FIXED_COLS_WIDTH_PERCENT = 4 /* no */ + 20 /* nama */ + 3.34 * 3 /* jumlah x3 */
+
 function renderBlock(block) {
-  const hariCols = '<col class="hari">'.repeat(12)
+  const dayCount = (block.hariLabel || []).length || (block.tanggal || []).length || 12
+  const hariColWidth = (100 - FIXED_COLS_WIDTH_PERCENT) / dayCount
+  const hariCols = `<col class="hari" style="width:${hariColWidth}%">`.repeat(dayCount)
   const hariHeader = (block.hariLabel || []).map((h) => cellTag('th', escapeHtml(h))).join('')
   const tanggalRow = (block.tanggal || []).map((t) => cellTag('td', escapeHtml(t))).join('')
   const rows = (block.siswa || [])
@@ -173,7 +184,7 @@ function renderBlock(block) {
       <tr>
         ${cellTag('th', 'No', { rowspan: 3 })}
         ${cellTag('th', 'Nama Peserta Didik', { rowspan: 3 })}
-        ${cellTag('th', 'Hari dan Tanggal', { colspan: 12 })}
+        ${cellTag('th', 'Hari dan Tanggal', { colspan: dayCount })}
         ${cellTag('th', 'Jumlah', { colspan: 3 })}
       </tr>
       <tr>

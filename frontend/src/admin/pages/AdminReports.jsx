@@ -1,14 +1,19 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Button, Card, Input, Label, ListBox, Select, TextField, DatePicker, DateField } from '@heroui/react'
-import { Calendar } from '@heroui/react'
-import { parseDate as parseCalDate } from '@internationalized/date'
+import { Button, Card, Label, ListBox, Select } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
 import { FileArrowDown } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
-import { formatShortDate, countWorkingDays, estimatePageCount } from '../lib/dateWindow.js'
+import {
+  formatShortDate,
+  countWorkingDays,
+  estimatePageCount,
+  WEEKDAY_OPTIONS,
+  DEFAULT_WORKING_DAYS,
+} from '../lib/dateWindow.js'
 import { downloadBlob } from '../lib/download.js'
 import { downloadAttendanceReportPdf } from '../lib/attendanceReportHtml.js'
+import { TextInput } from '../components/FormField.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
 // Backend expects an English month name (e.g. "august") in the ?month query
@@ -52,8 +57,7 @@ function todayIsoDate() {
 
 function startOfMonthIsoDate() {
   const d = new Date()
-  d.setDate(d.getDate() - 14)
-  return toIsoDate(d)
+  return toIsoDate(new Date(d.getFullYear(), d.getMonth(), 1))
 }
 
 export default function AdminReports() {
@@ -92,13 +96,35 @@ export default function AdminReports() {
   const [duName, setDuName] = useState('')
   const [duAddress, setDuAddress] = useState('')
   const [buildingPdf, setBuildingPdf] = useState(false)
+  // Which weekdays count as "working days" for the recap grid. Defaults to
+  // Senin-Sabtu (the original fixed 12-column/2-week layout); the admin can
+  // toggle any subset (e.g. Senin-Jumat only = 10 columns, or fewer/more).
+  const [selectedWeekdays, setSelectedWeekdays] = useState(DEFAULT_WORKING_DAYS)
+
+  function toggleWeekday(iso) {
+    setSelectedWeekdays((prev) => {
+      const isSelected = prev.includes(iso)
+      if (isSelected) {
+        if (prev.length === 1) return prev // keep at least 1 day selected
+        return prev.filter((d) => d !== iso)
+      }
+      return [...prev, iso].sort((a, b) => a - b)
+    })
+  }
 
   const rangeIsValid = Boolean(startDate) && Boolean(endDate) && startDate <= endDate
   const workingDays = useMemo(
-    () => (rangeIsValid ? countWorkingDays(startDate, endDate) : 0),
-    [startDate, endDate, rangeIsValid]
+    () => (rangeIsValid ? countWorkingDays(startDate, endDate, selectedWeekdays) : 0),
+    [startDate, endDate, rangeIsValid, selectedWeekdays]
   )
-  const pageEstimate = useMemo(() => estimatePageCount(workingDays), [workingDays])
+  const pageEstimate = useMemo(
+    () => estimatePageCount(workingDays, selectedWeekdays.length),
+    [workingDays, selectedWeekdays]
+  )
+  const columnsPerBlock = selectedWeekdays.length * 2
+  const selectedWeekdayLabel = WEEKDAY_OPTIONS.filter((w) => selectedWeekdays.includes(w.iso))
+    .map((w) => w.short)
+    .join(', ')
 
   async function handleBuildPdf() {
     if (!startDate || !endDate) {
@@ -109,10 +135,14 @@ export default function AdminReports() {
       toast.error('End date must not be before start date.')
       return
     }
+    if (selectedWeekdays.length === 0) {
+      toast.error('Select at least one working day.')
+      return
+    }
 
     setBuildingPdf(true)
     try {
-      const payload = { startDate, endDate, duName, duAddress }
+      const payload = { startDate, endDate, duName, duAddress, workingDays: selectedWeekdays }
       const filename = `Rekap-Presensi_${startDate}_${endDate}.pdf`
       const doc = await api.fetchAttendanceReportData(payload)
       await downloadAttendanceReportPdf(doc, filename)
@@ -155,7 +185,7 @@ export default function AdminReports() {
       </div>
 
       {method === 'csv' ? (
-        <Card className="flex flex-col gap-4 p-4 shadow-none dark:border-neutral-800">
+        <Card className="flex flex-col gap-4 p-4">
           <div>
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Download Monthly Report</p>
             <p className="text-sm text-neutral dark:text-neutral-400">
@@ -172,7 +202,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Month</Label>
-              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -194,7 +224,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Year</Label>
-              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -216,7 +246,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Language</Label>
-              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -244,7 +274,7 @@ export default function AdminReports() {
           </Button>
         </Card>
       ) : (
-        <Card className="flex flex-col gap-4 p-4 shadow-none dark:border-neutral-800">
+        <Card className="flex flex-col gap-4 p-4">
           <div>
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
               Build PDF Attendance Recap
@@ -252,104 +282,70 @@ export default function AdminReports() {
             <p className="text-sm text-neutral dark:text-neutral-400">
               Fill in the DU/DI (workplace) details below and pick a date range. All students are included
               automatically. Name, dates, attendance status (√/S/I/A), and the sick/permission/absent totals
-              per student are filled in automatically from the attendance &amp; permission data. Ranges longer
-              than 2 working weeks are automatically split across multiple pages using the exact same table
-              layout (2 full tables per page).
+              per student are filled in automatically from the attendance &amp; permission data. A day only
+              gets marked "A" (Alpa) for a student if at least one other student attended that same day —
+              if nobody attended at all, the day is treated as a holiday and left blank. Ranges longer than
+              2 working weeks are automatically split across multiple pages using the same table layout
+              (up to 2 full tables per page — a trailing table is only included when it actually has data).
             </p>
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Working days (recap grid columns)
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {WEEKDAY_OPTIONS.map((w) => {
+                const active = selectedWeekdays.includes(w.iso)
+                return (
+                  <button
+                    key={w.iso}
+                    type="button"
+                    onClick={() => toggleWeekday(w.iso)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      active
+                        ? 'bg-primary text-white'
+                        : 'bg-neutral-50 text-neutral-600 hover:bg-neutral-100 dark:bg-neutral-800/60 dark:text-neutral-400'
+                    }`}
+                  >
+                    {w.label}
+                  </button>
+                )
+              })}
+            </div>
+            <span className="text-xs text-neutral dark:text-neutral-500">
+              Default is Senin–Sabtu. Each table block repeats the selected days twice (e.g. {selectedWeekdays.length}{' '}
+              day{selectedWeekdays.length === 1 ? '' : 's'} selected → {columnsPerBlock} columns per table).
+            </span>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <DatePicker
-              value={startDate ? parseCalDate(startDate) : null}
-              onChange={(d) => setStartDate(d ? d.toString() : '')}
-              maxValue={endDate ? parseCalDate(endDate) : undefined}
-            >
-              <Label>Recap start date</Label>
-              <DateField.Group fullWidth className="shadow-none border border-neutral-100 dark:border-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
-                <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
-                <DateField.Suffix>
-                  <DatePicker.Trigger>
-                    <DatePicker.TriggerIndicator />
-                  </DatePicker.Trigger>
-                </DateField.Suffix>
-              </DateField.Group>
-              <DatePicker.Popover>
-                <Calendar>
-                  <Calendar.Header>
-                    <Calendar.YearPickerTrigger>
-                      <Calendar.YearPickerTriggerHeading />
-                      <Calendar.YearPickerTriggerIndicator />
-                    </Calendar.YearPickerTrigger>
-                    <Calendar.NavButton slot="previous" />
-                    <Calendar.NavButton slot="next" />
-                  </Calendar.Header>
-                  <Calendar.Grid>
-                    <Calendar.GridHeader>
-                      {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
-                    </Calendar.GridHeader>
-                    <Calendar.GridBody>
-                      {(date) => <Calendar.Cell date={date} />}
-                    </Calendar.GridBody>
-                  </Calendar.Grid>
-                  <Calendar.YearPickerGrid>
-                    <Calendar.YearPickerGridBody>
-                      {({ year }) => <Calendar.YearPickerCell year={year} />}
-                    </Calendar.YearPickerGridBody>
-                  </Calendar.YearPickerGrid>
-                </Calendar>
-              </DatePicker.Popover>
-            </DatePicker>
-
-            <DatePicker
-              value={endDate ? parseCalDate(endDate) : null}
-              onChange={(d) => setEndDate(d ? d.toString() : '')}
-              minValue={startDate ? parseCalDate(startDate) : undefined}
-            >
-              <Label>Recap end date</Label>
-              <DateField.Group fullWidth className="shadow-none border border-neutral-100 dark:border-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
-                <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
-                <DateField.Suffix>
-                  <DatePicker.Trigger>
-                    <DatePicker.TriggerIndicator />
-                  </DatePicker.Trigger>
-                </DateField.Suffix>
-              </DateField.Group>
-              <DatePicker.Popover>
-                <Calendar>
-                  <Calendar.Header>
-                    <Calendar.YearPickerTrigger>
-                      <Calendar.YearPickerTriggerHeading />
-                      <Calendar.YearPickerTriggerIndicator />
-                    </Calendar.YearPickerTrigger>
-                    <Calendar.NavButton slot="previous" />
-                    <Calendar.NavButton slot="next" />
-                  </Calendar.Header>
-                  <Calendar.Grid>
-                    <Calendar.GridHeader>
-                      {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
-                    </Calendar.GridHeader>
-                    <Calendar.GridBody>
-                      {(date) => <Calendar.Cell date={date} />}
-                    </Calendar.GridBody>
-                  </Calendar.Grid>
-                  <Calendar.YearPickerGrid>
-                    <Calendar.YearPickerGridBody>
-                      {({ year }) => <Calendar.YearPickerCell year={year} />}
-                    </Calendar.YearPickerGridBody>
-                  </Calendar.YearPickerGrid>
-                </Calendar>
-              </DatePicker.Popover>
-            </DatePicker>
-
-            <TextField value={duName} onChange={setDuName}>
-              <Label>DU/DI name (optional)</Label>
-              <Input placeholder="e.g. PT Sinar Abadi" className="shadow-none border border-neutral-100 dark:border-neutral-800" />
-            </TextField>
-
-            <TextField value={duAddress} onChange={setDuAddress}>
-              <Label>DU/DI address (optional)</Label>
-              <Input placeholder="e.g. Jl. Industri No. 12" className="shadow-none border border-neutral-100 dark:border-neutral-800" />
-            </TextField>
+            <TextInput
+              type="date"
+              label="Recap start date"
+              value={startDate}
+              max={endDate || undefined}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+            <TextInput
+              type="date"
+              label="Recap end date"
+              value={endDate}
+              min={startDate || undefined}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+            <TextInput
+              label="DU/DI name (optional)"
+              placeholder="e.g. PT Sinar Abadi"
+              value={duName}
+              onChange={(e) => setDuName(e.target.value)}
+            />
+            <TextInput
+              label="DU/DI address (optional)"
+              placeholder="e.g. Jl. Industri No. 12"
+              value={duAddress}
+              onChange={(e) => setDuAddress(e.target.value)}
+            />
           </div>
 
           <div className="rounded-xl bg-neutral-50 px-3.5 py-2.5 text-sm dark:bg-neutral-800/60">
@@ -359,7 +355,7 @@ export default function AdminReports() {
                   {formatShortDate(new Date(`${startDate}T00:00:00`))} –{' '}
                   {formatShortDate(new Date(`${endDate}T00:00:00`))}
                 </span>{' '}
-                · {workingDays} working days (Mon–Sat) · estimated{' '}
+                · {workingDays} working days ({selectedWeekdayLabel}) · estimated{' '}
                 <span className="font-medium text-neutral-900 dark:text-neutral-100">{pageEstimate} page(s)</span>
               </span>
             ) : (
@@ -370,7 +366,7 @@ export default function AdminReports() {
           <Button
             variant="primary"
             onPress={handleBuildPdf}
-            isDisabled={buildingPdf || !rangeIsValid}
+            isDisabled={buildingPdf || !rangeIsValid || selectedWeekdays.length === 0}
             className="self-start"
           >
             <Icon data={FileArrowDown} size={15} />

@@ -282,6 +282,7 @@ export async function fetchAttendanceReportData({
   duName = '',
   duAddress = '',
   studentIds = [],
+  workingDays = [],
 } = {}) {
   const response = await request('/api/admin/export/report-data', {
     params: {
@@ -290,6 +291,9 @@ export async function fetchAttendanceReportData({
       du_name: duName || undefined,
       du_address: duAddress || undefined,
       student_ids: studentIds.length > 0 ? studentIds.join(',') : undefined,
+      // ISO weekday numbers (Senin=1..Minggu=7). Omitted -> backend falls
+      // back to its own default (Senin-Sabtu).
+      working_days: workingDays.length > 0 ? workingDays.join(',') : undefined,
     },
   })
 
