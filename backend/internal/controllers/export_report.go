@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,15 +20,60 @@ type exportAPIError struct {
 
 func (e *exportAPIError) Error() string { return e.Message }
 
-// hariLabelConstant is the fixed "Senin, Selasa, ... x2" header row used by
-// every block regardless of which weekday the block actually starts on (per
-// the export contract: HariLabel is constant and never recomputed per block).
-var hariLabelConstant = []string{
-	"Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu",
-	"Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu",
+// weekdayOrder fixes the natural Monday-first weekly ordering used to build
+// the work-day pattern (Senin..Minggu), regardless of what order the
+// selected weekdays were supplied in.
+var weekdayOrder = []time.Weekday{
+	time.Monday, time.Tuesday, time.Wednesday, time.Thursday,
+	time.Friday, time.Saturday, time.Sunday,
 }
 
-const daysPerBlock = 12
+// weekdayLabels maps Go's time.Weekday to the Indonesian day-name used in
+// the report header row.
+var weekdayLabels = map[time.Weekday]string{
+	time.Monday:    "Senin",
+	time.Tuesday:   "Selasa",
+	time.Wednesday: "Rabu",
+	time.Thursday:  "Kamis",
+	time.Friday:    "Jumat",
+	time.Saturday:  "Sabtu",
+	time.Sunday:    "Minggu",
+}
+
+// defaultWorkDays is Senin-Sabtu, the recap's historical/default working
+// week, used whenever the request doesn't specify a custom `work_days` set.
+var defaultWorkDays = []time.Weekday{
+	time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday,
+}
+
+// parseWorkDays parses a comma-separated list of JS-style weekday numbers
+// (0 = Minggu/Sunday .. 6 = Sabtu/Saturday -- the same convention
+// Date.getDay() uses in the frontend) into a de-duplicated, Monday-first
+// ordered slice of weekdays. Falls back to defaultWorkDays (Senin-Sabtu)
+// when the raw string is empty or nothing valid is found in it.
+func parseWorkDays(raw string) []time.Weekday {
+	if strings.TrimSpace(raw) == "" {
+		return defaultWorkDays
+	}
+	selected := make(map[time.Weekday]bool)
+	for _, part := range strings.Split(raw, ",") {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || n < 0 || n > 6 {
+			continue
+		}
+		selected[time.Weekday(n)] = true
+	}
+	if len(selected) == 0 {
+		return defaultWorkDays
+	}
+	ordered := make([]time.Weekday, 0, len(selected))
+	for _, wd := range weekdayOrder {
+		if selected[wd] {
+			ordered = append(ordered, wd)
+		}
+	}
+	return ordered
+}
 
 // buildExportParams holds the parsed/validated query parameters shared by
 // both the PDF and XLSX export endpoints.
@@ -39,11 +85,18 @@ type buildExportParams struct {
 	DUName     string
 	DUAddress  string
 	StudentIDs []uuid.UUID
+	// WorkDays is the ordered (Monday-first) set of weekdays treated as
+	// working days for this recap -- e.g. Senin-Sabtu by default, but
+	// fully configurable from the frontend's day-of-week picker. The
+	// report's block width is always 2x this set's length (two weeks per
+	// block), which is what makes the number of day-columns per row
+	// flexible (8, 10, 12, ... days) instead of a hardcoded 12.
+	WorkDays []time.Weekday
 }
 
 // parseExportParams parses and validates the raw query string values shared
 // by both export endpoints.
-func parseExportParams(startDateStr, endDateStr, duName, duAddress, studentIDsStr string) (*buildExportParams, *exportAPIError) {
+func parseExportParams(startDateStr, endDateStr, duName, duAddress, studentIDsStr, workDaysStr string) (*buildExportParams, *exportAPIError) {
 	startDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		return nil, &exportAPIError{400, "Invalid start_date format", "INVALID_QUERY"}
@@ -77,6 +130,7 @@ func parseExportParams(startDateStr, endDateStr, duName, duAddress, studentIDsSt
 		DUName:     duName,
 		DUAddress:  duAddress,
 		StudentIDs: studentIDs,
+		WorkDays:   parseWorkDays(workDaysStr),
 	}, nil
 }
 
@@ -117,11 +171,17 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 		Find(&records)
 
 	index := make(map[uuid.UUID]map[string]attendanceMark)
+	// dayHasRecord tracks, per calendar date, whether *any* student in the
+	// recap has *any* record at all that day (attendance or absence,
+	// approved or not). A date with no record from anyone is treated as a
+	// non-school day (holiday/libur) rather than "everyone was Alpa".
+	dayHasRecord := make(map[string]bool)
 	for _, rec := range records {
 		if index[rec.UserID] == nil {
 			index[rec.UserID] = make(map[string]attendanceMark)
 		}
 		dateKey := rec.CreatedAt.Format("2006-01-02")
+		dayHasRecord[dateKey] = true
 		entry := index[rec.UserID][dateKey]
 
 		switch rec.Type {
@@ -149,6 +209,14 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 		if dateStr > todayStr {
 			return ""
 		}
+		// Nobody in the recap submitted anything that day (no attendance,
+		// no absence) -- treat it as a day off (libur) rather than
+		// defaulting every student to Alpa. Only once at least one student
+		// has *some* record that day do the rest, still without a record,
+		// get marked "A".
+		if !dayHasRecord[dateStr] {
+			return ""
+		}
 
 		mark := index[studentID][dateStr]
 		if mark.Hadir {
@@ -160,46 +228,95 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 		case "permission":
 			return "I"
 		}
-		// Past working day, no record and no approved absence -> Alpa.
+		// Past working day, someone else in the recap had activity, but
+		// this student has no record and no approved absence -> Alpa.
 		return "A"
 	}
 
-	// 2-3. Find the first working day (Mon-Sat, Sunday skipped) >= start_date,
-	// then walk forward generating 12-working-day blocks. Continuing the
-	// Mon-Sat pattern naturally carries a block's dates past end_date when
-	// needed to fill all 12 columns.
-	cursor := p.StartDate
+	// Work-day pattern (e.g. Senin..Sabtu), repeated twice per block. This
+	// makes daysPerBlock (and the header row) fully derived from the
+	// requested work-day set instead of a hardcoded 12.
+	pattern := p.WorkDays
+	if len(pattern) == 0 {
+		pattern = defaultWorkDays
+	}
+	weekN := len(pattern)
+	daysPerBlock := weekN * 2
 
-	// 4. Total number of blocks = ceil(working days in range / 12), minimum
-	// 1, rounded up to an even number so every page always has 2 full
-	// tables (extra block is entirely out-of-range filler).
+	patternLabels := make([]string, weekN)
+	for i, wd := range pattern {
+		patternLabels[i] = weekdayLabels[wd]
+	}
+	hariLabel := make([]string, 0, daysPerBlock)
+	hariLabel = append(hariLabel, patternLabels...)
+	hariLabel = append(hariLabel, patternLabels...)
+
+	isWorkDay := make(map[time.Weekday]bool, weekN)
+	for _, wd := range pattern {
+		isWorkDay[wd] = true
+	}
+	// indexInPattern maps a weekday to its 0-based column position within
+	// a single week of the pattern (i.e. within the first of the block's
+	// two weeks).
+	indexInPattern := make(map[time.Weekday]int, weekN)
+	for i, wd := range pattern {
+		indexInPattern[wd] = i
+	}
+
+	// 2. Find the first working day (per the selected pattern, Minggu
+	// skipped unless explicitly selected) >= start_date.
+	firstWorkDay := p.StartDate
+	for !isWorkDay[firstWorkDay.Weekday()] {
+		firstWorkDay = firstWorkDay.AddDate(0, 0, 1)
+	}
+	// Column offset where the very first block should start filling data --
+	// e.g. if the recap starts on a Rabu, the Senin/Selasa columns of the
+	// first block are left entirely blank (no date, no marks) and the
+	// first real date lands in the Rabu column, per the export contract.
+	firstBlockOffset := indexInPattern[firstWorkDay.Weekday()]
+
+	// Total selected working days inside [start_date, end_date] -- used to
+	// size how many blocks are actually needed.
 	workdayCount := 0
 	for d := p.StartDate; !d.After(p.EndDate); d = d.AddDate(0, 0, 1) {
-		if d.Weekday() != time.Sunday {
+		if isWorkDay[d.Weekday()] {
 			workdayCount++
 		}
 	}
-	totalBlocks := int(math.Ceil(float64(workdayCount) / float64(daysPerBlock)))
-	if totalBlocks < 1 {
-		totalBlocks = 1
-	}
-	if totalBlocks%2 != 0 {
-		totalBlocks++
+
+	// 3-4. Total number of blocks: however many are needed to hold every
+	// working day in range, given the first block has fewer usable columns
+	// (daysPerBlock - firstBlockOffset) because of the leading blank
+	// columns. No more rounding up to an even count / forcing a second,
+	// entirely-empty filler block just to keep 2 tables per page -- a
+	// short range that fully fits in the first block now produces exactly
+	// one block/table.
+	firstBlockCapacity := daysPerBlock - firstBlockOffset
+	totalBlocks := 1
+	if workdayCount > firstBlockCapacity {
+		totalBlocks = 1 + int(math.Ceil(float64(workdayCount-firstBlockCapacity)/float64(daysPerBlock)))
 	}
 
+	cursor := firstWorkDay
 	blocks := make([]models.PDFBlock, 0, totalBlocks)
 	for b := 0; b < totalBlocks; b++ {
-		blockDays := make([]time.Time, 0, daysPerBlock)
-		for len(blockDays) < daysPerBlock {
-			if cursor.Weekday() != time.Sunday {
-				blockDays = append(blockDays, cursor)
-			}
-			cursor = cursor.AddDate(0, 0, 1)
+		offset := 0
+		if b == 0 {
+			offset = firstBlockOffset
 		}
 
+		// Columns before `offset` (only possible on the first block) stay
+		// entirely blank: zero-value time.Time (never matched by markFor)
+		// and "" in tanggalStrs.
+		blockDays := make([]time.Time, daysPerBlock)
 		tanggalStrs := make([]string, daysPerBlock)
-		for i, d := range blockDays {
-			tanggalStrs[i] = d.Format("02")
+		for i := offset; i < daysPerBlock; i++ {
+			blockDays[i] = cursor
+			tanggalStrs[i] = cursor.Format("02")
+			cursor = cursor.AddDate(0, 0, 1)
+			for !isWorkDay[cursor.Weekday()] {
+				cursor = cursor.AddDate(0, 0, 1)
+			}
 		}
 
 		// 6-7. Per student, per block: fill marks and reset S/I/A totals
@@ -208,8 +325,8 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 		for _, st := range students {
 			marks := make([]string, daysPerBlock)
 			countS, countI, countA := 0, 0, 0
-			for i, d := range blockDays {
-				m := markFor(st.ID, d)
+			for i := offset; i < daysPerBlock; i++ {
+				m := markFor(st.ID, blockDays[i])
 				marks[i] = m
 				switch m {
 				case "S":
@@ -230,20 +347,26 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 		}
 
 		blocks = append(blocks, models.PDFBlock{
-			HariLabel: hariLabelConstant,
+			HariLabel: hariLabel,
 			Tanggal:   tanggalStrs,
 			Siswa:     siswaList,
 		})
 	}
 
-	// 5. Group blocks two-per-page.
-	pages := make([]models.PDFPage, 0, len(blocks)/2)
+	// 5. Group blocks two-per-page. A page may end with a single block
+	// when there's an odd number of blocks overall -- the bottom table is
+	// simply omitted rather than padded with an empty filler block.
+	pages := make([]models.PDFPage, 0, (len(blocks)+1)/2)
 	for i := 0; i < len(blocks); i += 2 {
-		pages = append(pages, models.PDFPage{
+		page := models.PDFPage{
 			NamaDUDI:   p.DUName,
 			AlamatDUDI: p.DUAddress,
-			Blocks:     []models.PDFBlock{blocks[i], blocks[i+1]},
-		})
+			Blocks:     []models.PDFBlock{blocks[i]},
+		}
+		if i+1 < len(blocks) {
+			page.Blocks = append(page.Blocks, blocks[i+1])
+		}
+		pages = append(pages, page)
 	}
 
 	return &models.PDFTemplateData{Pages: pages}, nil

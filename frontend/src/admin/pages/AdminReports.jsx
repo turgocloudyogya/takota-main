@@ -6,7 +6,13 @@ import { parseDate as parseCalDate } from '@internationalized/date'
 import { Icon } from '@gravity-ui/uikit'
 import { FileArrowDown } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
-import { formatShortDate, countWorkingDays, estimatePageCount } from '../lib/dateWindow.js'
+import {
+  formatShortDate,
+  countWorkingDays,
+  estimatePageCount,
+  DEFAULT_WORK_DAYS,
+  WEEKDAY_OPTIONS,
+} from '../lib/dateWindow.js'
 import { downloadBlob } from '../lib/download.js'
 import { downloadAttendanceReportPdf } from '../lib/attendanceReportHtml.js'
 import PageHeader from '../components/PageHeader.jsx'
@@ -93,12 +99,36 @@ export default function AdminReports() {
   const [duAddress, setDuAddress] = useState('')
   const [buildingPdf, setBuildingPdf] = useState(false)
 
+  // Which weekdays count as "work days" / table columns in the recap.
+  // Defaults to Senin-Sabtu (the previous fixed behavior); toggling days
+  // off/on changes how many day-columns each block has (e.g. Senin-Jumat =
+  // 10 columns per block, Senin-Sabtu = 12, add Minggu = 14).
+  const [workDays, setWorkDays] = useState(DEFAULT_WORK_DAYS)
+
+  function toggleWorkDay(value) {
+    setWorkDays((prev) => {
+      const isSelected = prev.includes(value)
+      if (isSelected) {
+        // Keep at least one work day selected at all times.
+        if (prev.length === 1) return prev
+        return prev.filter((d) => d !== value)
+      }
+      return [...prev, value].sort((a, b) => a - b)
+    })
+  }
+
   const rangeIsValid = Boolean(startDate) && Boolean(endDate) && startDate <= endDate
   const workingDays = useMemo(
-    () => (rangeIsValid ? countWorkingDays(startDate, endDate) : 0),
-    [startDate, endDate, rangeIsValid]
+    () => (rangeIsValid ? countWorkingDays(startDate, endDate, workDays) : 0),
+    [startDate, endDate, rangeIsValid, workDays]
   )
-  const pageEstimate = useMemo(() => estimatePageCount(workingDays), [workingDays])
+  const pageEstimate = useMemo(
+    () => estimatePageCount(workingDays, workDays.length),
+    [workingDays, workDays]
+  )
+  const workDaysLabel = WEEKDAY_OPTIONS.filter((opt) => workDays.includes(opt.value))
+    .map((opt) => opt.label)
+    .join(', ')
 
   async function handleBuildPdf() {
     if (!startDate || !endDate) {
@@ -112,7 +142,7 @@ export default function AdminReports() {
 
     setBuildingPdf(true)
     try {
-      const payload = { startDate, endDate, duName, duAddress }
+      const payload = { startDate, endDate, duName, duAddress, workDays }
       const filename = `Rekap-Presensi_${startDate}_${endDate}.pdf`
       const doc = await api.fetchAttendanceReportData(payload)
       await downloadAttendanceReportPdf(doc, filename)
@@ -250,11 +280,7 @@ export default function AdminReports() {
               Build PDF Attendance Recap
             </p>
             <p className="text-sm text-neutral dark:text-neutral-400">
-              Fill in the DU/DI (workplace) details below and pick a date range. All students are included
-              automatically. Name, dates, attendance status (√/S/I/A), and the sick/permission/absent totals
-              per student are filled in automatically from the attendance &amp; permission data. Ranges longer
-              than 2 working weeks are automatically split across multiple pages using the exact same table
-              layout (2 full tables per page).
+              Fill in the workplace (DU/DI) details, date range, and working days, and the system will automatically populate all student data, attendance statuses (√/S/I/A), and totals from existing records—marking a student absent ("A") only when peers are active, while leaving days with zero overall attendance blank as holidays—and automatically splitting ranges longer than two working weeks into a multi-page layout with up to two tables per page.
             </p>
           </div>
 
@@ -352,6 +378,28 @@ export default function AdminReports() {
             </TextField>
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Work days (report columns)
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {WEEKDAY_OPTIONS.map((opt) => (
+                <Button
+                  key={opt.value}
+                  variant={workDays.includes(opt.value) ? 'primary' : 'outline'}
+                  onPress={() => toggleWorkDay(opt.value)}
+                  className="min-w-[64px] px-2.5"
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+            <span className="text-xs text-neutral-500 dark:text-neutral-500">
+              Each table row block covers 2 weeks of the selected days (e.g. Senin–Sabtu = 12 columns,
+              Senin–Jumat = 10 columns). At least one day must stay selected.
+            </span>
+          </div>
+
           <div className="rounded-xl bg-neutral-50 px-3.5 py-2.5 text-sm dark:bg-neutral-800/60">
             {rangeIsValid ? (
               <span className="text-neutral-700 dark:text-neutral-300">
@@ -359,7 +407,7 @@ export default function AdminReports() {
                   {formatShortDate(new Date(`${startDate}T00:00:00`))} –{' '}
                   {formatShortDate(new Date(`${endDate}T00:00:00`))}
                 </span>{' '}
-                · {workingDays} working days (Mon–Sat) · estimated{' '}
+                · {workingDays} working days ({workDaysLabel}) · estimated{' '}
                 <span className="font-medium text-neutral-900 dark:text-neutral-100">{pageEstimate} page(s)</span>
               </span>
             ) : (
