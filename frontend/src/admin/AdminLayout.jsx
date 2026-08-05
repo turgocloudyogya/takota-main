@@ -17,6 +17,8 @@ import { getSession, isAdminSession } from './lib/session.js'
 import * as api from './lib/api.js'
 import { ConfirmDialog } from '../components/Modals.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import GuideOverlay from './components/GuideOverlay.jsx'
+import { isGuideDone } from './lib/guide.js'
 
 // Same icon everywhere a sidebar-toggle affordance is needed (desktop
 // collapse/expand button, mobile "open menu" button) - one glyph from the
@@ -130,6 +132,7 @@ export default function AdminLayout() {
   const [session] = useState(() => getSession())
   const [mobileOpen, setMobileOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const [showGuide, setShowGuide] = useState(() => !isGuideDone())
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
@@ -303,6 +306,8 @@ export default function AdminLayout() {
         danger
         onConfirm={handleConfirmLogout}
       />
+
+      {showGuide && <GuideOverlay onComplete={() => setShowGuide(false)} />}
     </div>
   )
 }

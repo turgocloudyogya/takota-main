@@ -215,7 +215,7 @@ export default function AdminUsers() {
         onRefresh={handleRefresh}
         placeholder="Search name or username…"
         actions={
-          <Button variant="primary" size="sm" onPress={openCreate}>
+          <Button data-guide="add-user-btn" variant="primary" size="sm" onPress={openCreate}>
             <Icon data={PersonPlus} size={15} />
             Add {typeFilter === 'admin' ? 'Admin' : typeFilter === 'user' ? 'Student' : 'User'}
           </Button>

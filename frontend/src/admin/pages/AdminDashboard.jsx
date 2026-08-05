@@ -197,7 +197,7 @@ export default function AdminDashboard() {
         description="Attendance and leave/absence submissions summary for Takota students."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div data-guide="stat-cards" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total Students"
           value={loading ? '-' : `${studentCount}${studentCapped ? '+' : ''}`}
@@ -227,7 +227,7 @@ export default function AdminDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div data-guide="charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="p-4 lg:col-span-2 shadow-none dark:border-neutral-800">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Attendance Trend - Last 14 Days</p>
@@ -356,7 +356,7 @@ export default function AdminDashboard() {
         </div>
       </Card>
 
-      <Card className="p-4 shadow-none dark:border-neutral-800">
+      <Card data-guide="recent-activity" className="p-4 shadow-none dark:border-neutral-800">
         <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Recent Activity</p>
         <div className="flex flex-col divide-y divide-app-border/10 dark:divide-white/10">
           {(() => {

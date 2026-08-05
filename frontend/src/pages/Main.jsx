@@ -4,10 +4,39 @@ import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { ArrowRightFromSquare, Paperclip } from '@gravity-ui/icons'
 import { getUserHome, logout } from '../lib/api.js'
+import { isPageTipDone } from '../lib/userGuide.js'
 import AbsenceCard from '../components/AbsenceCard.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
 import { ConfirmDialog } from '../components/Modals.jsx'
+
+const MAIN_STEPS = [
+  {
+    target: '[data-guide="greeting"]',
+    title: 'Welcome to Takota',
+    description: 'This is your home screen. You can see your attendance status and absence history at a glance.',
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="today-status"]',
+    title: "Today's Status",
+    description: "Your attendance status for today appears here. If you haven't checked in yet, it will show as empty.",
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="absence-list"]',
+    title: 'Absence History',
+    description: 'Your recent leave and sick submissions are listed here with their approval status.',
+    placement: 'top',
+  },
+  {
+    target: '[data-guide="attendance-button"]',
+    title: 'Check In',
+    description: 'Tap this button to open the attendance menu where you can check in, submit leave, or view photos.',
+    placement: 'top',
+  },
+]
 
 const GREETING_LABELS = {
   morning: 'Good Morning',
@@ -233,7 +262,7 @@ export default function Main() {
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-md px-6">
-      <header className="flex items-start justify-between gap-4 py-4 pt-8">
+      <header data-guide="greeting" className="flex items-start justify-between gap-4 py-4 pt-8">
         <div>
           <h1 className="text-xl font-bold leading-tight text-neutral-900 dark:text-neutral-100">
             {greeting}, {userName} <span aria-hidden>👋</span>
@@ -255,7 +284,7 @@ export default function Main() {
         </div>
       </header>
 
-      <section className="mt-6">
+      <section data-guide="today-status" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Today</h2>
         {todayStatus ? (
           <AbsenceCard {...todayStatus} />
@@ -266,7 +295,7 @@ export default function Main() {
         )}
       </section>
 
-      <section className="mt-6">
+      <section data-guide="absence-list" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Absence</h2>
         {absenceList.length > 0 ? (
           <div className="flex flex-col gap-2">
@@ -282,6 +311,7 @@ export default function Main() {
       </section>
 
       <button
+        data-guide="attendance-button"
         type="button"
         onClick={() => setSheetOpen(true)}
         className="fixed inset-x-0 bottom-6 z-30 mx-auto flex w-fit cursor-pointer items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition active:scale-[0.97]"
@@ -308,6 +338,10 @@ export default function Main() {
         danger
         onConfirm={handleConfirmLogout}
       />
+
+      {!isPageTipDone('main') && (
+        <PageGuideOverlay page="main" steps={MAIN_STEPS} />
+      )}
     </main>
   )
 }

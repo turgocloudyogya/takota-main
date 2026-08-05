@@ -134,25 +134,25 @@ jobs:
         run: |
           echo "Waiting for API to be ready..."
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+            if curl -sf http://localhost/health >/dev/null 2>&1; then
               echo "API is healthy"
               break
             fi
             echo "Attempt $i/30 - waiting 2s..."
             sleep 2
           done
-          curl -sf http://localhost:8080/health || (echo "API failed to start" && docker logs takota-app && exit 1)
+          curl -sf http://localhost/health || (echo "API failed to start" && docker logs takota-app && exit 1)
 
       - name: Test health endpoint
         run: |
-          RESPONSE=$(curl -sf http://localhost:8080/health)
+          RESPONSE=$(curl -sf http://localhost/health)
           echo "Health response: $RESPONSE"
           echo "$RESPONSE" | grep -q '"status":"ok"' || exit 1
 
       - name: Test user login
         run: |
           echo "=== Testing user001 login ==="
-          USER_RESPONSE=$(curl -sf -X POST http://localhost:8080/api/auth \
+          USER_RESPONSE=$(curl -sf -X POST http://localhost/api/auth \
             -H "Content-Type: application/json" \
             -d '{"username":"user001","password":"testing123"}')
           echo "User login response: $USER_RESPONSE"
@@ -160,7 +160,7 @@ jobs:
           echo "USER_TOKEN=$USER_TOKEN" >> $GITHUB_ENV
 
           echo "=== Testing admin login ==="
-          ADMIN_RESPONSE=$(curl -sf -X POST http://localhost:8080/api/auth \
+          ADMIN_RESPONSE=$(curl -sf -X POST http://localhost/api/auth \
             -H "Content-Type: application/json" \
             -d '{"username":"admin","password":"testing123"}')
           echo "Admin login response: $ADMIN_RESPONSE"
@@ -174,13 +174,13 @@ jobs:
       - name: Test user endpoints
         run: |
           echo "=== Testing GET /api/user/home ==="
-          HOME_RESPONSE=$(curl -sf http://localhost:8080/api/user/home \
+          HOME_RESPONSE=$(curl -sf http://localhost/api/user/home \
             -H "Authorization: Bearer $USER_TOKEN")
           echo "Home response: $HOME_RESPONSE"
           echo "$HOME_RESPONSE" | grep -q '"greeting_widget"' || exit 1
 
           echo "=== Testing POST /api/user/attendance ==="
-          ATTENDANCE_RESPONSE=$(curl -sf -X POST http://localhost:8080/api/user/attendance \
+          ATTENDANCE_RESPONSE=$(curl -sf -X POST http://localhost/api/user/attendance \
             -H "Authorization: Bearer $USER_TOKEN" \
             -F "latitude=-6.2088" \
             -F "longitude=106.8456")
@@ -190,13 +190,13 @@ jobs:
       - name: Test admin endpoints
         run: |
           echo "=== Testing GET /api/admin/users ==="
-          USERS_RESPONSE=$(curl -sf http://localhost:8080/api/admin/users \
+          USERS_RESPONSE=$(curl -sf http://localhost/api/admin/users \
             -H "Authorization: Bearer $ADMIN_TOKEN")
           echo "Users response: $USERS_RESPONSE"
           echo "$USERS_RESPONSE" | grep -q '"data"' || exit 1
 
           echo "=== Testing GET /api/admin/attendances ==="
-          ATTS_RESPONSE=$(curl -sf http://localhost:8080/api/admin/attendances \
+          ATTS_RESPONSE=$(curl -sf http://localhost/api/admin/attendances \
             -H "Authorization: Bearer $ADMIN_TOKEN")
           echo "Attendances response: $ATTS_RESPONSE"
           echo "$ATTS_RESPONSE" | grep -q '"data"' || exit 1
@@ -204,7 +204,7 @@ jobs:
       - name: Test absence submission
         run: |
           echo "=== Testing POST /api/user/absence ==="
-          ABSENCE_RESPONSE=$(curl -sf -X POST http://localhost:8080/api/user/absence \
+          ABSENCE_RESPONSE=$(curl -sf -X POST http://localhost/api/user/absence \
             -H "Authorization: Bearer $USER_TOKEN" \
             -F "option=sick" \
             -F "reason=Feeling unwell - CI test")
@@ -212,7 +212,7 @@ jobs:
           echo "$ABSENCE_RESPONSE" | grep -q '"message"' || exit 1
 
           echo "=== Testing GET /api/admin/absences ==="
-          ABSENCES_RESPONSE=$(curl -sf http://localhost:8080/api/admin/absences \
+          ABSENCES_RESPONSE=$(curl -sf http://localhost/api/admin/absences \
             -H "Authorization: Bearer $ADMIN_TOKEN")
           echo "Absences response: $ABSENCES_RESPONSE"
           echo "$ABSENCES_RESPONSE" | grep -q '"data"' || exit 1
@@ -220,12 +220,12 @@ jobs:
       - name: Test unauthorized access
         run: |
           echo "=== Testing unauthorized access (no token) ==="
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/user/home)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/user/home)
           echo "HTTP code: $HTTP_CODE"
           [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ] || exit 1
 
           echo "=== Testing forbidden access (user trying admin route) ==="
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/admin/users \
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/admin/users \
             -H "Authorization: Bearer $USER_TOKEN")
           echo "HTTP code: $HTTP_CODE"
           [ "$HTTP_CODE" = "403" ] || exit 1

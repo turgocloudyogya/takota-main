@@ -134,7 +134,7 @@ export default function AdminReports() {
       />
 
       {/* Method switcher */}
-      <div className="flex flex-col gap-1.5">
+      <div data-guide="reports-export" className="flex flex-col gap-1.5">
         <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Export method</span>
         <div className="flex gap-2">
           <Button

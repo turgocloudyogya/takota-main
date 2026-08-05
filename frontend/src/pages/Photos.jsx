@@ -2,8 +2,19 @@ import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { getPhotos } from '../lib/api.js'
 import BackButton from '../components/BackButton.jsx'
+import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
 import PhotoPreviewModal from '../components/PhotoPreviewModal.jsx'
 import PhotoGalleryEmptyState from '../components/PhotoGalleryEmptyState.jsx'
+import { isPageTipDone } from '../lib/userGuide.js'
+
+const PHOTOS_STEPS = [
+  {
+    target: '[data-guide="photo-gallery"]',
+    title: 'Photo Gallery',
+    description: 'Browse all attendance and absence photos submitted by you and other students. Tap any photo to view it full screen.',
+    placement: 'bottom',
+  },
+]
 
 // Gallery of every photo uploaded while recording attendance/absence
 // via photo. Mobile layout (3 columns) matches the design 1:1; on
@@ -92,7 +103,7 @@ export default function Photos() {
           </div>
         ) : photoList.length > 0 ? (
           <>
-            <div className="mt-2 grid grid-cols-3 gap-px">
+            <div data-guide="photo-gallery" className="mt-2 grid grid-cols-3 gap-px">
               {photoList.map((photo) => (
                 <button
                   key={photo.id}
@@ -136,6 +147,10 @@ export default function Photos() {
       </div>
 
       <PhotoPreviewModal photo={activePhoto} onClose={() => setActivePhoto(null)} />
+
+      {!isPageTipDone('photos') && (
+        <PageGuideOverlay page="photos" steps={PHOTOS_STEPS} />
+      )}
     </main>
   )
 }
