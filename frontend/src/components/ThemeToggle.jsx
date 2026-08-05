@@ -4,7 +4,7 @@ import { useTheme } from '../lib/useTheme.js'
 
 // Sun/Moon switch shared by the user pages and the admin sidebar. Follows
 // the surrounding UI's neutral-tone icon-button language.
-export default function ThemeToggle({ className = '' }) {
+export default function ThemeToggle({ className = '', ...rest }) {
   const { theme, toggleTheme } = useTheme()
   const dark = theme === 'dark'
 
@@ -15,6 +15,7 @@ export default function ThemeToggle({ className = '' }) {
       aria-label={dark ? 'Enable light mode' : 'Enable dark mode'}
       title={dark ? 'Light mode' : 'Dark mode'}
       className={`flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 hover:text-primary dark:text-neutral-400 dark:hover:bg-neutral-800 ${className}`}
+      {...rest}
     >
       <Icon data={dark ? Sun : Moon} size={16} />
     </button>

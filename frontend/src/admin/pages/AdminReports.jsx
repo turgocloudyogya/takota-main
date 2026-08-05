@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Button, Card, Label, ListBox, Select } from '@heroui/react'
+import { Button, Card, Input, Label, ListBox, Select, TextField, DatePicker, DateField } from '@heroui/react'
+import { Calendar } from '@heroui/react'
+import { parseDate as parseCalDate } from '@internationalized/date'
 import { Icon } from '@gravity-ui/uikit'
 import { FileArrowDown } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { formatShortDate, countWorkingDays, estimatePageCount } from '../lib/dateWindow.js'
 import { downloadBlob } from '../lib/download.js'
 import { downloadAttendanceReportPdf } from '../lib/attendanceReportHtml.js'
-import { TextInput } from '../components/FormField.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
 // Backend expects an English month name (e.g. "august") in the ?month query
@@ -51,7 +52,8 @@ function todayIsoDate() {
 
 function startOfMonthIsoDate() {
   const d = new Date()
-  return toIsoDate(new Date(d.getFullYear(), d.getMonth(), 1))
+  d.setDate(d.getDate() - 14)
+  return toIsoDate(d)
 }
 
 export default function AdminReports() {
@@ -132,7 +134,7 @@ export default function AdminReports() {
       />
 
       {/* Method switcher */}
-      <div className="flex flex-col gap-1.5">
+      <div data-guide="reports-export" className="flex flex-col gap-1.5">
         <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Export method</span>
         <div className="flex gap-2">
           <Button
@@ -153,7 +155,7 @@ export default function AdminReports() {
       </div>
 
       {method === 'csv' ? (
-        <Card className="flex flex-col gap-4 p-4">
+        <Card className="flex flex-col gap-4 p-4 shadow-none dark:border-neutral-800">
           <div>
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Download Monthly Report</p>
             <p className="text-sm text-neutral dark:text-neutral-400">
@@ -170,7 +172,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Month</Label>
-              <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -192,7 +194,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Year</Label>
-              <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -214,7 +216,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Language</Label>
-              <Select.Trigger className="border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -242,7 +244,7 @@ export default function AdminReports() {
           </Button>
         </Card>
       ) : (
-        <Card className="flex flex-col gap-4 p-4">
+        <Card className="flex flex-col gap-4 p-4 shadow-none dark:border-neutral-800">
           <div>
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
               Build PDF Attendance Recap
@@ -257,32 +259,97 @@ export default function AdminReports() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <TextInput
-              type="date"
-              label="Recap start date"
-              value={startDate}
-              max={endDate || undefined}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-            <TextInput
-              type="date"
-              label="Recap end date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-            <TextInput
-              label="DU/DI name (optional)"
-              placeholder="e.g. PT Sinar Abadi"
-              value={duName}
-              onChange={(e) => setDuName(e.target.value)}
-            />
-            <TextInput
-              label="DU/DI address (optional)"
-              placeholder="e.g. Jl. Industri No. 12"
-              value={duAddress}
-              onChange={(e) => setDuAddress(e.target.value)}
-            />
+            <DatePicker
+              value={startDate ? parseCalDate(startDate) : null}
+              onChange={(d) => setStartDate(d ? d.toString() : '')}
+              maxValue={endDate ? parseCalDate(endDate) : undefined}
+            >
+              <Label>Recap start date</Label>
+              <DateField.Group fullWidth className="shadow-none border border-neutral-100 dark:border-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
+                <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+                <DateField.Suffix>
+                  <DatePicker.Trigger>
+                    <DatePicker.TriggerIndicator />
+                  </DatePicker.Trigger>
+                </DateField.Suffix>
+              </DateField.Group>
+              <DatePicker.Popover>
+                <Calendar>
+                  <Calendar.Header>
+                    <Calendar.YearPickerTrigger>
+                      <Calendar.YearPickerTriggerHeading />
+                      <Calendar.YearPickerTriggerIndicator />
+                    </Calendar.YearPickerTrigger>
+                    <Calendar.NavButton slot="previous" />
+                    <Calendar.NavButton slot="next" />
+                  </Calendar.Header>
+                  <Calendar.Grid>
+                    <Calendar.GridHeader>
+                      {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+                    </Calendar.GridHeader>
+                    <Calendar.GridBody>
+                      {(date) => <Calendar.Cell date={date} />}
+                    </Calendar.GridBody>
+                  </Calendar.Grid>
+                  <Calendar.YearPickerGrid>
+                    <Calendar.YearPickerGridBody>
+                      {({ year }) => <Calendar.YearPickerCell year={year} />}
+                    </Calendar.YearPickerGridBody>
+                  </Calendar.YearPickerGrid>
+                </Calendar>
+              </DatePicker.Popover>
+            </DatePicker>
+
+            <DatePicker
+              value={endDate ? parseCalDate(endDate) : null}
+              onChange={(d) => setEndDate(d ? d.toString() : '')}
+              minValue={startDate ? parseCalDate(startDate) : undefined}
+            >
+              <Label>Recap end date</Label>
+              <DateField.Group fullWidth className="shadow-none border border-neutral-100 dark:border-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
+                <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
+                <DateField.Suffix>
+                  <DatePicker.Trigger>
+                    <DatePicker.TriggerIndicator />
+                  </DatePicker.Trigger>
+                </DateField.Suffix>
+              </DateField.Group>
+              <DatePicker.Popover>
+                <Calendar>
+                  <Calendar.Header>
+                    <Calendar.YearPickerTrigger>
+                      <Calendar.YearPickerTriggerHeading />
+                      <Calendar.YearPickerTriggerIndicator />
+                    </Calendar.YearPickerTrigger>
+                    <Calendar.NavButton slot="previous" />
+                    <Calendar.NavButton slot="next" />
+                  </Calendar.Header>
+                  <Calendar.Grid>
+                    <Calendar.GridHeader>
+                      {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+                    </Calendar.GridHeader>
+                    <Calendar.GridBody>
+                      {(date) => <Calendar.Cell date={date} />}
+                    </Calendar.GridBody>
+                  </Calendar.Grid>
+                  <Calendar.YearPickerGrid>
+                    <Calendar.YearPickerGridBody>
+                      {({ year }) => <Calendar.YearPickerCell year={year} />}
+                    </Calendar.YearPickerGridBody>
+                  </Calendar.YearPickerGrid>
+                </Calendar>
+              </DatePicker.Popover>
+            </DatePicker>
+
+            <TextField value={duName} onChange={setDuName}>
+              <Label>DU/DI name (optional)</Label>
+              <Input placeholder="e.g. PT Sinar Abadi" className="shadow-none border border-neutral-100 dark:border-neutral-800" />
+            </TextField>
+
+            <TextField value={duAddress} onChange={setDuAddress}>
+              <Label>DU/DI address (optional)</Label>
+              <Input placeholder="e.g. Jl. Industri No. 12" className="shadow-none border border-neutral-100 dark:border-neutral-800" />
+            </TextField>
           </div>
 
           <div className="rounded-xl bg-neutral-50 px-3.5 py-2.5 text-sm dark:bg-neutral-800/60">

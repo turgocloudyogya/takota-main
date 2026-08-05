@@ -79,7 +79,7 @@ export default function AdminPhotos() {
       />
 
       {loading ? (
-        <div className="grid grid-cols-3 gap-px sm:grid-cols-4 lg:grid-cols-5">
+        <div data-guide="photo-gallery" className="grid grid-cols-3 gap-px sm:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 15 }).map((_, i) => (
             <div key={i} className="aspect-square animate-pulse bg-neutral-200 dark:bg-neutral-700" />
           ))}
@@ -114,7 +114,7 @@ export default function AdminPhotos() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-px sm:grid-cols-4 lg:grid-cols-5">
+          <div data-guide="photo-gallery" className="grid grid-cols-3 gap-px sm:grid-cols-4 lg:grid-cols-5">
             {photos.map((photo) => (
               <button
                 key={photo.id}

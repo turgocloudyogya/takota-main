@@ -196,7 +196,7 @@ export default function AdminAbsence() {
         placeholder="Search name or username…"
       />
 
-      <Card className="overflow-hidden p-0">
+      <Card data-guide="absence-table" className="overflow-hidden p-0 shadow-none dark:border-neutral-800">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">

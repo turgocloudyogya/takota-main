@@ -8,19 +8,8 @@ import {
   PersonXmark,
   House,
 } from '@gravity-ui/icons'
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts'
+import { ResponsiveBar } from '@nivo/bar'
+import { ResponsivePie } from '@nivo/pie'
 import * as api from '../lib/api.js'
 import { unwrapList, normalizeUser, normalizeAttendance, normalizeAbsence } from '../lib/normalize.js'
 import { parseApiDate, toDateKey } from '../lib/dateWindow.js'
@@ -30,19 +19,22 @@ import PageHeader from '../components/PageHeader.jsx'
 const SAMPLE_LIMIT = 150
 const TREND_DAYS = 14
 
-const PIE_COLORS = {
-  Present: 'var(--color-success)',
-  'Leave or Sick': 'var(--color-primary)',
-  Alpha: 'var(--color-danger)',
-}
-
 export default function AdminDashboard() {
+  const [isDark, setIsDark] = useState(false)
   const [loading, setLoading] = useState(true)
   const [studentCount, setStudentCount] = useState(null)
   const [studentCapped, setStudentCapped] = useState(false)
   const [students, setStudents] = useState([])
   const [attendance, setAttendance] = useState([])
   const [absence, setAbsence] = useState([])
+
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains('dark'))
+    check()
+    const observer = new MutationObserver(check)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -116,7 +108,7 @@ export default function AdminDashboard() {
 
   const notCheckedInCount = studentCount == null ? null : Math.max(studentCount - presentTodayCount - leaveTodayCount, 0)
 
-  // Trend data: for each day, count Present, Leave, and Alpha (not checked in)
+  // Trend data: for each day, count Present and Leave
   const trendData = useMemo(() => {
     const buckets = new Map()
     const today = new Date()
@@ -154,15 +146,8 @@ export default function AdminDashboard() {
       if (buckets.has(key)) buckets.get(key).Leave = ids.size
     })
 
-    // For today, compute Alpha = total students - Present - Leave
-    const todayKey = toDateKey(new Date())
-    if (buckets.has(todayKey) && studentCount != null) {
-      const todayBucket = buckets.get(todayKey)
-      todayBucket.Alpha = Math.max(studentCount - todayBucket.Present - todayBucket.Leave, 0)
-    }
-
     return Array.from(buckets.values())
-  }, [attendance, absence, studentCount])
+  }, [attendance, absence])
 
   // Pie chart: today's status breakdown (always show, even if zero)
   const pieData = useMemo(() => {
@@ -188,11 +173,20 @@ export default function AdminDashboard() {
     const alpha = studentCount != null ? Math.max(studentCount - present - leave, 0) : 0
 
     return [
-      { name: 'Present', value: present },
-      { name: 'Leave or Sick', value: leave },
-      { name: 'Alpha', value: alpha },
+      { id: 'Ok', value: present, label: 'Ok', color: 'var(--color-success)' },
+      { id: 'Leave', value: leave, label: 'Leave', color: 'var(--color-primary)' },
+      { id: 'No Act', value: alpha, label: 'No Act', color: 'var(--color-danger)' },
     ]
   }, [attendance, absence, studentCount])
+
+  const nivoTheme = {
+    fontFamily: 'Inter, sans-serif',
+    text: { fill: isDark ? '#e5e5e5' : '#1a1a1a' },
+    axis: {
+      ticks: { text: { fill: isDark ? '#a3a3a3' : '#666666' } },
+      legend: { text: { fill: isDark ? '#a3a3a3' : '#666666' } },
+    },
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -203,7 +197,7 @@ export default function AdminDashboard() {
         description="Attendance and leave/absence submissions summary for Takota students."
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div data-guide="stat-cards" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total Students"
           value={loading ? '-' : `${studentCount}${studentCapped ? '+' : ''}`}
@@ -233,8 +227,8 @@ export default function AdminDashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="p-4 lg:col-span-2">
+      <div data-guide="charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="p-4 lg:col-span-2 shadow-none dark:border-neutral-800">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Attendance Trend - Last 14 Days</p>
             <span className="flex items-center gap-1.5 text-xs text-neutral dark:text-neutral-400">
@@ -246,40 +240,89 @@ export default function AdminDashboard() {
             </span>
           </div>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={trendData} margin={{ left: -20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-app-border)" strokeOpacity={0.25} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={1} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} width={28} />
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={30} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="Present" fill="var(--color-success)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Leave" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Alpha" fill="var(--color-danger)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ResponsiveBar
+              data={trendData}
+              keys={['Present', 'Leave']}
+              indexBy="label"
+              margin={{ top: 20, right: 20, bottom: 50, left: 50 }}
+              padding={0.3}
+              colors={({ id }) => {
+                if (id === 'Present') return 'var(--color-success)'
+                return 'var(--color-primary)'
+              }}
+              borderRadius={4}
+              theme={nivoTheme}
+              enableGridX={false}
+              enableGridY={false}
+              axisBottom={{
+                tickSize: 0,
+                tickPadding: 12,
+              }}
+              axisLeft={{
+                tickSize: 0,
+                tickPadding: 12,
+                format: (v) => Number.isInteger(v) ? v : '',
+              }}
+              enableLabel={false}
+              tooltip={({ id, value, color }) => (
+                <div className="rounded-lg bg-white px-3 py-2 shadow-lg dark:bg-neutral-800">
+                  <span className="text-sm font-medium" style={{ color }}>{id}: {value}</span>
+                </div>
+              )}
+              legends={[
+                {
+                  dataFrom: 'keys',
+                  anchor: 'bottom',
+                  direction: 'row',
+                  translateY: 40,
+                  itemWidth: 80,
+                  itemHeight: 16,
+                  symbolShape: 'circle'
+                }
+              ]}
+            />
           </div>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 shadow-none dark:border-neutral-800">
           <p className="mb-4 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Today's Status</p>
           <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} paddingAngle={2}>
-                  {pieData.map((entry) => (
-                    <Cell key={entry.name} fill={PIE_COLORS[entry.name]} />
-                  ))}
-                </Pie>
-                <Legend verticalAlign="bottom" height={30} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            <ResponsivePie
+              data={pieData}
+              margin={{ top: 40, right: 80, bottom: 80, left: 80 }}
+              innerRadius={0.5}
+              padAngle={0.6}
+              cornerRadius={2}
+              activeOuterRadiusOffset={8}
+              colors={({ data }) => data.color}
+              theme={nivoTheme}
+              arcLinkLabelsSkipAngle={10}
+              arcLinkLabelsTextColor={isDark ? '#a3a3a3' : '#555555'}
+              arcLinkLabelsThickness={2}
+              arcLinkLabelsColor={{ from: 'color' }}
+              arcLabelsSkipAngle={10}
+              arcLabelsTextColor={{ from: 'color', modifiers: [['darker', isDark ? -1.5 : 2]] }}
+              tooltip={({ datum }) => (
+                <div className="rounded-lg bg-white px-3 py-2 shadow-lg dark:bg-neutral-800">
+                  <span className="text-sm font-medium" style={{ color: datum.color }}>{datum.label}: {datum.value}</span>
+                </div>
+              )}
+              legends={[
+                {
+                  anchor: 'bottom',
+                  direction: 'row',
+                  translateY: 56,
+                  itemWidth: 100,
+                  itemHeight: 18,
+                  symbolShape: 'circle'
+                }
+              ]}
+            />
           </div>
         </Card>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-4 shadow-none dark:border-neutral-800">
         <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">No Action Today</p>
         <div className="flex flex-col divide-y divide-app-border/10 dark:divide-white/10">
           {(() => {
@@ -313,7 +356,7 @@ export default function AdminDashboard() {
         </div>
       </Card>
 
-      <Card className="p-4">
+      <Card data-guide="recent-activity" className="p-4 shadow-none dark:border-neutral-800">
         <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Recent Activity</p>
         <div className="flex flex-col divide-y divide-app-border/10 dark:divide-white/10">
           {(() => {

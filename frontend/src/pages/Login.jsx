@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { At, Key, Eye, EyeSlash, Person } from '@gravity-ui/icons'
+import { At, Key, Eye, EyeSlash } from '@gravity-ui/icons'
 
 // Import API and session utilities from admin
 const API_BASE = localStorage.getItem('api-base-url') || ''
@@ -80,7 +80,7 @@ export default function Login() {
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
       <div className="mb-8 flex flex-col items-center">
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral/15 dark:bg-white/10">
-          <Icon data={Person} size={32} className="text-neutral dark:text-neutral-300" />
+          <img src="/takota-icon.svg" alt="Takota" className="h-12 w-12" />
         </div>
         <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Takota Login</h1>
         <p className="mt-2 max-w-[260px] text-center text-sm text-neutral dark:text-neutral-400">

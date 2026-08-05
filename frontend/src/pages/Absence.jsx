@@ -6,7 +6,36 @@ import { Icon } from '@gravity-ui/uikit'
 import { Files, Xmark, PaperPlane } from '@gravity-ui/icons'
 import { Label, ListBox, Select, TextArea } from '@heroui/react'
 import BackButton from '../components/BackButton.jsx'
+import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
 import { submitAbsence } from '../lib/api.js'
+import { isPageTipDone } from '../lib/userGuide.js'
+
+const ABSENCE_STEPS = [
+  {
+    target: '[data-guide="absence-textarea"]',
+    title: 'Reason for Absence',
+    description: 'Enter a brief explanation for why you are not present today.',
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="absence-file-upload"]',
+    title: 'Attach Document',
+    description: "Optionally attach a photo or document to support your absence request (e.g., a doctor's note).",
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="absence-reason-select"]',
+    title: 'Select Reason Type',
+    description: 'Choose whether this is an Absence/Leave or a Sick leave.',
+    placement: 'top',
+  },
+  {
+    target: '[data-guide="absence-submit-btn"]',
+    title: 'Submit Absence',
+    description: "After filling in the details, tap this button to submit your absence request.",
+    placement: 'top',
+  },
+]
 
 // The 2 choices shown under "Select a reason", per design.
 // Backend expects: 'sick' or 'permission'
@@ -138,12 +167,14 @@ export default function Absence() {
         <span className="h-8 w-8 shrink-0" />
       </header>
 
-      <div className="flex flex-1 flex-col justify-center px-6 py-6 pb-[80px]">
+      <div className="flex flex-1 flex-col px-6 py-6 pb-[80px]">
+        <div className="flex flex-1 flex-col justify-center">
         <p className="text-sm text-neutral dark:text-neutral-400">
           Please explain why you are not present at this time
         </p>
 
         <TextArea
+          data-guide="absence-textarea"
           value={reasonText}
           onChange={(e) => setReasonText(e.target.value)}
           placeholder="Enter the reason for your absence…"
@@ -172,6 +203,7 @@ export default function Absence() {
           </div>
         ) : (
           <button
+            data-guide="absence-file-upload"
             type="button"
             onClick={() => fileInputRef.current?.click()}
             onDragOver={handleDragOver}
@@ -190,7 +222,7 @@ export default function Absence() {
           </button>
         )}
 
-        <div className="mt-3">
+        <div data-guide="absence-reason-select" className="mt-3">
           <Select
             selectedKey={reasonType}
             onSelectionChange={(key) => setReasonType(String(key))}
@@ -215,6 +247,7 @@ export default function Absence() {
         </div>
 
         <button
+          data-guide="absence-submit-btn"
           type="button"
           onClick={handleTakeAbsence}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] cursor-pointer"
@@ -222,6 +255,7 @@ export default function Absence() {
           <Icon data={PaperPlane} size={16} />
           Take Absence!
         </button>
+        </div>
       </div>
 
       <Drawer.Root
@@ -260,6 +294,10 @@ export default function Absence() {
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
+
+      {!isPageTipDone('absence') && (
+        <PageGuideOverlay page="absence" steps={ABSENCE_STEPS} />
+      )}
     </main>
   )
 }

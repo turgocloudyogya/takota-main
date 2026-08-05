@@ -215,14 +215,14 @@ export default function AdminUsers() {
         onRefresh={handleRefresh}
         placeholder="Search name or username…"
         actions={
-          <Button variant="primary" size="sm" onPress={openCreate}>
+          <Button data-guide="add-user-btn" variant="primary" size="sm" onPress={openCreate}>
             <Icon data={PersonPlus} size={15} />
             Add {typeFilter === 'admin' ? 'Admin' : typeFilter === 'user' ? 'Student' : 'User'}
           </Button>
         }
       />
 
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-hidden p-0 shadow-none dark:border-neutral-800">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">

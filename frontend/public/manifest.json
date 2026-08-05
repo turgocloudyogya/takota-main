@@ -1,0 +1,17 @@
+{
+  "name": "Takota Absensi",
+  "short_name": "Takota",
+  "description": "Attendance management application for Takota students",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#DD5C00",
+  "icons": [
+    {
+      "src": "/takota-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

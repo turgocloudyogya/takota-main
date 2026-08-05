@@ -11,7 +11,30 @@ import {
 } from '@gravity-ui/icons'
 import { Checkbox } from '@heroui/react'
 import BackButton from '../components/BackButton.jsx'
+import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
 import { submitAttendance } from '../lib/api.js'
+import { isPageTipDone } from '../lib/userGuide.js'
+
+const ATTENDANCE_STEPS = [
+  {
+    target: '[data-guide="camera-preview"]',
+    title: 'Camera Preview',
+    description: 'Your camera preview appears here. The app will capture a photo when you check in.',
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="use-camera-checkbox"]',
+    title: 'Camera Tracking',
+    description: 'Enable this option to include a photo with your attendance. The photo is taken when you press "Take Attendance".',
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="take-attendance-btn"]',
+    title: 'Submit Attendance',
+    description: 'Tap this button to submit your attendance. Make sure you have granted camera and location permissions first.',
+    placement: 'top',
+  },
+]
 
 // Browsers only ever show the native permission dialog once. After the user
 // has explicitly blocked a permission, calling the API again just fails
@@ -310,7 +333,9 @@ export default function Attendance() {
         <span className="h-8 w-8 shrink-0" />
       </header>
 
-      <div className="flex flex-1 flex-col justify-center px-6 py-6 pb-[80px]">
+      <div className="flex flex-1 flex-col px-6 py-6 pb-[80px]">
+
+        <div className="flex flex-1 flex-col justify-center">
         {permissionsReady && (
           <div className="mt-6">
             {cameraStatus === 'granted' ? (
@@ -323,7 +348,7 @@ export default function Attendance() {
                   />
                 </div>
               ) : (
-                <div className="relative overflow-hidden rounded-2xl bg-neutral-900">
+              <div data-guide="camera-preview" className="relative overflow-hidden rounded-2xl bg-neutral-900">
                   <video
                     ref={setVideoElement}
                     autoPlay
@@ -357,18 +382,21 @@ export default function Attendance() {
               </div>
             )}
 
-            <label className="mt-4 flex items-center gap-2 text-sm text-neutral-900 dark:text-neutral-100">
-              <Checkbox name="use-camera-for-attedance" isSelected={useCameraTracking} onChange={(e) => setUseCameraTracking(e)}>
-                <Checkbox.Content>
-                  <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
-                    <Checkbox.Indicator />
-                  </Checkbox.Control>
-                  Use the camera for attendance tracking
-                </Checkbox.Content>
-              </Checkbox>
-            </label>
+            <div data-guide="use-camera-checkbox" className="mt-4">
+              <label className="flex items-center gap-2 text-sm text-neutral-900 dark:text-neutral-100">
+                <Checkbox name="use-camera-for-attedance" isSelected={useCameraTracking} onChange={(e) => setUseCameraTracking(e)}>
+                  <Checkbox.Content>
+                    <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
+                      <Checkbox.Indicator />
+                    </Checkbox.Control>
+                    Use the camera for attendance tracking
+                  </Checkbox.Content>
+                </Checkbox>
+              </label>
+            </div>
 
             <button
+              data-guide="take-attendance-btn"
               type="button"
               onClick={handleTakeAttendance}
               className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
@@ -378,6 +406,7 @@ export default function Attendance() {
             </button>
           </div>
         )}
+        </div>
       </div>
 
       <Drawer.Root
@@ -422,6 +451,10 @@ export default function Attendance() {
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
+
+      {!isPageTipDone('attendance') && (
+        <PageGuideOverlay page="attendance" steps={ATTENDANCE_STEPS} />
+      )}
     </main>
   )
 }

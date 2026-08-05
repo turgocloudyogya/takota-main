@@ -110,22 +110,11 @@ body {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* Recharts: axis ticks, gridlines and the hover tooltip are hard-coded to
-   light-mode colors inside SVG, so nudge them for dark mode here. */
-.dark .recharts-text {
-  fill: #a3a3a3;
-}
-.dark .recharts-default-tooltip {
-  background-color: #1c1c1c !important;
-  border: 1px solid rgba(255, 255, 255, 0.10) !important;
-  border-radius: 0.75rem;
-}
-.dark .recharts-default-tooltip .recharts-tooltip-item {
+/* Nivo charts: tooltip dark mode styling */
+.dark [data-tooltip] {
+  background-color: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.10);
   color: #e5e5e5;
-}
-.dark .recharts-cartesian-axis-line,
-.dark .recharts-cartesian-axis-tick-line {
-  stroke: rgba(255, 255, 255, 0.12);
 }
 
 /* Signature: a slow "presence" pulse used sparingly - the sidebar mark and

@@ -89,8 +89,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        # MinIO needs a command override for CI
-        # The default entrypoint handles this
+        command: server /data
     steps:
       - name: Checkout
         uses: actions/checkout@v4
