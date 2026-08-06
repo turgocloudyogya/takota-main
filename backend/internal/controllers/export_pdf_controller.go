@@ -22,8 +22,9 @@ func (ctrl *AdminController) ExportAttendanceReportData(c *gin.Context) {
 	duName := c.Query("du_name")
 	duAddress := c.Query("du_address")
 	studentIDsStr := c.Query("student_ids")
+	workDaysStr := c.Query("work_days")
 
-	params, apiErr := parseExportParams(startDateStr, endDateStr, duName, duAddress, studentIDsStr)
+	params, apiErr := parseExportParams(startDateStr, endDateStr, duName, duAddress, studentIDsStr, workDaysStr)
 	if apiErr != nil {
 		utils.RespondError(c, apiErr.Status, apiErr.Message, apiErr.Code)
 		return

@@ -1,9 +1,9 @@
-# =========================================================
+# ==========================================================
 # Takota - Multi-stage Dockerfile
 # Builds the React frontend and Go backend, then packages
 # both into a single Nginx image that serves the frontend
 # and reverse-proxies /api/* to the backend.
-# =========================================================
+# ==========================================================
 
 # ---------- Stage 1: Build frontend ----------
 FROM node:22-alpine AS frontend-build

@@ -282,6 +282,10 @@ export async function fetchAttendanceReportData({
   duName = '',
   duAddress = '',
   studentIds = [],
+  // Which weekdays count as "work days" for the recap, using JS
+  // Date#getDay() numbering (0=Minggu..6=Sabtu). Defaults to Senin-Sabtu on
+  // the backend when omitted.
+  workDays = [],
 } = {}) {
   const response = await request('/api/admin/export/report-data', {
     params: {
@@ -290,6 +294,7 @@ export async function fetchAttendanceReportData({
       du_name: duName || undefined,
       du_address: duAddress || undefined,
       student_ids: studentIds.length > 0 ? studentIds.join(',') : undefined,
+      work_days: workDays.length > 0 ? workDays.join(',') : undefined,
     },
   })
 

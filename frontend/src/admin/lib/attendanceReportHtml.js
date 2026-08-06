@@ -146,7 +146,16 @@ function cellTag(tag, innerHtml, { rowspan, colspan, className } = {}) {
 }
 
 function renderBlock(block) {
-  const hariCols = '<col class="hari">'.repeat(12)
+  // Column count is fully driven by the data (hariLabel/tanggal length),
+  // matching the backend's flexible work-day pattern (e.g. 8, 10, 12, ...
+  // day-columns) instead of a hardcoded 12.
+  const dayColumnCount = (block.hariLabel || block.tanggal || []).length
+  // col.no (4%) + col.nama (20%) + 3x col.jumlah (3.34% each, 10.02%) are
+  // fixed; whatever's left is split evenly across however many day-columns
+  // this block actually has, so the table layout adapts to any work-day
+  // count (8, 10, 12, ...) instead of assuming a fixed 12 columns.
+  const hariColWidthPct = dayColumnCount > 0 ? (100 - 4 - 20 - 3.34 * 3) / dayColumnCount : 0
+  const hariCols = `<col class="hari" style="width:${hariColWidthPct}%">`.repeat(dayColumnCount)
   const hariHeader = (block.hariLabel || []).map((h) => cellTag('th', escapeHtml(h))).join('')
   const tanggalRow = (block.tanggal || []).map((t) => cellTag('td', escapeHtml(t))).join('')
   const rows = (block.siswa || [])
@@ -173,7 +182,7 @@ function renderBlock(block) {
       <tr>
         ${cellTag('th', 'No', { rowspan: 3 })}
         ${cellTag('th', 'Nama Peserta Didik', { rowspan: 3 })}
-        ${cellTag('th', 'Hari dan Tanggal', { colspan: 12 })}
+        ${cellTag('th', 'Hari dan Tanggal', { colspan: dayColumnCount })}
         ${cellTag('th', 'Jumlah', { colspan: 3 })}
       </tr>
       <tr>
