@@ -171,7 +171,7 @@ jobs:
           [ -n "$USER_TOKEN" ] || (echo "USER_TOKEN is empty" && exit 1)
           [ -n "$ADMIN_TOKEN" ] || (echo "ADMIN_TOKEN is empty" && exit 1)
 
-      - name: Test user endpoints
+      - name: Test user home
         run: |
           echo "=== Testing GET /api/user/home ==="
           HOME_RESPONSE=$(curl -sf http://localhost/api/user/home \
@@ -179,13 +179,27 @@ jobs:
           echo "Home response: $HOME_RESPONSE"
           echo "$HOME_RESPONSE" | grep -q '"greeting_widget"' || exit 1
 
-          echo "=== Testing POST /api/user/attendance ==="
-          ATTENDANCE_RESPONSE=$(curl -sf -X POST http://localhost/api/user/attendance \
+      - name: Test absence submission
+        run: |
+          # Runs BEFORE the attendance test below: the API correctly
+          # rejects an absence request once a normal attendance already
+          # exists for the same user/day ("Cannot submit absence after
+          # normal attendance"), so these two mutually-exclusive actions
+          # can't both be tested against the same user on the same day
+          # unless absence goes first.
+          echo "=== Testing POST /api/user/absence ==="
+          ABSENCE_RESPONSE=$(curl -sf -X POST http://localhost/api/user/absence \
             -H "Authorization: Bearer $USER_TOKEN" \
-            -F "latitude=-6.2088" \
-            -F "longitude=106.8456")
-          echo "Attendance response: $ATTENDANCE_RESPONSE"
-          echo "$ATTENDANCE_RESPONSE" | grep -q '"message"' || exit 1
+            -F "option=sick" \
+            -F "reason=Feeling unwell - CI test")
+          echo "Absence response: $ABSENCE_RESPONSE"
+          echo "$ABSENCE_RESPONSE" | grep -q '"message"' || exit 1
+
+          echo "=== Testing GET /api/admin/absences ==="
+          ABSENCES_RESPONSE=$(curl -sf http://localhost/api/admin/absences \
+            -H "Authorization: Bearer $ADMIN_TOKEN")
+          echo "Absences response: $ABSENCES_RESPONSE"
+          echo "$ABSENCES_RESPONSE" | grep -q '"data"' || exit 1
 
       - name: Test admin endpoints
         run: |
@@ -201,21 +215,15 @@ jobs:
           echo "Attendances response: $ATTS_RESPONSE"
           echo "$ATTS_RESPONSE" | grep -q '"data"' || exit 1
 
-      - name: Test absence submission
+      - name: Test user attendance
         run: |
-          echo "=== Testing POST /api/user/absence ==="
-          ABSENCE_RESPONSE=$(curl -sf -X POST http://localhost/api/user/absence \
+          echo "=== Testing POST /api/user/attendance ==="
+          ATTENDANCE_RESPONSE=$(curl -sf -X POST http://localhost/api/user/attendance \
             -H "Authorization: Bearer $USER_TOKEN" \
-            -F "option=sick" \
-            -F "reason=Feeling unwell - CI test")
-          echo "Absence response: $ABSENCE_RESPONSE"
-          echo "$ABSENCE_RESPONSE" | grep -q '"message"' || exit 1
-
-          echo "=== Testing GET /api/admin/absences ==="
-          ABSENCES_RESPONSE=$(curl -sf http://localhost/api/admin/absences \
-            -H "Authorization: Bearer $ADMIN_TOKEN")
-          echo "Absences response: $ABSENCES_RESPONSE"
-          echo "$ABSENCES_RESPONSE" | grep -q '"data"' || exit 1
+            -F "latitude=-6.2088" \
+            -F "longitude=106.8456")
+          echo "Attendance response: $ATTENDANCE_RESPONSE"
+          echo "$ATTENDANCE_RESPONSE" | grep -q '"message"' || exit 1
 
       - name: Test unauthorized access
         run: |
