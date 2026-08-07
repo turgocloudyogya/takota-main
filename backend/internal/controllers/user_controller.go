@@ -43,9 +43,12 @@ type TodayAttendance struct {
 }
 
 type AbsenceItem struct {
-	Type   string        `json:"type"`
-	Option string        `json:"option"`
-	Verify *VerifierInfo `json:"verify"`
+	ID        string        `json:"id"`
+	Type      string        `json:"type"`
+	Option    string        `json:"option"`
+	Reason    string        `json:"reason"`
+	Timestamp string        `json:"timestamp"`
+	Verify    *VerifierInfo `json:"verify"`
 }
 
 type VerifierInfo struct {
@@ -108,12 +111,18 @@ func (ctrl *UserController) Home(c *gin.Context) {
 	absenceItems := []AbsenceItem{}
 	for _, abs := range absences {
 		item := AbsenceItem{
-			Type:   abs.Type,
-			Option: "",
-			Verify: nil,
+			ID:        abs.ID.String(),
+			Type:      abs.Type,
+			Option:    "",
+			Reason:    "",
+			Timestamp: abs.CreatedAt.Format(time.RFC3339),
+			Verify:    nil,
 		}
 		if abs.Option != nil {
 			item.Option = *abs.Option
+		}
+		if abs.Reason != nil {
+			item.Reason = *abs.Reason
 		}
 		if abs.SignStatus != nil {
 			username := "unknown"
@@ -333,5 +342,54 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 	utils.RespondSuccess(c, http.StatusOK, gin.H{
 		"id":      absence.ID.String(),
 		"message": "Absence successfully submitted",
+	})
+}
+
+// DeleteAbsence deletes one of the user's own pending absence records.
+// A record can only be removed while it is still pending; once an admin has
+// accepted or rejected it, it can no longer be deleted.
+func (ctrl *UserController) DeleteAbsence(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	uid, _ := uuid.Parse(userID.(string))
+
+	id, err := uuid.Parse(c.Param("absence_id"))
+	if err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Data not found", utils.ErrDataNotFound)
+		return
+	}
+
+	// Ownership is enforced at the query level: users can only delete their own records
+	var absence models.Attendance
+	if err := ctrl.DB.Where("id = ? AND user_id = ?", id, uid).First(&absence).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Data not found", utils.ErrDataNotFound)
+		return
+	}
+
+	// Only absence records can be deleted via this endpoint
+	if absence.Type != "absence" {
+		utils.RespondError(c, http.StatusNotFound, "Data not found", utils.ErrDataNotFound)
+		return
+	}
+
+	// Pending requests can be deleted; accepted/rejected ones cannot
+	if absence.SignStatus != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Cannot delete absence that has already been verified", utils.ErrCannotDeleteVerifiedAbsence)
+		return
+	}
+
+	// Delete file from S3 if present
+	if absence.File != nil {
+		ctx := context.Background()
+		s3.DeleteFile(ctx, *absence.File)
+	}
+
+	// Delete absence
+	if err := ctrl.DB.Delete(&absence).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to delete", "DB_ERROR")
+		return
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"message": "Absence deleted successfully",
 	})
 }

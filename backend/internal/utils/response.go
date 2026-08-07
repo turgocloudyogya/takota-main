@@ -55,6 +55,7 @@ const (
 	ErrAttendanceAlreadySubmitted      = "ATTENDANCE_ALREADY_SUBMITTED"
 	ErrCannotSubmitAbsenceAfterAttendance = "CANNOT_SUBMIT_ABSENCE_AFTER_ATTENDANCE"
 	ErrPendingAbsenceVerification     = "PENDING_ABSENCE_VERIFICATION"
+	ErrCannotDeleteVerifiedAbsence    = "CANNOT_DELETE_VERIFIED_ABSENCE"
 
 	// User management invariants
 	ErrCannotDeleteLastUser  = "CANNOT_DELETE_LAST_USER"

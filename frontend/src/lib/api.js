@@ -165,6 +165,14 @@ export async function submitAbsence({ option, reason, file }) {
 }
 
 /**
+ * Delete one of the user's own pending absence requests
+ * DELETE /api/user/absence/:absenceId
+ */
+export async function deleteAbsence(absenceId) {
+  return request(`/api/user/absence/${absenceId}`, { method: 'DELETE' })
+}
+
+/**
  * Get photos gallery
  * GET /api/all/photos
  */
