@@ -58,7 +58,7 @@ internal/config/        Env-based configuration loader (Server, DB, Redis, S3, J
 internal/models/        GORM models: User, Attendance
 internal/controllers/   HTTP handlers:
                           auth_controller     login + change password
-                          user_controller     home, attendance, absence
+                          user_controller     home, attendance, absence, delete absence
                           admin_controller    attendance/absence lists + approval
                           admin_user_controller  user CRUD
                           export_controller   CSV export
@@ -98,6 +98,7 @@ User (auth + role "user" + password changed)
   GET    /api/user/home               Dashboard: greeting, today attendance, absences
   POST   /api/user/attendance         Submit attendance (location + photo)
   POST   /api/user/absence            Submit absence/leave request
+  DELETE /api/user/absence/:absence_id  Delete own pending absence request
 
 Admin (auth + role "admin" + password changed)
   GET    /api/admin/users             List users
@@ -228,6 +229,7 @@ Created by `pkg/migrator`: `version` (PK) and `applied_at`. Records which SQL fi
 1. `POST /api/user/absence` with `reason` + `option` + optional document (rules: cannot submit after same-day attendance; only one pending request).
 2. Admin sees it in `/api/admin/absences`; `PATCH /api/admin/absence` sets `verify_by` + `sign_status` (allow/reject).
 3. The user home reflects the status in real time.
+4. `DELETE /api/user/absence/:absence_id` removes the user's own request while it is still pending (`sign_status IS NULL`), including its uploaded document from S3. Ownership is enforced at the query level (`id` + `user_id`), and verified requests are rejected with `CANNOT_DELETE_VERIFIED_ABSENCE`.
 
 ## Deployment
 
