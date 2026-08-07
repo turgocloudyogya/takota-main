@@ -8,7 +8,7 @@ A Go backend for attendance and absence management, built with Gin, GORM, Postgr
 - **ORM**: GORM with pgx driver (`gorm.io/gorm`, `gorm.io/driver/pgx`)
 - **Auth**: JWT HS256 (`github.com/golang-jwt/jwt/v5`)
 - **Validation**: go-playground/validator/v10
-- **Storage**: minio-go/v7 (S3 compatible)
+- **Storage**: AWS SDK v2 S3 client (S3-compatible: AWS, MinIO, Cloudflare R2)
 - **UUID**: google/uuid (v6)
 - **Cache**: go-redis/v9 (optional, falls back to PostgreSQL)
 - **Compression**: pgx non-blocking shutdown
@@ -115,6 +115,22 @@ Response 200:
 {
   "message": "Absence request submitted",
   "data": { "id": "..." }
+}
+```
+
+```
+DELETE /api/user/absence/:absence_id
+Authorization: Bearer <JWT_TOKEN>
+
+Deletes one of the user's own absence requests. Only works while the
+request is still pending (sign_status is null); accepted/rejected
+requests return 400 with error code CANNOT_DELETE_VERIFIED_ABSENCE.
+Ownership is enforced on the backend, and the uploaded document is also
+removed from S3.
+
+Response 200:
+{
+  "message": "Absence deleted successfully"
 }
 ```
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { ArrowRightFromSquare, Paperclip } from '@gravity-ui/icons'
-import { getUserHome, logout } from '../lib/api.js'
+import { getUserHome, logout, deleteAbsence } from '../lib/api.js'
 import { isPageTipDone } from '../lib/userGuide.js'
 import AbsenceCard from '../components/AbsenceCard.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
@@ -99,6 +99,8 @@ export default function Main() {
   const [userName, setUserName] = useState('')
   const [todayStatus, setTodayStatus] = useState(null)
   const [absenceList, setAbsenceList] = useState([])
+  const [absenceToDelete, setAbsenceToDelete] = useState(null)
+  const [deletingAbsence, setDeletingAbsence] = useState(false)
 
   useEffect(() => {
     let isInitialLoad = true
@@ -164,7 +166,7 @@ export default function Main() {
             
             return {
               id: item.id || Math.random().toString(),
-              date: '03/07', // TODO: Get from actual timestamp when available
+              date: item.timestamp ? formatDate(item.timestamp) : '03/07',
               status: status,
               title: title,
               subtitle: subtitle,
@@ -235,6 +237,23 @@ export default function Main() {
     navigate('/absence')
   }
 
+  async function handleConfirmDeleteAbsence() {
+    if (!absenceToDelete) return
+    setDeletingAbsence(true)
+
+    try {
+      await deleteAbsence(absenceToDelete.id)
+      toast.success('Absence deleted successfully')
+      setAbsenceList((prev) => prev.filter((item) => item.id !== absenceToDelete.id))
+      setAbsenceToDelete(null)
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete absence')
+      console.error('deleteAbsence error:', err)
+    } finally {
+      setDeletingAbsence(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto min-h-dvh w-full max-w-md px-6">
@@ -300,7 +319,15 @@ export default function Main() {
         {absenceList.length > 0 ? (
           <div className="flex flex-col gap-2">
             {absenceList.map((item) => (
-              <AbsenceCard key={item.id} {...item} />
+              <AbsenceCard
+                key={item.id}
+                {...item}
+                onDelete={
+                  item.status === 'pending'
+                    ? () => setAbsenceToDelete(item)
+                    : undefined
+                }
+              />
             ))}
           </div>
         ) : (
@@ -337,6 +364,20 @@ export default function Main() {
         cancelLabel="Cancel"
         danger
         onConfirm={handleConfirmLogout}
+      />
+
+      <ConfirmDialog
+        open={!!absenceToDelete}
+        onOpenChange={(open) => {
+          if (!open) setAbsenceToDelete(null)
+        }}
+        title="Delete this absence request?"
+        description="This will permanently remove your absence request. You can only delete requests that have not been accepted or rejected yet."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        loading={deletingAbsence}
+        onConfirm={handleConfirmDeleteAbsence}
       />
 
       {!isPageTipDone('main') && (

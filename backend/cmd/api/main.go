@@ -121,6 +121,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			user.GET("/home", userCtrl.Home)
 			user.POST("/attendance", userCtrl.Attendance)
 			user.POST("/absence", userCtrl.Absence)
+			user.DELETE("/absence/:absence_id", userCtrl.DeleteAbsence)
 		}
 
 		// Admin routes (auth required + admin role + password changed)
