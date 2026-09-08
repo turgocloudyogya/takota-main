@@ -147,13 +147,17 @@ export default function GuideOverlay({ onComplete }) {
   const [visible, setVisible] = useState(false)
   const [animating, setAnimating] = useState(false)
   const tooltipRef = useRef(null)
+  // Only navigate on user-initiated step changes (Next/Back), never on
+  // mount — otherwise deep links like /admin/settings get hijacked back
+  // to /admin/dashboard on every fresh page load.
+  const userSteppedRef = useRef(false)
 
   const currentStep = STEPS[stepIndex]
   const totalSteps = STEPS.length
 
-  // Navigate to the correct page when step changes
+  // Navigate to the correct page when the user moves between steps
   useEffect(() => {
-    if (!currentStep) return
+    if (!currentStep || !userSteppedRef.current) return
     const currentPath = window.location.pathname
     if (currentPath !== currentStep.page) {
       navigate(currentStep.page, { replace: true })
@@ -216,6 +220,7 @@ export default function GuideOverlay({ onComplete }) {
 
   function handleNext() {
     if (stepIndex < totalSteps - 1) {
+      userSteppedRef.current = true
       setStepIndex(stepIndex + 1)
     } else {
       markGuideDone()
@@ -225,6 +230,7 @@ export default function GuideOverlay({ onComplete }) {
 
   function handlePrev() {
     if (stepIndex > 0) {
+      userSteppedRef.current = true
       setStepIndex(stepIndex - 1)
     }
   }

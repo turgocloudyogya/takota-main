@@ -85,6 +85,7 @@ const NAV_ITEMS = [
   { to: '/admin/absence', label: 'Leave & Sick', icon: FileCheck },
   { to: '/admin/photos', label: 'Photo Gallery', icon: Picture },
   { to: '/admin/reports', label: 'Reports & Export', icon: FileArrowDown },
+  { to: '/admin/settings', label: 'Settings', icon: Clock },
 ]
 
 function NavList({ onNavigate, collapsed = false }) {

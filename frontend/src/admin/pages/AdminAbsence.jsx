@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
-import { Button, Card } from '@heroui/react'
+import { Button, Card, Label, DatePicker, DateField, Calendar } from '@heroui/react'
+import { parseDate } from '@internationalized/date'
 import { Icon } from '@gravity-ui/uikit'
 import { Check, Xmark, FileText, FileCheck, TrashBin } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
@@ -14,6 +15,104 @@ import EmptyState from '../../components/EmptyState.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 
 const LIMIT = 15
+
+function toCalendarDate(str) {
+  if (!str) return null
+  try {
+    const [y, m, d] = String(str).split('-').map(Number)
+    return parseDate(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`)
+  } catch {
+    return null
+  }
+}
+
+function toISODate(date) {
+  if (!date) return ''
+  return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
+}
+
+function EndDatePicker({ value, min, onChange }) {
+  return (
+    <DatePicker
+      value={toCalendarDate(value)}
+      onChange={(date) => onChange(toISODate(date))}
+      minValue={toCalendarDate(min)}
+      fullWidth
+      className="w-full"
+    >
+      <Label>End date</Label>
+      <DateField.Group fullWidth className="w-full bg-neutral-100 dark:bg-neutral-900 shadow-none">
+        <DateField.Input>
+          {(segment) => <DateField.Segment segment={segment} />}
+        </DateField.Input>
+        <DateField.Suffix>
+          <DatePicker.Trigger>
+            <DatePicker.TriggerIndicator />
+          </DatePicker.Trigger>
+        </DateField.Suffix>
+      </DateField.Group>
+      <DatePicker.Popover>
+        <Calendar aria-label="Choose end date">
+          <Calendar.Header>
+            <Calendar.YearPickerTrigger>
+              <Calendar.YearPickerTriggerHeading />
+              <Calendar.YearPickerTriggerIndicator />
+            </Calendar.YearPickerTrigger>
+            <Calendar.NavButton slot="previous" />
+            <Calendar.NavButton slot="next" />
+          </Calendar.Header>
+          <Calendar.Grid>
+            <Calendar.GridHeader>
+              {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+            </Calendar.GridHeader>
+            <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
+          </Calendar.Grid>
+        </Calendar>
+      </DatePicker.Popover>
+    </DatePicker>
+  )
+}
+
+function StartDatePicker({ value, onChange }) {
+  return (
+    <DatePicker
+      value={toCalendarDate(value)}
+      onChange={(date) => onChange(toISODate(date))}
+      fullWidth
+      className="w-full"
+    >
+      <Label>Start date</Label>
+      <DateField.Group fullWidth className="w-full bg-neutral-100 dark:bg-neutral-900 shadow-none">
+        <DateField.Input>
+          {(segment) => <DateField.Segment segment={segment} />}
+        </DateField.Input>
+        <DateField.Suffix>
+          <DatePicker.Trigger>
+            <DatePicker.TriggerIndicator />
+          </DatePicker.Trigger>
+        </DateField.Suffix>
+      </DateField.Group>
+      <DatePicker.Popover>
+        <Calendar aria-label="Choose start date">
+          <Calendar.Header>
+            <Calendar.YearPickerTrigger>
+              <Calendar.YearPickerTriggerHeading />
+              <Calendar.YearPickerTriggerIndicator />
+            </Calendar.YearPickerTrigger>
+            <Calendar.NavButton slot="previous" />
+            <Calendar.NavButton slot="next" />
+          </Calendar.Header>
+          <Calendar.Grid>
+            <Calendar.GridHeader>
+              {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+            </Calendar.GridHeader>
+            <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
+          </Calendar.Grid>
+        </Calendar>
+      </DatePicker.Popover>
+    </DatePicker>
+  )
+}
 
 function formatDate(dateRaw) {
   const d = parseApiDate(dateRaw)
@@ -29,9 +128,25 @@ export default function AdminAbsence() {
   const [pageIndex, setPageIndex] = useState(0)
   const [lastIds, setLastIds] = useState([''])
   const [hasNext, setHasNext] = useState(false)
-  const [pendingAction, setPendingAction] = useState(null) // { row, sign }
+  const [pendingAction, setPendingAction] = useState(null) // { row, sign, startDate, endDate }
   const [pendingDelete, setPendingDelete] = useState(null) // { row }
   const [processing, setProcessing] = useState(false)
+
+  function openAction(row, sign) {
+    setPendingAction({
+      row,
+      sign,
+      startDate: row.startDate || '',
+      endDate: row.endDate || '',
+    })
+  }
+
+  function periodLabel(row) {
+    if (row.isMultiDay && row.startDate && row.endDate) {
+      return `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`
+    }
+    return formatDate(row.dateRaw)
+  }
 
   // Use refs to store latest values for polling
   const pageIndexRef = useRef(pageIndex)
@@ -151,10 +266,28 @@ export default function AdminAbsence() {
 
   async function handleConfirmAction() {
     if (!pendingAction) return
+    const { row, sign } = pendingAction
+    const datesChanged =
+      row.isMultiDay &&
+      pendingAction.startDate &&
+      pendingAction.endDate &&
+      (pendingAction.startDate !== (row.startDate || '') ||
+        pendingAction.endDate !== (row.endDate || ''))
+    // Changing the period requires approval (backend enforces this too).
+    const finalSign = datesChanged ? 'allow' : sign
+    if (datesChanged && sign !== 'allow') {
+      toast.info('Period changed — the submission will be approved.')
+    }
     setProcessing(true)
     try {
-      await api.signAbsence(pendingAction.row.id, pendingAction.sign)
-      toast.success(pendingAction.sign === 'allow' ? 'Submission approved.' : 'Submission rejected.')
+      await api.signAbsence(
+        row.id,
+        finalSign,
+        datesChanged
+          ? { startDate: pendingAction.startDate, endDate: pendingAction.endDate }
+          : {},
+      )
+      toast.success(finalSign === 'allow' ? 'Submission approved.' : 'Submission rejected.')
       setPendingAction(null)
       handleRefresh()
     } catch (err) {
@@ -229,7 +362,12 @@ export default function AdminAbsence() {
                       <p className="font-medium text-neutral-900 dark:text-neutral-100">{row.name || row.raw?.nickname || '-'}</p>
                       {row.username && <p className="text-xs text-neutral dark:text-neutral-400">{row.username}</p>}
                     </td>
-                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{formatDate(row.dateRaw)}</td>
+                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">
+                      {periodLabel(row)}
+                      {row.isMultiDay && (
+                        <p className="text-xs text-neutral dark:text-neutral-400">Multi-day</p>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <OptionChip isSick={row.isSick} />
                     </td>
@@ -259,7 +397,7 @@ export default function AdminAbsence() {
                               isIconOnly
                               className="text-success"
                               aria-label="Approve"
-                              onPress={() => setPendingAction({ row, sign: 'allow' })}
+                              onPress={() => openAction(row, 'allow')}
                             >
                               <Icon data={Check} size={15} />
                             </Button>
@@ -269,7 +407,7 @@ export default function AdminAbsence() {
                               isIconOnly
                               className="text-danger"
                               aria-label="Reject"
-                              onPress={() => setPendingAction({ row, sign: 'reject' })}
+                              onPress={() => openAction(row, 'reject')}
                             >
                               <Icon data={Xmark} size={15} />
                             </Button>
@@ -280,7 +418,7 @@ export default function AdminAbsence() {
                               variant="ghost"
                               size="sm"
                               onPress={() =>
-                                setPendingAction({ row, sign: row.sign === 'allow' ? 'reject' : 'allow' })
+                                openAction(row, row.sign === 'allow' ? 'reject' : 'allow')
                               }
                             >
                               Change
@@ -323,11 +461,43 @@ export default function AdminAbsence() {
         onOpenChange={(open) => !open && setPendingAction(null)}
         title={pendingAction?.sign === 'allow' ? 'Approve this submission?' : 'Reject this submission?'}
         description={
-          pendingAction
-            ? `The submission status for "${pendingAction.row.name}" will be changed to ${
+          pendingAction ? (
+            <span className="block">
+              {`The submission status for "${pendingAction.row.name}" will be changed to ${
                 pendingAction.sign === 'allow' ? 'Approved' : 'Rejected'
-              }.`
-            : ''
+              }.`}
+              {pendingAction.row.isMultiDay ? (
+                <span className="mt-3 block">
+                  <span className="block text-xs text-neutral dark:text-neutral-400">
+                    Edit period (multi-day only — changing it approves the submission)
+                  </span>
+                  <span className="mt-2 block">
+                    <StartDatePicker
+                      value={pendingAction.startDate}
+                      onChange={(v) =>
+                        setPendingAction((prev) => (prev ? { ...prev, startDate: v } : prev))
+                      }
+                    />
+                  </span>
+                  <span className="mt-2 block">
+                    <EndDatePicker
+                      value={pendingAction.endDate}
+                      min={pendingAction.startDate || undefined}
+                      onChange={(v) =>
+                        setPendingAction((prev) => (prev ? { ...prev, endDate: v } : prev))
+                      }
+                    />
+                  </span>
+                </span>
+              ) : (
+                <span className="mt-2 block text-xs text-neutral dark:text-neutral-400">
+                  Single-day submissions cannot have their date edited.
+                </span>
+              )}
+            </span>
+          ) : (
+            ''
+          )
         }
         confirmLabel={pendingAction?.sign === 'allow' ? 'Approve' : 'Reject'}
         danger={pendingAction?.sign === 'reject'}

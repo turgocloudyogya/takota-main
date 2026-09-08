@@ -2,6 +2,9 @@
 # Takota - Combined .gitignore (Frontend + Backend)
 # =========================================================
 
+# ---------- AI -------------
+NEED-UPDATE.md
+
 # ---------- Dependencies ----------
 node_modules/
 frontend/node_modules/
@@ -79,3 +82,5 @@ storage/
 *.dump
 dump.rdb
 .minio/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

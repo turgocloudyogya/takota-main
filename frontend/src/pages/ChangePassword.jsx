@@ -4,21 +4,17 @@ import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { Key, Eye, EyeSlash, ShieldKeyhole } from '@gravity-ui/icons'
 
+import { getProfile } from '../lib/cookies.js'
+
 const MIN_PASSWORD_LENGTH = 6 // Changed from 8 to match backend requirement
 const API_BASE = localStorage.getItem('api-base-url') || ''
 
 async function changePasswordAPI(currentPassword, newPassword, repeatPassword) {
-  const token = localStorage.getItem('takota_admin_token') || localStorage.getItem('takota_token')
-  
-  if (!token) {
-    throw new Error('Session expired. Please login again.')
-  }
-
   const response = await fetch(`${API_BASE}/api/auth-chpw`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
       'key-request': 'web-user'
     },
     body: JSON.stringify({
@@ -74,19 +70,14 @@ export default function ChangePassword() {
     setSubmitting(true)
     try {
       const data = await changePasswordAPI(oldPassword, newPassword, confirmPassword)
-      
-      // Update token with new one from response
-      if (data.token) {
-        localStorage.setItem('takota_admin_token', data.token)
-        localStorage.setItem('takota_token', data.token)
-      }
-      
+
+      // New session cookie is set by the backend; nothing to store in JS.
       toast.success('Password changed successfully!')
-      
+
       // Redirect based on response or role
       const redirectPath = data.redirect || '/main'
-      const userRole = localStorage.getItem('takota-role')
-      
+      const userRole = data.login_as || getProfile()?.role
+
       if (userRole === 'admin') {
         navigate('/admin/dashboard', { replace: true })
       } else {

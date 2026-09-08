@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { checkAuth, clearSession } from './lib/authGate.js'
@@ -16,6 +16,7 @@ import AdminAttendance from './admin/pages/AdminAttendance.jsx'
 import AdminAbsence from './admin/pages/AdminAbsence.jsx'
 import AdminPhotos from './admin/pages/AdminPhotos.jsx'
 import AdminReports from './admin/pages/AdminReports.jsx'
+import AdminSettings from './admin/pages/AdminSettings.jsx'
 
 // Page title map: pathname → browser tab title
 const PAGE_TITLES = {
@@ -31,6 +32,7 @@ const PAGE_TITLES = {
   '/admin/absence': 'Leave & Sick • Takota Admin',
   '/admin/photos': 'Photo Gallery • Takota Admin',
   '/admin/reports': 'Reports & Export • Takota Admin',
+  '/admin/settings': 'Settings • Takota Admin',
 }
 
 // Validates the JWT through GET /api/all/info on every route change.
@@ -41,45 +43,57 @@ const PAGE_TITLES = {
 const USER_ONLY_PATHS = ['/main', '/attendance', '/absence', '/photos']
 
 function AuthGate() {
-  const location = useLocation()
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     let cancelled = false
-    async function run() {
+
+    async function validateAndRoute() {
+      const cookieBefore = typeof document !== 'undefined' ? document.cookie : ''
       const result = await checkAuth()
       if (cancelled) return
 
+      // Invalid session: force logout and redirect to login.
+      // Skip the wipe if the session changed while we were checking
+      // (e.g. the user just logged in) so we never delete a fresh cookie.
       if (result.valid === false) {
-        clearSession()
+        const cookieAfter = typeof document !== 'undefined' ? document.cookie : ''
+        if (cookieAfter === cookieBefore) {
+          clearSession()
+        }
         if (location.pathname !== '/') {
-          toast.error("Unvalid session, please login!")
+          toast.error("Session invalid, please login again")
           navigate('/', { replace: true })
         }
         return
       }
 
+      // Valid session
       if (result.valid === true) {
         const isAdmin = result.role === 'admin'
         const onUserPage = USER_ONLY_PATHS.includes(location.pathname)
         const onAdminPage = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
 
-        // Admins must not land on user pages; users must not land on /admin.
+        // Role mismatch: redirect to appropriate home
         if ((isAdmin && onUserPage) || (!isAdmin && onAdminPage)) {
-          navigate(isAdmin ? '/admin' : '/main', { replace: true })
+          navigate(isAdmin ? '/admin/dashboard' : '/main', { replace: true })
           return
         }
 
+        // On login page: redirect to home
         if (location.pathname === '/') {
           navigate(result.redirectHome, { replace: true })
+          return
         }
       }
     }
-    run()
+
+    validateAndRoute()
     return () => {
       cancelled = true
     }
-  }, [location.pathname, navigate])
+  }, []) // Empty dependency: only run once on mount
 
   return null
 }
@@ -117,6 +131,7 @@ export default function App() {
           <Route path="absence" element={<AdminAbsence />} />
           <Route path="photos" element={<AdminPhotos />} />
           <Route path="reports" element={<AdminReports />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -10,6 +10,11 @@
    utility below use `dark:` variants. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Checked checkboxes keep the blue border to match the blue fill. */
+label.checkbox__content[data-selected] span.checkbox__control {
+  border-color: rgb(43, 127, 255);
+}
+
 @theme {
   --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
 

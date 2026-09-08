@@ -41,6 +41,10 @@ export default function Photos() {
             date: photo.timestamp || photo.created_at || '',
             nickname: photo.user?.name || 'Student',
             username: photo.user?.username || 'Student',
+            displayAddress: photo.display_address || null,
+            latitude: photo.latitude || null,
+            longitude: photo.longitude || null,
+            gmapsEmbed: photo.gmaps_embed || null,
           }))
           setPhotoList(mappedPhotos)
           setHasMore(Boolean(data.last_id))
@@ -75,6 +79,10 @@ export default function Photos() {
           date: photo.timestamp || photo.created_at || '',
           nickname: photo.user?.name || 'Student',
           username: photo.user?.username || 'Student',
+          displayAddress: photo.display_address || null,
+          latitude: photo.latitude || null,
+          longitude: photo.longitude || null,
+          gmapsEmbed: photo.gmaps_embed || null,
         }))
         setPhotoList((prev) => [...prev, ...mappedPhotos])
         setHasMore(Boolean(data.last_id))

@@ -38,6 +38,29 @@ type ChangePasswordRequest struct {
 	RepeatPassword  string `json:"repeat_password" binding:"required"`
 }
 
+// AuthCookieName is the HttpOnly session cookie carrying the JWT.
+// The SPA never touches it via JS; the browser attaches it automatically
+// (fetch credentials:"include"), which also keeps it working behind the
+// nginx proxy in Docker without extra config.
+const AuthCookieName = "takota_token"
+
+// UIProfileCookie carries non-sensitive display info (username/role) so the
+// SPA can gate routes without reading the token from JS.
+const UIProfileCookieName = "takota_profile"
+
+func setAuthCookies(c *gin.Context, token, username, userType string, expiryHours int) {
+	maxAge := expiryHours * 3600
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(AuthCookieName, token, maxAge, "/", "", false, true)
+	c.SetCookie(UIProfileCookieName, username+"|"+userType, maxAge, "/", "", false, false)
+}
+
+func clearAuthCookies(c *gin.Context) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(AuthCookieName, "", -1, "/", "", false, true)
+	c.SetCookie(UIProfileCookieName, "", -1, "/", "", false, false)
+}
+
 // Login handles user authentication
 func (ctrl *AuthController) Login(c *gin.Context) {
 	var req LoginRequest
@@ -142,6 +165,7 @@ func (ctrl *AuthController) Login(c *gin.Context) {
 		redirect = "/chpw"
 	}
 
+	setAuthCookies(c, token, user.Username, user.Type, ctrl.Config.JWT.ExpiryHours)
 	utils.RespondSuccess(c, http.StatusOK, LoginResponse{
 		Token:    token,
 		LoginAs:  user.Type,
@@ -236,6 +260,7 @@ func (ctrl *AuthController) ChangePassword(c *gin.Context) {
 		redirect = "/admin"
 	}
 
+	setAuthCookies(c, token, user.Username, user.Type, ctrl.Config.JWT.ExpiryHours)
 	utils.RespondSuccess(c, http.StatusOK, LoginResponse{
 		Token:    token,
 		LoginAs:  user.Type,
@@ -277,5 +302,6 @@ func (ctrl *AuthController) Logout(c *gin.Context) {
 		redis.SetAuthID(ctx, user.ID.String(), authID, expiry)
 	}
 
+	clearAuthCookies(c)
 	utils.RespondSuccess(c, http.StatusOK, gin.H{"message": "Logout successful"})
 }

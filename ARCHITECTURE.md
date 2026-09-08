@@ -55,15 +55,19 @@ In production the built frontend and the Go backend run inside a single Nginx im
 ```
 cmd/api/                Entry point: load config -> connect DB -> run migrations -> routes -> serve
 internal/config/        Env-based configuration loader (Server, DB, Redis, S3, JWT, App, Upload)
-internal/models/        GORM models: User, Attendance
+internal/models/        GORM models: User, Attendance, Settings
 internal/controllers/   HTTP handlers:
-                          auth_controller     login + change password
-                          user_controller     home, attendance, absence, delete absence
+                          auth_controller     login + change password + logout (HttpOnly cookie)
+                          user_controller     home, attendance, absence, delete absence, personal activity
                           admin_controller    attendance/absence lists + approval
                           admin_user_controller  user CRUD
+                          admin_settings_controller  attendance time/day settings
+                          dashboard_controller  admin stats, trend, activity heatmap
+                          twofa_controller    TOTP setup/verify/disable (paused)
+                          notification_controller  push subscriptions (paused)
                           export_controller   CSV export
-                          all_controller      /all/info, /all/photos
-internal/middlewares/   KeyRequest, Auth (JWT), RequireRole, RequirePasswordChanged
+                          all_controller      /all/info, /all/photos, /all/settings/status
+internal/middlewares/   KeyRequest, Auth (JWT, header or HttpOnly cookie), RequireRole, RequirePasswordChanged, AttendanceTime
 internal/utils/         bcrypt, greetings, response helpers, Google Maps embed, reverse geocoding
 pkg/database/           GORM + pgx connection, pool tuning, startup retry
 pkg/migrator/           Applies embedded SQL migrations (see below)
@@ -95,9 +99,10 @@ Public
   GET    /health                      Health check
 
 User (auth + role "user" + password changed)
-  GET    /api/user/home               Dashboard: greeting, today attendance, absences
-  POST   /api/user/attendance         Submit attendance (location + photo)
-  POST   /api/user/absence            Submit absence/leave request
+  GET    /api/user/home               Dashboard: greeting, today attendance, absences (20), attendance history (20)
+  GET    /api/user/dashboard/activity Personal activity heatmap (own days only)
+  POST   /api/user/attendance         Submit attendance (location + photo, time-gated)
+  POST   /api/user/absence            Submit absence/leave request (single day, or end-date only for multi-day starting today)
   DELETE /api/user/absence/:absence_id  Delete own pending absence request
 
 Admin (auth + role "admin" + password changed)
@@ -105,15 +110,21 @@ Admin (auth + role "admin" + password changed)
   POST   /api/admin/user              Create user
   POST   /api/admin/user/:user_id     Update user
   DELETE /api/admin/user/:user_id     Delete user
+  GET    /api/admin/dashboard/stats   Focused metrics (today, 7d averages, alpha respecting open days)
+  GET    /api/admin/dashboard/trend   7-day attendance/absence trend
+  GET    /api/admin/dashboard/activity  Per-day heatmap buckets (days, user_id params)
   GET    /api/admin/attendances       List attendances (cursor pagination, search)
   DELETE /api/admin/attendance        Delete attendance
-  GET    /api/admin/absences          List absences
-  PATCH  /api/admin/absence           Approve/reject absence (sign_status)
+  GET    /api/admin/absences          List absences (with period + is_multi_day)
+  PATCH  /api/admin/absence           Approve/reject absence; period edit allowed for multi-day only and forces approval
+  GET    /api/admin/settings          Get attendance time/day settings
+  PATCH  /api/admin/settings          Update attendance time/day settings
   GET    /api/admin/export            Export attendance to CSV
 
 Any authenticated role
   GET    /api/all/info                Current user info + redirect_home (used by the auth gate)
-  GET    /api/all/photos              Attendance photo gallery
+  GET    /api/all/photos              Attendance photo gallery (with location fields)
+  GET    /api/all/settings/status     Open/closed status + next_open for countdown UIs
 ```
 
 ### Attendance Creation Flow
@@ -213,7 +224,7 @@ Created by `pkg/migrator`: `version` (PK) and `applied_at`. Records which SQL fi
 ### Authentication
 
 1. `POST /api/auth` validates username/password (bcrypt) and respects the login-attempt lockout (10 attempts, 5-minute lockout).
-2. Issues a JWT (HS256, `JWT_EXPIRY_HOURS`) plus an `auth_id`; `auth_id` is stored (Redis if enabled, otherwise PostgreSQL).
+2. Issues a JWT (HS256, `JWT_EXPIRY_HOURS`) plus an `auth_id`; `auth_id` is stored (Redis if enabled, otherwise PostgreSQL). The token is also set as an HttpOnly `takota_token` cookie (plus a readable `takota_profile` hint); `AuthMiddleware` accepts the `Authorization` header or the cookie.
 3. `AuthMiddleware` verifies the JWT and re-validates the `auth_id` on each request so logout invalidates existing tokens.
 4. Users with `change_as_login = true` are forced through `ChangePassword` before accessing app routes.
 

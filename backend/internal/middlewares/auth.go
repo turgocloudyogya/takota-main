@@ -18,16 +18,15 @@ import (
 func AuthMiddleware(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			utils.RespondError(c, http.StatusUnauthorized, "Need Authorization", utils.ErrHeaderAuthReq)
-			c.Abort()
-			return
-		}
-
-		// Extract token from "Bearer <token>"
 		tokenString := jwtpkg.ExtractTokenFromHeader(authHeader)
 		if tokenString == "" {
-			utils.RespondError(c, http.StatusUnauthorized, "JWT not valid", utils.ErrTokenInvalid)
+			// Fall back to the HttpOnly session cookie set at login
+			if cookie, err := c.Cookie("takota_token"); err == nil {
+				tokenString = cookie
+			}
+		}
+		if tokenString == "" {
+			utils.RespondError(c, http.StatusUnauthorized, "Need Authorization", utils.ErrHeaderAuthReq)
 			c.Abort()
 			return
 		}

@@ -1,46 +1,41 @@
 // Route-level auth gate backed by GET /api/all/info.
 //
-// The backend's /api/all/info is the source of truth for whether the JWT is
-// still valid. On every route change the gate re-checks it (no polling):
-//   - token missing / invalid  -> session cleared, user lands on "/"
-//   - token valid and user is on "/" -> redirected to data.redirect_home
+// Auth uses the HttpOnly `takota_token` cookie (set by the backend at login),
+// sent automatically via `credentials: "include"`. The backend's
+// /api/all/info is the source of truth for whether the session is valid:
+//   - session invalid  -> user lands on "/"
+//   - session valid and user is on "/" -> redirected to data.redirect_home
 //     (the backend returns "/main" for users and "/admin" for admins)
 //   - network / parse problems  -> left alone (no forced logout)
+
+import { clearAuthCookies, clearLegacyTokenStorage, getProfile } from './cookies.js'
 
 const API_BASE =
   (typeof localStorage !== 'undefined' &&
     (localStorage.getItem('api-base-url') || localStorage.getItem('takota_api_base_url') || '')) ||
   ''
 
-const TOKEN_KEYS = ['takota_token', 'takota_admin_token', 'token']
-
 export function getSessionToken() {
-  if (typeof localStorage === 'undefined') return null
-  for (const key of TOKEN_KEYS) {
-    const value = localStorage.getItem(key)
-    if (value) return value
-  }
   return null
 }
 
+export function getSessionProfile() {
+  return getProfile()
+}
+
 export function clearSession() {
-  if (typeof localStorage === 'undefined') return
-  for (const key of TOKEN_KEYS) localStorage.removeItem(key)
-  localStorage.removeItem('takota-username')
-  localStorage.removeItem('takota-role')
+  clearAuthCookies()
+  clearLegacyTokenStorage()
 }
 
 export async function checkAuth() {
-  const token = getSessionToken()
-  if (!token) return { valid: false, reason: 'no-token' }
-
   let response
   try {
     response = await fetch(`${API_BASE}/api/all/info`, {
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'key-request': 'web-user',
-        Authorization: `Bearer ${token}`,
       },
     })
   } catch {

@@ -5,11 +5,14 @@ import { Icon } from '@gravity-ui/uikit'
 import { At, Key, Eye, EyeSlash } from '@gravity-ui/icons'
 
 // Import API and session utilities from admin
+import { clearLegacyTokenStorage } from '../lib/cookies.js'
+
 const API_BASE = localStorage.getItem('api-base-url') || ''
 
 async function loginAPI(username, password) {
   const response = await fetch(`${API_BASE}/api/auth`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'key-request': 'web-login'
@@ -43,15 +46,10 @@ export default function Login() {
     setSubmitting(true)
     try {
       const data = await loginAPI(username.trim(), password)
-      
-      // Clear any old session keys first
-      localStorage.removeItem('takota-token')
-      
-      // Save session using the same key as admin (takota_admin_token)
-      localStorage.setItem('takota_admin_token', data.token)
-      localStorage.setItem('takota_token', data.token) // Also save with this key for compatibility
-      localStorage.setItem('takota-username', username.trim())
-      localStorage.setItem('takota-role', data.login_as)
+
+      // Session lives in the HttpOnly cookie set by the backend; just drop
+      // any token leftovers from the old localStorage scheme.
+      clearLegacyTokenStorage()
 
       // Check if password change is required
       const redirectPath = data.redirect || (data.login_as === 'admin' ? '/admin' : '/main')

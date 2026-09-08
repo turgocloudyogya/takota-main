@@ -1,439 +1,395 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Card } from '@heroui/react'
-import {
-  Persons,
-  Clock,
-  FileCheck,
-  PersonXmark,
-  House,
-} from '@gravity-ui/icons'
-import { ResponsiveBar } from '@nivo/bar'
-import { ResponsivePie } from '@nivo/pie'
-import * as api from '../lib/api.js'
-import { unwrapList, normalizeUser, normalizeAttendance, normalizeAbsence } from '../lib/normalize.js'
-import { parseApiDate, toDateKey } from '../lib/dateWindow.js'
-import StatCard from '../components/StatCard.jsx'
-import PageHeader from '../components/PageHeader.jsx'
-
-const SAMPLE_LIMIT = 150
-const TREND_DAYS = 14
+import { Icon } from '@gravity-ui/uikit'
+import { Persons, Check, FileCheck, TriangleExclamation, ArrowRightFromLine } from '@gravity-ui/icons'
+import { ResponsiveLine } from '@nivo/line'
+import { Label, ListBox, Select } from '@heroui/react'
+import ActivityHeatmap from '../components/ActivityHeatmap.jsx'
+import { listUsers } from '../lib/api.js'
+import { unwrapList, normalizeUser } from '../lib/normalize.js'
 
 export default function AdminDashboard() {
-  const [isDark, setIsDark] = useState(false)
+  const [stats, setStats] = useState(null)
+  const [trend, setTrend] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [studentCount, setStudentCount] = useState(null)
-  const [studentCapped, setStudentCapped] = useState(false)
-  const [students, setStudents] = useState([])
-  const [attendance, setAttendance] = useState([])
-  const [absence, setAbsence] = useState([])
+  const [activity, setActivity] = useState(null)
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [users, setUsers] = useState([])
+  const [activityUser, setActivityUser] = useState('all')
 
   useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains('dark'))
-    check()
-    const observer = new MutationObserver(check)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
+    loadDashboardData()
+    loadUserOptions()
   }, [])
 
   useEffect(() => {
-    let cancelled = false
+    loadActivity(activityUser)
+  }, [activityUser])
 
-    async function load() {
-      setLoading(true)
-      try {
-        const [usersJson, attendanceJson, absenceJson] = await Promise.all([
-          api.listUsers({ limit: SAMPLE_LIMIT }),
-          api.listAttendance({ limit: SAMPLE_LIMIT }),
-          api.listAbsence({ limit: SAMPLE_LIMIT }),
-        ])
-        if (cancelled) return
-
-        const users = unwrapList(usersJson, 'users').map(normalizeUser).filter(Boolean)
-        const studentList = users.filter((u) => u.type !== 'admin')
-        setStudents(studentList)
-        setStudentCount(studentList.length)
-        setStudentCapped(studentList.length >= SAMPLE_LIMIT)
-
-        const attendanceRows = unwrapList(attendanceJson, 'attendances')
-          .map(normalizeAttendance)
-          .filter(Boolean)
-        setAttendance(attendanceRows)
-
-        const absenceRows = unwrapList(absenceJson, 'absences').map(normalizeAbsence).filter(Boolean)
-        setAbsence(absenceRows)
-      } catch (err) {
-        if (!cancelled) toast.error(err.message || 'Failed to load the dashboard summary.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+  async function loadUserOptions() {
+    try {
+      const json = await listUsers({ limit: 100 })
+      const list = unwrapList(json, 'users').map(normalizeUser).filter(Boolean)
+      setUsers(list.filter((u) => u.type === 'user'))
+    } catch (err) {
+      console.error('Failed to load user options:', err)
     }
+  }
 
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const todayCount = useMemo(() => {
-    const todayKey = toDateKey(new Date())
-    return attendance.filter((row) => {
-      const d = parseApiDate(row.dateRaw)
-      return d && toDateKey(d) === todayKey
-    }).length
-  }, [attendance])
-
-  const pendingCount = useMemo(() => absence.filter((row) => row.sign === 'pending').length, [absence])
-
-  const presentTodayCount = useMemo(() => {
-    const todayKey = toDateKey(new Date())
-    const ids = new Set()
-    attendance.forEach((row) => {
-      const d = parseApiDate(row.dateRaw)
-      if (d && toDateKey(d) === todayKey && row.userId != null) ids.add(row.userId)
-    })
-    return ids.size
-  }, [attendance])
-
-  // Count students who submitted leave/sick today (should NOT be counted as "not checked in")
-  const leaveTodayCount = useMemo(() => {
-    const todayKey = toDateKey(new Date())
-    const ids = new Set()
-    absence.forEach((row) => {
-      const d = parseApiDate(row.dateRaw)
-      if (d && toDateKey(d) === todayKey && row.userId != null) ids.add(row.userId)
-    })
-    return ids.size
-  }, [absence])
-
-  const notCheckedInCount = studentCount == null ? null : Math.max(studentCount - presentTodayCount - leaveTodayCount, 0)
-
-  // Trend data: for each day, count Present and Leave
-  const trendData = useMemo(() => {
-    const buckets = new Map()
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    for (let i = TREND_DAYS - 1; i >= 0; i -= 1) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      buckets.set(toDateKey(d), {
-        key: toDateKey(d),
-        label: d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit' }),
-        Present: 0,
-        Leave: 0,
+  async function loadActivity(userId) {
+    try {
+      setActivityLoading(true)
+      const params = new URLSearchParams({ days: '150' })
+      if (userId && userId !== 'all') params.set('user_id', userId)
+      const response = await fetch(`/api/admin/dashboard/activity?${params.toString()}`, {
+        credentials: 'include',
+        headers: {
+          'key-request': 'web-admin',
+        },
       })
+      if (!response.ok) throw new Error('Failed to load activity')
+      const json = await response.json()
+      setActivity(json.data || [])
+    } catch (err) {
+      console.error('Failed to load activity:', err)
+    } finally {
+      setActivityLoading(false)
     }
+  }
 
-    // Count distinct students with attendance per day
-    attendance.forEach((row) => {
-      const d = parseApiDate(row.dateRaw)
-      if (!d) return
-      const key = toDateKey(d)
-      if (buckets.has(key)) buckets.get(key).Present += 1
-    })
+  async function loadDashboardData() {
+    try {
+      setLoading(true)
 
-    // Count distinct students with absence per day
-    const absenceByDay = new Map()
-    absence.forEach((row) => {
-      const d = parseApiDate(row.dateRaw)
-      if (!d) return
-      const key = toDateKey(d)
-      if (!absenceByDay.has(key)) absenceByDay.set(key, new Set())
-      if (row.userId) absenceByDay.get(key).add(row.userId)
-    })
-    absenceByDay.forEach((ids, key) => {
-      if (buckets.has(key)) buckets.get(key).Leave = ids.size
-    })
+      // Load stats
+      const statsResponse = await fetch('/api/admin/dashboard/stats', {
+        credentials: 'include',
+        headers: {
+          'key-request': 'web-admin',
+        },
+      })
 
-    return Array.from(buckets.values())
-  }, [attendance, absence])
+      if (!statsResponse.ok) throw new Error('Failed to load stats')
+      const statsData = await statsResponse.json()
+      setStats(statsData.data)
 
-  // Pie chart: today's status breakdown (always show, even if zero)
-  const pieData = useMemo(() => {
-    const todayKey = toDateKey(new Date())
+      // Load trend
+      const trendResponse = await fetch('/api/admin/dashboard/trend', {
+        credentials: 'include',
+        headers: {
+          'key-request': 'web-admin',
+        },
+      })
 
-    // Present today
-    const presentIds = new Set()
-    attendance.forEach((row) => {
-      const d = parseApiDate(row.dateRaw)
-      if (d && toDateKey(d) === todayKey && row.userId != null) presentIds.add(row.userId)
-    })
-    const present = presentIds.size
+      if (!trendResponse.ok) throw new Error('Failed to load trend')
+      const trendData = await trendResponse.json()
+      setTrend(trendData.data)
+    } catch (err) {
+      toast.error('Failed to load dashboard data')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    // Leave today (absence submitted today)
-    const leaveIds = new Set()
-    absence.forEach((row) => {
-      const d = parseApiDate(row.dateRaw)
-      if (d && toDateKey(d) === todayKey && row.userId != null) leaveIds.add(row.userId)
-    })
-    const leave = leaveIds.size
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <p className="text-sm text-neutral-600 dark:text-neutral-400">Loading dashboard...</p>
+      </div>
+    )
+  }
 
-    // Alpha = total students - present - leave
-    const alpha = studentCount != null ? Math.max(studentCount - present - leave, 0) : 0
-
-    return [
-      { id: 'Ok', value: present, label: 'Ok', color: 'var(--color-success)' },
-      { id: 'Leave', value: leave, label: 'Leave', color: 'var(--color-primary)' },
-      { id: 'No Act', value: alpha, label: 'No Act', color: 'var(--color-danger)' },
-    ]
-  }, [attendance, absence, studentCount])
-
-  const nivoTheme = {
-    fontFamily: 'Inter, sans-serif',
-    text: { fill: isDark ? '#e5e5e5' : '#1a1a1a' },
-    axis: {
-      ticks: { text: { fill: isDark ? '#a3a3a3' : '#666666' } },
-      legend: { text: { fill: isDark ? '#a3a3a3' : '#666666' } },
-    },
+  if (!stats) {
+    return (
+      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-500/10">
+        <p className="text-sm text-red-900 dark:text-red-200">Failed to load dashboard data</p>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        icon={House}
-        eyebrow="Summary"
-        title="Dashboard"
-        description="Attendance and leave/absence submissions summary for Takota students."
-      />
-
-      <div data-guide="stat-cards" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total Students"
-          value={loading ? '-' : `${studentCount}${studentCapped ? '+' : ''}`}
-          icon={Persons}
-          tone="primary"
-        />
-        <StatCard
-          label="Present Today"
-          value={loading ? '-' : todayCount}
-          icon={Clock}
-          tone="success"
-          hint={`out of ${attendance.length} recent records`}
-        />
-        <StatCard
-          label="Pending Leave"
-          value={loading ? '-' : pendingCount}
-          icon={FileCheck}
-          tone="warning"
-          hint="needs review"
-        />
-        <StatCard
-          label="Not Checked In Today"
-          value={loading ? '-' : notCheckedInCount}
-          icon={PersonXmark}
-          tone="danger"
-          hint={`out of ${studentCount}${studentCapped ? '+' : ''} registered students`}
-        />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
+        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+          Overview of attendance and absence records
+        </p>
       </div>
 
-      <div data-guide="charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="p-4 lg:col-span-2 shadow-none dark:border-neutral-800">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Attendance Trend - Last 14 Days</p>
-            <span className="flex items-center gap-1.5 text-xs text-neutral dark:text-neutral-400">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="presence-pulse absolute inset-0 rounded-full bg-primary" />
-                <span className="relative h-full w-full rounded-full bg-primary" />
-              </span>
-              Today
-            </span>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Total Users */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Total Users</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.total_users}
+              </p>
+            </div>
+            <Icon data={Persons} size={24} className="text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="h-64 w-full">
-            <ResponsiveBar
-              data={trendData}
-              keys={['Present', 'Leave']}
-              indexBy="label"
-              margin={{ top: 20, right: 20, bottom: 50, left: 50 }}
-              padding={0.3}
-              colors={({ id }) => {
-                if (id === 'Present') return 'var(--color-success)'
-                return 'var(--color-primary)'
-              }}
-              borderRadius={4}
-              theme={nivoTheme}
-              enableGridX={false}
-              enableGridY={false}
+        </div>
+
+        {/* Today's Attendance */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Today's Check-ins</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.attendance_today}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                {stats.attendance_rate ? stats.attendance_rate.toFixed(1) : 0}% attendance rate
+              </p>
+            </div>
+            <Icon data={Check} size={24} className="text-green-600 dark:text-green-400" />
+          </div>
+        </div>
+
+        {/* Today's Absence */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Today's Absence</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.absence_today}
+              </p>
+            </div>
+            <Icon data={FileCheck} size={24} className="text-orange-600 dark:text-orange-400" />
+          </div>
+        </div>
+
+        {/* Pending Approvals */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Pending Approvals</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.pending_approvals}
+              </p>
+            </div>
+            <Icon data={TriangleExclamation} size={24} className="text-yellow-600 dark:text-yellow-400" />
+          </div>
+        </div>
+
+        {/* Total Attendance */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Total Check-ins</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.total_attendance}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Avg: {stats.average_attendance ? stats.average_attendance.toFixed(1) : 0} per user
+              </p>
+            </div>
+            <Icon data={ArrowRightFromLine} size={24} className="text-purple-600 dark:text-purple-400" />
+          </div>
+        </div>
+
+        {/* Most Frequent Time */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Peak Check-in Time</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.most_frequent_time}
+              </p>
+            </div>
+            <Icon data={ArrowRightFromLine} size={24} className="text-indigo-600 dark:text-indigo-400" />
+          </div>
+        </div>
+
+        {/* Weekly Average Check-ins */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Daily Average Check-ins (7d)</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.weekly_avg_checkins ? stats.weekly_avg_checkins.toFixed(1) : 0}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Average check-ins per day, last 7 days
+              </p>
+            </div>
+            <Icon data={Check} size={24} className="text-teal-600 dark:text-teal-400" />
+          </div>
+        </div>
+
+        {/* Weekly Average Absences */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Daily Average Absences (7d)</p>
+              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                {stats.weekly_avg_absences ? stats.weekly_avg_absences.toFixed(1) : 0}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Average absence requests per day, last 7 days
+              </p>
+            </div>
+            <Icon data={FileCheck} size={24} className="text-rose-600 dark:text-rose-400" />
+          </div>
+        </div>
+
+        {/* Overall Statistics */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Overall Statistics</p>
+          <div className="mt-2 space-y-1 text-sm">
+            <div className="flex justify-between gap-2">
+              <span className="text-neutral-600 dark:text-neutral-400">Total Absence Requests:</span>
+              <span className="font-bold text-neutral-900 dark:text-neutral-100">{stats.total_absence}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-neutral-600 dark:text-neutral-400">Total Alpha:</span>
+              <span className="font-bold text-neutral-900 dark:text-neutral-100">{stats.total_alpha}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Trend Chart Data */}
+      {trend && trend.length > 0 && (
+        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">7-Day Trend</h3>
+          <div className="mt-4 h-72">
+            <ResponsiveLine
+              data={[
+                {
+                  id: 'Check-ins',
+                  data: trend.map((day) => ({ x: day.date, y: Number(day.attendance) || 0 })),
+                },
+                {
+                  id: 'Absences',
+                  data: trend.map((day) => ({ x: day.date, y: Number(day.absence) || 0 })),
+                },
+              ]}
+              margin={{ top: 16, right: 24, bottom: 48, left: 44 }}
+              xScale={{ type: 'point' }}
+              yScale={{ type: 'linear', min: 0, max: 'auto', stacked: false }}
+              curve="monotoneX"
               axisBottom={{
                 tickSize: 0,
-                tickPadding: 12,
+                tickPadding: 10,
+                tickRotation: -25,
+                legend: 'Date',
+                legendOffset: 40,
+                legendPosition: 'middle',
               }}
               axisLeft={{
                 tickSize: 0,
-                tickPadding: 12,
-                format: (v) => Number.isInteger(v) ? v : '',
+                tickPadding: 8,
+                legend: 'Records',
+                legendOffset: -36,
+                legendPosition: 'middle',
               }}
-              enableLabel={false}
-              tooltip={({ id, value, color }) => (
-                <div className="rounded-lg bg-white px-3 py-2 shadow-lg dark:bg-neutral-800">
-                  <span className="text-sm font-medium" style={{ color }}>{id}: {value}</span>
-                </div>
-              )}
+              colors={['#16a34a', '#f97316']}
+              pointSize={8}
+              pointBorderWidth={2}
+              pointBorderColor={{ from: 'serieColor' }}
+              pointLabelYOffset={-12}
+              useMesh
+              enableSlices="x"
               legends={[
                 {
-                  dataFrom: 'keys',
-                  anchor: 'bottom',
+                  anchor: 'top-left',
                   direction: 'row',
-                  translateY: 40,
-                  itemWidth: 80,
-                  itemHeight: 16,
-                  symbolShape: 'circle'
-                }
+                  translateY: -16,
+                  itemWidth: 110,
+                  itemHeight: 20,
+                  symbolSize: 12,
+                  symbolShape: 'circle',
+                },
               ]}
+              theme={{
+                axis: {
+                  ticks: { text: { fill: '#888888', fontSize: 11 } },
+                  legend: { text: { fill: '#888888', fontSize: 12 } },
+                },
+                grid: { line: { strokeDasharray: '3 3', stroke: '#e5e5e5' } },
+                legends: { text: { fill: '#888888', fontSize: 12 } },
+                tooltip: {
+                  container: {
+                    fontSize: 12,
+                    background: '#111827',
+                    color: '#f9fafb',
+                    borderRadius: 8,
+                  },
+                },
+              }}
             />
           </div>
-        </Card>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-neutral-200 dark:border-neutral-700">
+                <tr>
+                  <th className="px-2 py-2 text-left text-neutral-600 dark:text-neutral-400">Date</th>
+                  <th className="px-2 py-2 text-right text-neutral-600 dark:text-neutral-400">Check-ins</th>
+                  <th className="px-2 py-2 text-right text-neutral-600 dark:text-neutral-400">Absences</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+                {trend.map((day, idx) => (
+                  <tr key={idx}>
+                    <td className="px-2 py-2 text-neutral-900 dark:text-neutral-100">{day.date}</td>
+                    <td className="px-2 py-2 text-right text-green-600 dark:text-green-400">{day.attendance}</td>
+                    <td className="px-2 py-2 text-right text-orange-600 dark:text-orange-400">{day.absence}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-        <Card className="p-4 shadow-none dark:border-neutral-800">
-          <p className="mb-4 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Today's Status</p>
-          <div className="h-64 w-full">
-            <ResponsivePie
-              data={pieData}
-              margin={{ top: 40, right: 80, bottom: 80, left: 80 }}
-              innerRadius={0.5}
-              padAngle={0.6}
-              cornerRadius={2}
-              activeOuterRadiusOffset={8}
-              colors={({ data }) => data.color}
-              theme={nivoTheme}
-              arcLinkLabelsSkipAngle={10}
-              arcLinkLabelsTextColor={isDark ? '#a3a3a3' : '#555555'}
-              arcLinkLabelsThickness={2}
-              arcLinkLabelsColor={{ from: 'color' }}
-              arcLabelsSkipAngle={10}
-              arcLabelsTextColor={{ from: 'color', modifiers: [['darker', isDark ? -1.5 : 2]] }}
-              tooltip={({ datum }) => (
-                <div className="rounded-lg bg-white px-3 py-2 shadow-lg dark:bg-neutral-800">
-                  <span className="text-sm font-medium" style={{ color: datum.color }}>{datum.label}: {datum.value}</span>
-                </div>
-              )}
-              legends={[
-                {
-                  anchor: 'bottom',
-                  direction: 'row',
-                  translateY: 56,
-                  itemWidth: 100,
-                  itemHeight: 18,
-                  symbolShape: 'circle'
-                }
-              ]}
-            />
+      {/* Activity Heatmap */}
+      <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">Activity</h3>
+            <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+              Daily attendance activity, last 5 months
+            </p>
           </div>
-        </Card>
+          <div className="w-56">
+            <Select
+              selectedKey={activityUser}
+              onSelectionChange={(key) => setActivityUser(String(key))}
+              fullWidth
+            >
+              <Label>User</Label>
+              <Select.Trigger className="bg-neutral-100 dark:bg-neutral-900 shadow-none">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover>
+                <ListBox>
+                  <ListBox.Item key="all" id="all" textValue="All Users">
+                    <Label>All Users</Label>
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                  {users.map((u) => (
+                    <ListBox.Item key={u.id} id={u.id} textValue={u.nickname || u.username}>
+                      <Label>{u.nickname || u.username}</Label>
+                      <ListBox.ItemIndicator />
+                    </ListBox.Item>
+                  ))}
+                </ListBox>
+              </Select.Popover>
+            </Select>
+          </div>
+        </div>
+        <div className="mt-4">
+          {activityLoading ? (
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">Loading activity…</p>
+          ) : (
+            <ActivityHeatmap days={activity} />
+          )}
+        </div>
       </div>
-
-      <Card className="p-4 shadow-none dark:border-neutral-800">
-        <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">No Action Today</p>
-        <div className="flex flex-col divide-y divide-app-border/10 dark:divide-white/10">
-          {(() => {
-            const todayKey = toDateKey(new Date())
-            const presentToday = new Set()
-            attendance.forEach((row) => {
-              const d = parseApiDate(row.dateRaw)
-              if (d && toDateKey(d) === todayKey && row.userId != null) presentToday.add(row.userId)
-            })
-            const leaveToday = new Set()
-            absence.forEach((row) => {
-              const d = parseApiDate(row.dateRaw)
-              if (d && toDateKey(d) === todayKey && row.userId != null) leaveToday.add(row.userId)
-            })
-            const noAction = students.filter((s) => !presentToday.has(s.id) && !leaveToday.has(s.id))
-            if (noAction.length === 0) {
-              return <p className="py-4 text-center text-sm text-neutral dark:text-neutral-400">All students have checked in or submitted leave today</p>
-            }
-            return noAction.map((student) => (
-              <div key={student.id} className="flex items-center gap-3 py-2.5 text-sm">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger/10 text-xs font-bold text-danger">
-                  {(student.nickname || student.username || '?')[0]?.toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{student.nickname || '-'}</p>
-                  <p className="truncate text-xs text-neutral dark:text-neutral-400">{student.username}</p>
-                </div>
-              </div>
-            ))
-          })()}
-        </div>
-      </Card>
-
-      <Card data-guide="recent-activity" className="p-4 shadow-none dark:border-neutral-800">
-        <p className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Recent Activity</p>
-        <div className="flex flex-col divide-y divide-app-border/10 dark:divide-white/10">
-          {(() => {
-            // Combine attendance and absence into a single activity list
-            const activities = []
-
-            // Add attendance entries (green)
-            attendance.slice(0, 10).forEach((row) => {
-              activities.push({
-                id: row.id,
-                name: row.name,
-                username: row.username,
-                dateRaw: row.dateRaw,
-                type: 'attendance',
-              })
-            })
-
-            // Add absence entries (yellow)
-            absence.slice(0, 10).forEach((row) => {
-              activities.push({
-                id: row.id,
-                name: row.name,
-                username: row.username,
-                dateRaw: row.dateRaw,
-                type: 'absence',
-                isSick: row.isSick,
-              })
-            })
-
-            // Sort by date descending
-            activities.sort((a, b) => {
-              const dateA = parseApiDate(a.dateRaw)
-              const dateB = parseApiDate(b.dateRaw)
-              if (!dateA || !dateB) return 0
-              return dateB - dateA
-            })
-
-            // Take only the 6 most recent
-            const recentActivities = activities.slice(0, 6)
-
-            if (recentActivities.length === 0) {
-              return <p className="py-4 text-center text-sm text-neutral dark:text-neutral-400">No activity yet</p>
-            }
-
-            return recentActivities.map((activity) => {
-              const isAttendance = activity.type === 'attendance'
-              const bgColor = isAttendance ? 'bg-success/10' : 'bg-warning/10'
-              const textColor = isAttendance ? 'text-success' : 'text-warning'
-              const label = isAttendance ? 'Present' : (activity.isSick ? 'Sick' : 'Leave')
-
-              return (
-                <div key={activity.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${bgColor} text-xs font-bold ${textColor}`}>
-                      {(activity.name || activity.username || '?')[0]?.toUpperCase()}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-neutral-900 dark:text-neutral-100">{activity.name || '-'}</p>
-                      <p className="truncate text-xs text-neutral dark:text-neutral-400">
-                        {activity.username} - {label}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="shrink-0 text-xs text-neutral dark:text-neutral-400">
-                    {parseApiDate(activity.dateRaw)?.toLocaleString('en-US', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }) || '-'}
-                  </p>
-                </div>
-              )
-            })
-          })()}
-        </div>
-      </Card>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"github.com/carakan/takota/pkg/redis"
 	"github.com/carakan/takota/pkg/s3"
 	"github.com/carakan/takota/pkg/seed"
+	"github.com/carakan/takota/pkg/notification"
 	"github.com/gin-gonic/gin"
 )
 
@@ -66,6 +68,11 @@ func main() {
 	// Setup routes
 	setupRoutes(router, cfg)
 
+	// Start notification scheduler
+	ctx, cancel := context.WithCancel(context.Background())
+	scheduler := notification.NewScheduler(database.GetDB())
+	scheduler.Start(ctx)
+
 	// Graceful shutdown
 	go func() {
 		if err := router.Run(":" + cfg.Server.Port); err != nil {
@@ -81,6 +88,7 @@ func main() {
 	<-quit
 
 	log.Println("Shutting down server...")
+	cancel()
 }
 
 func setupRoutes(router *gin.Engine, cfg *config.Config) {
@@ -90,6 +98,9 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 	authCtrl := &controllers.AuthController{DB: db, Config: cfg}
 	userCtrl := &controllers.UserController{DB: db, Config: cfg}
 	adminCtrl := &controllers.AdminController{DB: db, Config: cfg}
+	adminSettingsCtrl := &controllers.AdminSettingsController{DB: db, Config: cfg}
+	twoFACtrl := &controllers.TwoFAController{DB: db, Config: cfg}
+	notificationCtrl := &controllers.NotificationController{DB: db, Config: cfg}
 	allCtrl := &controllers.AllController{DB: db, Config: cfg}
 
 	// Global middleware
@@ -119,9 +130,21 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		user.Use(middlewares.RequirePasswordChanged(db))
 		{
 			user.GET("/home", userCtrl.Home)
-			user.POST("/attendance", userCtrl.Attendance)
+			user.GET("/dashboard/activity", userCtrl.GetUserActivityHeatmap)
+			user.POST("/attendance", middlewares.AttendanceTimeMiddleware(db), userCtrl.Attendance)
 			user.POST("/absence", userCtrl.Absence)
 			user.DELETE("/absence/:absence_id", userCtrl.DeleteAbsence)
+
+			// 2FA routes
+			user.POST("/2fa/setup", twoFACtrl.Setup2FA)
+			user.POST("/2fa/verify", twoFACtrl.Verify2FA)
+			user.POST("/2fa/disable", twoFACtrl.Disable2FA)
+			user.GET("/2fa/status", twoFACtrl.Check2FAStatus)
+
+			// Push notification routes
+			user.POST("/push-subscription", notificationCtrl.RegisterPushSubscription)
+			user.DELETE("/push-subscription", notificationCtrl.UnregisterPushSubscription)
+			user.GET("/push-subscription/status", notificationCtrl.GetPushSubscriptionStatus)
 		}
 
 		// Admin routes (auth required + admin role + password changed)
@@ -130,6 +153,11 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		admin.Use(middlewares.RequireRole("admin"))
 		admin.Use(middlewares.RequirePasswordChanged(db))
 		{
+			// Dashboard
+			admin.GET("/dashboard/stats", adminCtrl.GetDashboardStats)
+			admin.GET("/dashboard/trend", adminCtrl.GetAttendanceTrend)
+			admin.GET("/dashboard/activity", adminCtrl.GetActivityHeatmap)
+
 			// Attendance & Absence management
 			admin.GET("/attendances", adminCtrl.ListAttendances)
 			admin.GET("/absences", adminCtrl.ListAbsences)
@@ -143,6 +171,10 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			admin.POST("/user/:user_id", adminCtrl.UpdateUser)
 			admin.DELETE("/user/:user_id", adminCtrl.DeleteUser)
 
+			// Settings management
+			admin.GET("/settings", adminSettingsCtrl.GetSettings)
+			admin.PATCH("/settings", adminSettingsCtrl.UpdateSettings)
+
 			// Export
 			admin.GET("/export", adminCtrl.ExportAttendance)
 			admin.GET("/export/report-data", adminCtrl.ExportAttendanceReportData)
@@ -154,6 +186,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		{
 			all.GET("/info", allCtrl.GetInfo)
 			all.GET("/photos", allCtrl.GetPhotos)
+			all.GET("/settings/status", adminSettingsCtrl.GetPublicStatus)
 		}
 	}
 }

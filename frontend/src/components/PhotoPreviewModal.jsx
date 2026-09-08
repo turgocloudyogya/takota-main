@@ -59,6 +59,11 @@ export default function PhotoPreviewModal({ photo, onClose }) {
                     return `${month}/${day}/${year} ${hours}:${minutes}`
                   })() : ''} • by @{photo.username || 'user'}
                 </p>
+                {photo.displayAddress && (
+                  <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                    {photo.displayAddress}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
