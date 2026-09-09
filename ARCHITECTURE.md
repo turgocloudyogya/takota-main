@@ -55,26 +55,29 @@ In production the built frontend and the Go backend run inside a single Nginx im
 ```
 cmd/api/                Entry point: load config -> connect DB -> run migrations -> routes -> serve
 internal/config/        Env-based configuration loader (Server, DB, Redis, S3, JWT, App, Upload)
-internal/models/        GORM models: User, Attendance, Settings
+internal/models/        GORM models: User, Attendance, Settings, WebauthnCredential
+internal/twofactor/   2FA challenge store (5-min TTL) + backup code helpers
 internal/controllers/   HTTP handlers:
-                          auth_controller     login + change password + logout (HttpOnly cookie)
+                          auth_controller     login (+2FA challenge) + change password + logout (HttpOnly cookie)
                           user_controller     home, attendance, absence, delete absence, personal activity
                           admin_controller    attendance/absence lists + approval
                           admin_user_controller  user CRUD
                           admin_settings_controller  attendance time/day settings
                           dashboard_controller  admin stats, trend, activity heatmap
-                          twofa_controller    TOTP setup/verify/disable (paused)
-                          notification_controller  push subscriptions (paused)
+                          twofa_controller    TOTP setup/verify/disable + backup codes (active)
+                          passkey_controller  WebAuthn register/list/delete + passwordless login (active)
+                          notification_controller  push subscriptions (active)
                           export_controller   CSV export
-                          all_controller      /all/info, /all/photos, /all/settings/status
+                          all_controller      /all/info, /all/photos, /all/settings/status, /all/push-public-key
 internal/middlewares/   KeyRequest, Auth (JWT, header or HttpOnly cookie), RequireRole, RequirePasswordChanged, AttendanceTime
 internal/utils/         bcrypt, greetings, response helpers, Google Maps embed, reverse geocoding
 pkg/database/           GORM + pgx connection, pool tuning, startup retry
 pkg/migrator/           Applies embedded SQL migrations (see below)
 pkg/jwt/                JWT sign/verify (HS256)
+pkg/notification/       Web Push sender (RFC 8291/8292) + reminder scheduler (5-min ticker)
 pkg/redis/              Optional cache for auth sessions; falls back to PostgreSQL
 pkg/s3/                 S3-compatible file upload, validation, signed URLs
-migrations/             Versioned, idempotent SQL files (embedded at build time)
+migrations/             Versioned, idempotent SQL files (embedded at build time, through 008)
 ```
 
 ### Startup Sequence
@@ -95,7 +98,10 @@ migrations/             Versioned, idempotent SQL files (embedded at build time)
 
 ```
 Public
-  POST   /api/auth                    Login, returns JWT + redirect_home
+  POST   /api/auth                    Login, returns JWT + redirect_home (or 202 require_2fa challenge)
+  POST   /api/auth/2fa                Complete login with TOTP/backup code
+  POST   /api/auth/passkey/begin      Start passwordless login {username}
+  POST   /api/auth/passkey/finish     Finish passwordless login (raw assertion JSON)
   GET    /health                      Health check
 
 User (auth + role "user" + password changed)
@@ -104,6 +110,17 @@ User (auth + role "user" + password changed)
   POST   /api/user/attendance         Submit attendance (location + photo, time-gated)
   POST   /api/user/absence            Submit absence/leave request (single day, or end-date only for multi-day starting today)
   DELETE /api/user/absence/:absence_id  Delete own pending absence request
+  POST   /api/user/2fa/setup          Start TOTP setup (pending secret + QR)
+  POST   /api/user/2fa/verify         Enable TOTP, returns one-time backup codes
+  POST   /api/user/2fa/disable        Disable TOTP (TOTP or backup code)
+  GET    /api/user/2fa/status         TOTP/passkey/backup-count status
+  POST   /api/user/2fa/backup-codes/regenerate  Fresh backup codes
+  POST   /api/user/passkey/register/begin|finish  Add a passkey
+  GET    /api/user/passkey            List own passkeys
+  DELETE /api/user/passkey/:id        Remove a passkey
+  POST   /api/user/push-subscription  Save push subscription (replaces device)
+  DELETE /api/user/push-subscription  Remove push subscription
+  GET    /api/user/push-subscription/status
 
 Admin (auth + role "admin" + password changed)
   GET    /api/admin/users             List users
@@ -119,12 +136,19 @@ Admin (auth + role "admin" + password changed)
   PATCH  /api/admin/absence           Approve/reject absence; period edit allowed for multi-day only and forces approval
   GET    /api/admin/settings          Get attendance time/day settings
   PATCH  /api/admin/settings          Update attendance time/day settings
+  POST   /api/admin/2fa/setup|verify|disable            Own TOTP (same controller, token user)
+  GET    /api/admin/2fa/status
+  POST   /api/admin/2fa/backup-codes/regenerate
+  POST   /api/admin/passkey/register/begin|finish       Own passkeys
+  GET    /api/admin/passkey
+  DELETE /api/admin/passkey/:id
   GET    /api/admin/export            Export attendance to CSV
 
 Any authenticated role
   GET    /api/all/info                Current user info + redirect_home (used by the auth gate)
   GET    /api/all/photos              Attendance photo gallery (with location fields)
   GET    /api/all/settings/status     Open/closed status + next_open for countdown UIs
+  GET    /api/all/push-public-key     VAPID public key for push subscribe
 ```
 
 ### Attendance Creation Flow
@@ -145,15 +169,22 @@ src/
 │   ├── api.js             API client (fetch wrappers)
 │   ├── authGate.js        JWT validation via GET /api/all/info
 │   ├── location.js        GPS helpers for attendance
+│   ├── push.js            Web Push subscribe/unsubscribe/status helpers
+│   ├── pwaInstall.js      beforeinstallprompt install-prompt store
+│   ├── webauthn.js        Raw WebAuthn create/get helpers (no extra dep)
 │   └── mockData.js        Fallback sample data
 ├── pages/                 User-facing pages
-│   ├── Login.jsx          Login (redirects via backend redirect_home)
+│   ├── Login.jsx          Login + 2FA step + passkey sign-in (redirects via backend redirect_home)
 │   ├── ChangePassword.jsx
 │   ├── Main.jsx           Home: greeting widget, today status, absence list
+│   ├── TwoFactor.jsx      /main/2fa Authentication Security (self service)
 │   ├── Attendance.jsx     GPS + photo capture
 │   ├── Absence.jsx        Leave/sick request form
 │   └── Photos.jsx         Attendance photo gallery
 ├── components/            Shared UI: AbsenceCard, AttendanceSheet, EmptyState, modals...
+│   ├── SecuritySettings.jsx  TOTP + passkey + backup-code settings (user & admin)
+│   ├── NotificationBanner.jsx  Opt-in push recommendation banner
+│   └── NotificationToggle.jsx  Header bell enable/disable button
 └── admin/                 Admin app
     ├── AdminLayout.jsx    Shell with navigation
     ├── pages/             Dashboard, Users, Attendance, Absence, Photos, Reports, ApiTester
@@ -192,10 +223,26 @@ PostgreSQL with the `uuid-ossp` extension. All migrations live in `backend/migra
 | auth_id         | text        | session auth id for force-logout        |
 | type            | varchar(20) | `user` / `admin`, default `user`        |
 | change_as_login | boolean     | forces password change on next login    |
+| totp_enabled    | boolean     | authenticator 2FA active                |
+| totp_secret     | varchar(255)| active TOTP secret (never serialized)   |
+| totp_pending_secret | varchar(255) | setup-in-progress secret, cleared on verify |
+| backup_codes    | jsonb       | bcrypt hashes of single-use backup codes |
+| passkey_enabled | boolean     | at least one passkey registered         |
+| push_subscription | jsonb     | Web Push endpoint + keys (one device)   |
 | last_login      | timestamptz |                                         |
 | created_at / updated_at | timestamptz | maintained by a trigger |
 
 Seed users: `admin` and `user001` (created with `ON CONFLICT (username) DO NOTHING`).
+
+### webauthn_credentials
+
+| Column     | Type        | Notes                          |
+| ---------- | ----------- | ------------------------------ |
+| id         | text        | PK, base64url credential ID    |
+| user_id    | uuid        | FK -> users, cascade delete    |
+| credential | jsonb       | marshaled webauthn credential  |
+| name       | varchar(100)| user-given label               |
+| created_at | timestamptz |                                |
 
 ### attendance
 
@@ -224,9 +271,17 @@ Created by `pkg/migrator`: `version` (PK) and `applied_at`. Records which SQL fi
 ### Authentication
 
 1. `POST /api/auth` validates username/password (bcrypt) and respects the login-attempt lockout (10 attempts, 5-minute lockout).
-2. Issues a JWT (HS256, `JWT_EXPIRY_HOURS`) plus an `auth_id`; `auth_id` is stored (Redis if enabled, otherwise PostgreSQL). The token is also set as an HttpOnly `takota_token` cookie (plus a readable `takota_profile` hint); `AuthMiddleware` accepts the `Authorization` header or the cookie.
-3. `AuthMiddleware` verifies the JWT and re-validates the `auth_id` on each request so logout invalidates existing tokens.
-4. Users with `change_as_login = true` are forced through `ChangePassword` before accessing app routes.
+2. If the account has TOTP or a passkey, it answers `202 {require_2fa, challenge, methods}` with no session; the SPA stays on `/` and completes via `POST /api/auth/2fa` (TOTP or single-use backup code, consumed) or the passkey begin/finish pair. Challenges live 5 minutes in an in-memory store.
+3. Otherwise (or after the second factor) it issues a JWT (HS256, `JWT_EXPIRY_HOURS`) plus an `auth_id`; `auth_id` is stored (Redis if enabled, otherwise PostgreSQL). The token is also set as an HttpOnly `takota_token` cookie (plus a readable `takota_profile` hint); `AuthMiddleware` accepts the `Authorization` header or the cookie.
+4. `AuthMiddleware` verifies the JWT and re-validates the `auth_id` on each request so logout invalidates existing tokens.
+5. Users with `change_as_login = true` are forced through `ChangePassword` before accessing app routes (2FA/passkey setup routes return 403 until then).
+
+### Push Notifications
+
+1. The user opts in via the `/main` banner or header bell; the browser's push subscription (endpoint + keys) is saved to `users.push_subscription`, replacing any previous device.
+2. The in-process scheduler (`pkg/notification`, 5-minute ticker) computes the reminder from settings in the app timezone: close minus 2 hours, or 60% into the window when it is 2 hours or shorter; skipped on closed days.
+3. Recipients are subscribed users with no same-day check-in and no approved leave covering today (multi-day included); a missed-attendance notice goes out 5 minutes after close. Each type sends at most once per user per day.
+4. Delivery is RFC 8291 `aes128gcm` + RFC 8292 VAPID (`VAPID_*` env); endpoints answering 404/410 are cleared so reinstalls re-subscribe cleanly.
 
 ### Attendance
 
@@ -261,7 +316,7 @@ The multi-stage `Dockerfile`:
 
 ### Environment
 
-All configuration is env-driven (see `backend/.env.example`). Key groups: `PORT`/`APP_ENV`/`GIN_MODE`/`TIMEZONE_APP`, `DB_*`, `REDIS_*`, `S3_*` (+ CloudFront), `JWT_*`, `MAX_LOGIN_ATTEMPTS`, `LOGIN_LOCK_DURATION_MINUTES`, file size limits. Never commit real values - only placeholders in `.env.example`.
+All configuration is env-driven (see `backend/.env.example`). Key groups: `PORT`/`APP_ENV`/`GIN_MODE`/`TIMEZONE_APP`, `DB_*`, `REDIS_*`, `S3_*` (+ CloudFront), `JWT_*`, `VAPID_*` (+ `scripts/generate-vapid.sh`), `WEBAUTHN_ORIGINS`, `MAX_LOGIN_ATTEMPTS`, `LOGIN_LOCK_DURATION_MINUTES`, file size limits. Never commit real values - only placeholders in `.env.example`.
 
 ## Security
 

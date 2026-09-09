@@ -28,7 +28,8 @@ Backend:
 - Database: PostgreSQL (GORM + pgx)
 - Cache: Redis (optional, falls back to PostgreSQL)
 - Storage: S3 compatible (MinIO, AWS S3, Supabase Storage)
-- Auth: JWT with role-based access control
+- Auth: JWT with role-based access control + optional TOTP/passkey two-factor auth
+- Push: Web Push notifications (VAPID, RFC 8291 aes128gcm) with a built-in reminder scheduler
 
 ## Project Structure
 
@@ -53,6 +54,12 @@ Backend:
 ```
 
 ## Recent Changes
+
+- **Two-factor authentication (TOTP + passkey, optional)**: users manage it at `/main/2fa` (linked from the Attendance sheet as "Authentication Security"), admins in a separate "My Security" section on `/admin/settings` (self only). Authenticator-app flow uses a server-side pending secret + QR + single-use hashed backup codes (10, shown once); passkeys use WebAuthn (fingerprint/face/security key) with per-request RP ID/origin. Login becomes two-step (`202 require_2fa` challenge, stays on `/`) and also supports passwordless passkey sign-in. Setup is blocked while `change_as_login` is true.
+- **Web Push reminders (opt-in)**: `/main` shows a dismissible recommendation banner plus a header bell toggle. The backend sends encrypted pushes (no new dependencies) via an in-process scheduler: a reminder 2 hours before close (60% into the window when it is 2 hours or shorter, skipped on closed days/for checked-in or approved-leave users) and a "missed attendance" notice 5 minutes after close. VAPID keys come from `VAPID_*` env (`scripts/generate-vapid.sh` creates them).
+- **PWA Install-as-App button**: the admin sidebar (and mobile drawer) shows it above Logout only while the app is installable and not yet installed; includes PNG icons, a no-op SW fetch handler, and production-only SW registration.
+- **Admin settings time inputs**: open/close times use the HeroUI `TimeField` component instead of native time inputs.
+- **Complete compose env**: `docker-compose.yml` `services.app.environment` now carries the full current variable set (pool tuning, login lockout, upload limits, VAPID placeholders).
 
 - **Enriched CSV export**: the admin report export now includes three new columns: **Location** (a Google Maps link built from the stored coordinates), **Photo File** (public URL of the attendance photo), and **Document** (public URL of the absence supporting document, when present). Headers are localized for English and Indonesian.
 - **HeroUI Select for report filters**: the Month and Language pickers on the admin reports page now use the HeroUI `Select` component instead of a native `<select>`, matching the rest of the UI.
@@ -205,6 +212,9 @@ services:
       S3_REGION: us-east-1
       JWT_SECRET: change-this-secret
       TIMEZONE_APP: Asia/Jakarta
+      VAPID_PUBLIC_KEY: change-me-vapid-public-key
+      VAPID_PRIVATE_KEY: change-me-vapid-private-key
+      VAPID_SUBJECT: mailto:admin@example.com
 ```
 
 Then run:
@@ -259,6 +269,10 @@ All backend settings are read from environment variables. Copy `backend/.env.exa
 | `MAX_ATTENDANCE_FILE_SIZE_MB` | Photo file size limit | `10` |
 | `MAX_ABSENCE_FILE_SIZE_MB` | Document file size limit | `50` |
 | `TIMEZONE_APP` | App timezone for greetings/timestamps (falls back to `TIMEZONE`, then UTC) | `UTC` |
+| `VAPID_PUBLIC_KEY` | Web Push VAPID public key (base64url) | - |
+| `VAPID_PRIVATE_KEY` | Web Push VAPID private key (base64url, keep secret) | - |
+| `VAPID_SUBJECT` | VAPID contact (mailto:) | `mailto:admin@takota.local` |
+| `WEBAUTHN_ORIGINS` | Extra allowed WebAuthn origins, comma-separated (request origin always allowed) | empty |
 
 ## Local Development (without Docker)
 
