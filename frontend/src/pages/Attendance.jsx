@@ -21,13 +21,19 @@ const ATTENDANCE_STEPS = [
   {
     target: '[data-guide="camera-preview"]',
     title: 'Camera Preview',
-    description: 'Your camera preview appears here. Photo is required for attendance.',
+    description: 'Your camera preview appears here. Photo is required for attendance, and your location is captured automatically.',
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="camera-select"]',
+    title: 'Choose a Camera',
+    description: 'If your device has more than one camera, pick front, back, or another lens here. This only appears when multiple cameras are available.',
     placement: 'bottom',
   },
   {
     target: '[data-guide="take-attendance-btn"]',
     title: 'Submit Attendance',
-    description: 'Tap this button to submit your attendance. Make sure you have granted camera and location permissions first.',
+    description: 'Tap this button to submit your attendance. Make sure you have granted camera and location permissions first. When attendance is closed, a countdown shows when it opens next.',
     placement: 'top',
   },
 ]
@@ -545,7 +551,7 @@ export default function Attendance() {
             )}
 
             {cameraStatus === 'granted' && availableCameras.length > 1 && !attendanceClosed && (
-              <div className="mt-4">
+              <div data-guide="camera-select" className="mt-4">
                 <Select
                   selectedKey={selectedCameraId}
                   onSelectionChange={(key) => handleSelectCamera(String(key))}

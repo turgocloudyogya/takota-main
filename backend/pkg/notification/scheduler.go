@@ -5,25 +5,41 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/carakan/takota/internal/models"
+	"github.com/carakan/takota/internal/utils"
 	"gorm.io/gorm"
 )
 
 type Scheduler struct {
 	DB *gorm.DB
 	svc *Service
+
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDSubject    string
+
+	mu           sync.Mutex
+	sentReminder map[string]bool
+	sentMissed   map[string]bool
 }
 
 func NewScheduler(db *gorm.DB) *Scheduler {
 	return &Scheduler{
-		DB: db,
-		svc: NewService(db),
+		DB:           db,
+		svc:          NewService(db),
+		sentReminder: map[string]bool{},
+		sentMissed:   map[string]bool{},
 	}
 }
 
 func (s *Scheduler) Start(ctx context.Context) {
+	s.svc.VAPIDPublicKey = s.VAPIDPublicKey
+	s.svc.VAPIDPrivateKey = s.VAPIDPrivateKey
+	s.svc.VAPIDSubject = s.VAPIDSubject
+
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute) // Check every 5 minutes
 		defer ticker.Stop()
@@ -42,6 +58,21 @@ func (s *Scheduler) Start(ctx context.Context) {
 	log.Println("✓ Push notification scheduler started")
 }
 
+func parseDayTime(now time.Time, hhmmss string) time.Time {
+	parts := strings.Split(hhmmss, ":")
+	hour, _ := strconv.Atoi(firstOr(parts, 0, "0"))
+	min, _ := strconv.Atoi(firstOr(parts, 1, "0"))
+	year, month, day := now.Date()
+	return time.Date(year, month, day, hour, min, 0, 0, now.Location())
+}
+
+func firstOr(parts []string, i int, fallback string) string {
+	if i < len(parts) {
+		return parts[i]
+	}
+	return fallback
+}
+
 func (s *Scheduler) checkAndSendReminders() {
 	var settings models.Settings
 	if err := s.DB.First(&settings).Error; err != nil {
@@ -51,43 +82,111 @@ func (s *Scheduler) checkAndSendReminders() {
 		return
 	}
 
-	now := time.Now()
-	year, month, day := now.Date()
+	now := utils.Now()
 
-	// Parse close time string (format: "HH:MM:SS")
-	closeTimeParts := strings.Split(settings.AttendanceCloseTime, ":")
-	closeHour, _ := strconv.Atoi(closeTimeParts[0])
-	closeMin, _ := strconv.Atoi(closeTimeParts[1])
-	closeTime := time.Date(year, month, day, closeHour, closeMin, 0, 0, now.Location())
-
-	// Send reminders 1 hour before and 3 hours before
-	sendReminder1h := closeTime.Add(-1 * time.Hour)
-	sendReminder3h := closeTime.Add(-3 * time.Hour)
-
-	// Check if we're in the reminder window (within 5 minutes of the send time)
-	timeDiff1h := now.Sub(sendReminder1h)
-	if timeDiff1h >= 0 && timeDiff1h <= 5*time.Minute {
-		s.sendRemindersToAllUsers(1)
+	// Only run on configured open days.
+	dayName := strings.ToLower(now.Weekday().String())
+	openDay := false
+	for _, d := range settings.OpenDays {
+		if strings.ToLower(d) == dayName {
+			openDay = true
+			break
+		}
 	}
-
-	timeDiff3h := now.Sub(sendReminder3h)
-	if timeDiff3h >= 0 && timeDiff3h <= 5*time.Minute {
-		s.sendRemindersToAllUsers(3)
-	}
-}
-
-func (s *Scheduler) sendRemindersToAllUsers(hoursBefore int) {
-	var users []models.User
-	if err := s.DB.Where("push_subscription IS NOT NULL").Find(&users).Error; err != nil {
-		log.Printf("Error fetching users for reminder: %v", err)
+	if !openDay {
 		return
 	}
 
-	for _, user := range users {
-		if err := s.svc.SendAttendanceReminder(user.ID.String(), hoursBefore); err != nil {
-			log.Printf("Error sending reminder to user %s: %v", user.ID, err)
-		}
+	openTime := parseDayTime(now, settings.AttendanceOpenTime)
+	closeTime := parseDayTime(now, settings.AttendanceCloseTime)
+	window := closeTime.Sub(openTime)
+	if window <= 0 {
+		return
 	}
 
-	log.Printf("Sent %d attendance reminders (%d hour(s) before close)", len(users), hoursBefore)
+	// Reminder goes out 2 hours before close. When the window is 2 hours
+	// or shorter, remind at 60% of the window instead.
+	reminderAt := closeTime.Add(-2 * time.Hour)
+	reminderLabel := "Attendance closes in 2 hours."
+	if window <= 2*time.Hour {
+		reminderAt = openTime.Add(time.Duration(float64(window) * 0.6))
+		reminderLabel = "Attendance closes soon."
+	}
+
+	todayKey := now.Format("2006-01-02")
+
+	s.mu.Lock()
+	reminderDone := s.sentReminder[todayKey]
+	missedDone := s.sentMissed[todayKey]
+	s.mu.Unlock()
+
+	if !reminderDone && !now.Before(reminderAt) && now.Sub(reminderAt) <= 5*time.Minute {
+		count := s.sendToEligibleUsers(func(userID string) error {
+			return s.svc.SendAttendanceReminder(userID, reminderLabel)
+		}, now)
+		log.Printf("Sent %d attendance reminders (%s)", count, reminderLabel)
+		s.mu.Lock()
+		s.sentReminder[todayKey] = true
+		s.mu.Unlock()
+	}
+
+	// After closing (+5 min grace), notify users who never checked in.
+	missedAt := closeTime.Add(5 * time.Minute)
+	if !missedDone && !now.Before(missedAt) && now.Sub(missedAt) <= 5*time.Minute {
+		count := s.sendToEligibleUsers(func(userID string) error {
+			return s.svc.SendMissedAttendance(userID)
+		}, now)
+		log.Printf("Sent %d missed-attendance notifications", count)
+		s.mu.Lock()
+		s.sentMissed[todayKey] = true
+		s.mu.Unlock()
+	}
+}
+
+// sendToEligibleUsers delivers payload to every subscribed user who has
+// neither checked in today nor holds an approved absence covering today
+// (multi-day approvals included). Returns the number of users notified.
+func (s *Scheduler) sendToEligibleUsers(send func(userID string) error, now time.Time) int {
+	var users []models.User
+	if err := s.DB.Where("push_subscription IS NOT NULL").Find(&users).Error; err != nil {
+		log.Printf("Error fetching users for reminder: %v", err)
+		return 0
+	}
+
+	year, month, day := now.Date()
+	dayStart := time.Date(year, month, day, 0, 0, 0, 0, now.Location())
+	dayEnd := dayStart.Add(24 * time.Hour)
+
+	sent := 0
+	for _, user := range users {
+		if s.hasCheckedInToday(user.ID.String(), dayStart, dayEnd) {
+			continue
+		}
+		if s.hasCoveringAbsence(user.ID.String(), dayStart, dayEnd) {
+			continue
+		}
+		if err := send(user.ID.String()); err != nil {
+			log.Printf("Error sending notification to user %s: %v", user.ID, err)
+			continue
+		}
+		sent++
+	}
+	return sent
+}
+
+func (s *Scheduler) hasCheckedInToday(userID string, dayStart, dayEnd time.Time) bool {
+	var count int64
+	s.DB.Model(&models.Attendance{}).
+		Where("user_id = ? AND type = ? AND created_at >= ? AND created_at < ?", userID, "attendance", dayStart, dayEnd).
+		Count(&count)
+	return count > 0
+}
+
+func (s *Scheduler) hasCoveringAbsence(userID string, dayStart, dayEnd time.Time) bool {
+	var count int64
+	s.DB.Model(&models.Attendance{}).
+		Where("user_id = ? AND type = ? AND sign_status = ? AND absence_start_date <= ? AND (absence_end_date IS NULL OR absence_end_date >= ?)",
+			userID, "absence", "allow", dayEnd, dayStart).
+		Count(&count)
+	return count > 0
 }

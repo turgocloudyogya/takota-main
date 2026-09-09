@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { Key, Eye, EyeSlash, ShieldKeyhole } from '@gravity-ui/icons'
-
 import { getProfile } from '../lib/cookies.js'
 
 const MIN_PASSWORD_LENGTH = 6 // Changed from 8 to match backend requirement

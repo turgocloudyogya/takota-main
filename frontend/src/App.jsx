@@ -9,6 +9,7 @@ import Main from './pages/Main.jsx'
 import Absence from './pages/Absence.jsx'
 import Attendance from './pages/Attendance.jsx'
 import Photos from './pages/Photos.jsx'
+import TwoFactor from './pages/TwoFactor.jsx'
 import AdminLayout from './admin/AdminLayout.jsx'
 import AdminDashboard from './admin/pages/AdminDashboard.jsx'
 import AdminUsers from './admin/pages/AdminUsers.jsx'
@@ -26,6 +27,7 @@ const PAGE_TITLES = {
   '/attendance': 'Attendance • Absensi',
   '/absence': 'Absence • Absensi',
   '/photos': 'Photos • Absensi',
+  '/main/2fa': 'Authentication Security • Absensi',
   '/admin/dashboard': 'Dashboard • Takota Admin',
   '/admin/users': 'Users • Takota Admin',
   '/admin/attendance': 'Attendance • Takota Admin',
@@ -40,7 +42,7 @@ const PAGE_TITLES = {
 // are forwarded to the backend-provided redirect_home. Also enforces
 // role-based access: admins may only use /admin pages, regular users may
 // only use the user pages (/main, /attendance, /absence, /photos).
-const USER_ONLY_PATHS = ['/main', '/attendance', '/absence', '/photos']
+const USER_ONLY_PATHS = ['/main', '/main/2fa', '/attendance', '/absence', '/photos']
 
 function AuthGate() {
   const navigate = useNavigate()
@@ -118,6 +120,7 @@ export default function App() {
         <Route path="/" element={<Login />} />
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/main" element={<Main />} />
+        <Route path="/main/2fa" element={<TwoFactor />} />
         <Route path="/absence" element={<Absence />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/photos" element={<Photos />} />

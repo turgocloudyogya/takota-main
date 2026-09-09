@@ -5,6 +5,15 @@ import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './lib/theme.jsx'
 
+// Register the service worker in production builds so the PWA install
+// prompt (beforeinstallprompt) can fire. Skipped in dev to avoid stale
+// caches interfering with HMR.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {})
+  })
+}
+
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
     <HeroUIProvider>

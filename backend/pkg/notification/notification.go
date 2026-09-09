@@ -1,10 +1,8 @@
 package notification
 
 import (
-	"bytes"
 	"encoding/json"
 	"log"
-	"net/http"
 
 	"github.com/carakan/takota/internal/models"
 	"gorm.io/gorm"
@@ -12,6 +10,10 @@ import (
 
 type Service struct {
 	DB *gorm.DB
+
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDSubject    string
 }
 
 type PushPayload struct {
@@ -38,8 +40,13 @@ func (s *Service) SendToUser(userID string, payload *PushPayload) error {
 		return nil // No subscription, skip
 	}
 
-	endpoint := user.PushSubscription.Endpoint
-	if endpoint == "" {
+	sub := user.PushSubscription
+	if sub.Endpoint == "" || sub.P256DH == "" || sub.Auth == "" {
+		return nil
+	}
+
+	if s.VAPIDPublicKey == "" || s.VAPIDPrivateKey == "" {
+		log.Println("VAPID keys not configured, skipping push notification")
 		return nil
 	}
 
@@ -49,34 +56,33 @@ func (s *Service) SendToUser(userID string, payload *PushPayload) error {
 		return err
 	}
 
-	resp, err := http.Post(endpoint, "application/json", bytes.NewBuffer(payloadBytes))
+	expired, err := SendWebPush(sub.Endpoint, sub.P256DH, sub.Auth, payloadBytes, s.VAPIDPublicKey, s.VAPIDPrivateKey, s.VAPIDSubject)
 	if err != nil {
 		log.Printf("Failed to send push notification: %v", err)
 		return nil // Log but don't fail
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if expired {
 		// Subscription is invalid, clear it
 		s.DB.Model(&user).Update("push_subscription", nil)
-		return nil
 	}
 
 	return nil
 }
 
-func (s *Service) SendAttendanceReminder(userID string, hoursBefore int) error {
-	hoursStr := ""
-	if hoursBefore == 1 {
-		hoursStr = "1 hour"
-	} else {
-		hoursStr = string(rune(hoursBefore)) + " hours"
-	}
-
+func (s *Service) SendAttendanceReminder(userID string, label string) error {
 	return s.SendToUser(userID, &PushPayload{
 		Title: "Attendance Reminder",
-		Body:  "Don't forget to check in! Attendance closes in " + hoursStr + ".",
+		Body:  "Don't forget to check in! " + label,
 		Tag:   "attendance-reminder",
+	})
+}
+
+func (s *Service) SendMissedAttendance(userID string) error {
+	return s.SendToUser(userID, &PushPayload{
+		Title: "You missed attendance today",
+		Body:  "Attendance is now closed and no check-in was recorded for you today.",
+		Tag:   "attendance-missed",
 	})
 }
 

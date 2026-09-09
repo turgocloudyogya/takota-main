@@ -37,7 +37,7 @@ function formatDayLabel(iso) {
   return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export default function ActivityHeatmap({ days }) {
+export default function ActivityHeatmap({ days, showDetails = true }) {
   const [hovered, setHovered] = useState(null)
 
   const weeks = useMemo(() => {
@@ -115,9 +115,10 @@ export default function ActivityHeatmap({ days }) {
         </div>
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="min-h-5 flex-1 text-xs text-neutral-600 dark:text-neutral-400">
-          {hovered
+      <div className={`mt-2 flex items-center gap-2 ${showDetails ? 'justify-between' : 'justify-end'}`}>
+        {showDetails && (
+          <p className="min-h-5 flex-1 text-xs text-neutral-600 dark:text-neutral-400">
+            {hovered
               ? (() => {
                 const d = days.find((x) => x.date === hovered)
                 if (!d) return ''
@@ -129,8 +130,9 @@ export default function ActivityHeatmap({ days }) {
                     : `${d.alpha_pct.toFixed(0)}% alpha`
                 return `${formatDayLabel(d.date)} · ${d.present_pct.toFixed(0)}% present · ${d.leave_pct.toFixed(0)}% leave · ${restLabel}`
               })()
-            : 'Hover a square for details'}
-        </p>
+              : 'Hover a square for details'}
+          </p>
+        )}
         <div className="flex shrink-0 items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400">
           <span>Less</span>
           {[0, 1, 2, 3, 6, 4, 5].map((l) => (

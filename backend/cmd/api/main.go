@@ -71,6 +71,9 @@ func main() {
 	// Start notification scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	scheduler := notification.NewScheduler(database.GetDB())
+	scheduler.VAPIDPublicKey = cfg.VAPID.PublicKey
+	scheduler.VAPIDPrivateKey = cfg.VAPID.PrivateKey
+	scheduler.VAPIDSubject = cfg.VAPID.Subject
 	scheduler.Start(ctx)
 
 	// Graceful shutdown
@@ -100,6 +103,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 	adminCtrl := &controllers.AdminController{DB: db, Config: cfg}
 	adminSettingsCtrl := &controllers.AdminSettingsController{DB: db, Config: cfg}
 	twoFACtrl := &controllers.TwoFAController{DB: db, Config: cfg}
+	passkeyCtrl := &controllers.PasskeyController{DB: db, Config: cfg}
 	notificationCtrl := &controllers.NotificationController{DB: db, Config: cfg}
 	allCtrl := &controllers.AllController{DB: db, Config: cfg}
 
@@ -116,6 +120,9 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 	{
 		// Auth routes (no auth required)
 		api.POST("/auth", authCtrl.Login)
+		api.POST("/auth/2fa", authCtrl.VerifyLogin2FA)
+		api.POST("/auth/passkey/begin", passkeyCtrl.BeginPasskeyLogin)
+		api.POST("/auth/passkey/finish", passkeyCtrl.FinishPasskeyLogin)
 		
 		// Change password (auth required, no password change validation)
 		api.POST("/auth-chpw", middlewares.AuthMiddleware(db), authCtrl.ChangePassword)
@@ -135,11 +142,19 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			user.POST("/absence", userCtrl.Absence)
 			user.DELETE("/absence/:absence_id", userCtrl.DeleteAbsence)
 
-			// 2FA routes
+			// 2FA routes (setup requires a settled password - the
+			// RequirePasswordChanged middleware blocks change_as_login users)
 			user.POST("/2fa/setup", twoFACtrl.Setup2FA)
 			user.POST("/2fa/verify", twoFACtrl.Verify2FA)
 			user.POST("/2fa/disable", twoFACtrl.Disable2FA)
 			user.GET("/2fa/status", twoFACtrl.Check2FAStatus)
+			user.POST("/2fa/backup-codes/regenerate", twoFACtrl.RegenerateBackupCodes)
+
+			// Passkey routes (self only)
+			user.POST("/passkey/register/begin", passkeyCtrl.BeginPasskeyRegistration)
+			user.POST("/passkey/register/finish", passkeyCtrl.FinishPasskeyRegistration)
+			user.GET("/passkey", passkeyCtrl.ListPasskeys)
+			user.DELETE("/passkey/:id", passkeyCtrl.DeletePasskey)
 
 			// Push notification routes
 			user.POST("/push-subscription", notificationCtrl.RegisterPushSubscription)
@@ -175,6 +190,18 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			admin.GET("/settings", adminSettingsCtrl.GetSettings)
 			admin.PATCH("/settings", adminSettingsCtrl.UpdateSettings)
 
+			// Self security: same 2FA/passkey controllers operate on the
+			// logged-in admin (user_id from token), never on other admins.
+			admin.POST("/2fa/setup", twoFACtrl.Setup2FA)
+			admin.POST("/2fa/verify", twoFACtrl.Verify2FA)
+			admin.POST("/2fa/disable", twoFACtrl.Disable2FA)
+			admin.GET("/2fa/status", twoFACtrl.Check2FAStatus)
+			admin.POST("/2fa/backup-codes/regenerate", twoFACtrl.RegenerateBackupCodes)
+			admin.POST("/passkey/register/begin", passkeyCtrl.BeginPasskeyRegistration)
+			admin.POST("/passkey/register/finish", passkeyCtrl.FinishPasskeyRegistration)
+			admin.GET("/passkey", passkeyCtrl.ListPasskeys)
+			admin.DELETE("/passkey/:id", passkeyCtrl.DeletePasskey)
+
 			// Export
 			admin.GET("/export", adminCtrl.ExportAttendance)
 			admin.GET("/export/report-data", adminCtrl.ExportAttendanceReportData)
@@ -187,6 +214,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			all.GET("/info", allCtrl.GetInfo)
 			all.GET("/photos", allCtrl.GetPhotos)
 			all.GET("/settings/status", adminSettingsCtrl.GetPublicStatus)
+			all.GET("/push-public-key", allCtrl.GetPushPublicKey)
 		}
 	}
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
-import { Button, Card } from '@heroui/react'
+import { Button } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
 import { TrashBin, MapPin, Camera, Clock } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
@@ -13,6 +13,25 @@ import PageHeader from '../components/PageHeader.jsx'
 import PhotoPreviewModal from '../../components/PhotoPreviewModal.jsx'
 
 const LIMIT = 15
+
+function formatDate(dateRaw) {
+  const d = parseApiDate(dateRaw)
+  if (!d) return dateRaw || '-'
+  return d.toLocaleDateString('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatTime(dateRaw) {
+  const d = parseApiDate(dateRaw)
+  if (!d) return ''
+  return d.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 function formatDateTime(dateRaw) {
   const d = parseApiDate(dateRaw)
@@ -186,120 +205,101 @@ export default function AdminAttendance() {
         placeholder="Search name or username…"
       />
 
-      <Card data-guide="attendance-table" className="overflow-hidden p-0 shadow-none dark:border-neutral-800">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Time</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Photo</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-app-border/10 dark:divide-white/10">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-neutral dark:text-neutral-400">
-                    Loading data…
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8">
-                    <EmptyState label="No attendance data yet" />
-                  </td>
-                </tr>
-              ) : (
-                items.map((row) => (
-                  <tr key={row.id} className="hover:bg-neutral-50/60 dark:hover:bg-white/5">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-neutral-900 dark:text-neutral-100">{row.name || '-'}</p>
-                      {row.username && <p className="text-xs text-neutral dark:text-neutral-400">{row.username}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{formatDateTime(row.dateRaw)}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="text-neutral-700 dark:text-neutral-300">
-                          {row.displayAddress ? (
-                            <span className="inline-flex items-center gap-1">
-                              {row.displayAddress}
-                            </span>
-                          ) : row.location ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Icon data={MapPin} size={13} className="text-neutral dark:text-neutral-400" />
-                              {row.location}
-                            </span>
-                          ) : row.latitude && row.longitude ? (
-                            <span className="inline-flex items-center gap-1 text-xs">
-                              <Icon data={MapPin} size={13} className="text-neutral dark:text-neutral-400" />
-                              {Number(row.latitude).toFixed(4)}, {Number(row.longitude).toFixed(4)}
-                            </span>
-                          ) : (
-                            '-'
-                          )}
-                        </span>
-                        {row.mapsUrl && (
-                          <a
-                            href={row.mapsUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Open location in Google Maps"
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral hover:bg-primary/10 hover:text-primary dark:bg-neutral-800 dark:text-neutral-400"
-                          >
-                            <Icon data={MapPin} size={14} />
-                          </a>
-                        )}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {row.photoUrl ? (
-                        <button
-                          type="button"
-                          onClick={() => setActivePhoto({ url: row.photoUrl, date: row.dateRaw, username: row.username, displayAddress: row.displayAddress, latitude: row.latitude, longitude: row.longitude })}
-                          className="inline-flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800"
-                        >
-                          <img src={row.photoUrl} alt="Attendance photo" className="h-full w-full object-cover" />
-                        </button>
-                      ) : (
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-neutral dark:bg-neutral-800 dark:text-neutral-400">
-                          <Icon data={Camera} size={14} />
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          isIconOnly
-                          onPress={() => setDeleteTarget(row)}
-                          aria-label="Delete"
-                          className="text-danger"
-                        >
-                          <Icon data={TrashBin} size={14} />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div data-guide="attendance-table" className="flex flex-col gap-3">
+        {loading ? (
+          <p className="py-8 text-center text-sm text-neutral dark:text-neutral-400">
+            Loading data…
+          </p>
+        ) : items.length === 0 ? (
+          <div className="py-8">
+            <EmptyState label="No attendance data yet" />
+          </div>
+        ) : (
+          items.map((row) => {
+            const mapSrc =
+              row.latitude && row.longitude
+                ? `https://maps.google.com/maps?q=${encodeURIComponent(row.latitude)},${encodeURIComponent(row.longitude)}&z=15&output=embed`
+                : null
+            return (
+              <div
+                key={row.id}
+                className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:flex-row dark:border-neutral-700 dark:bg-neutral-900"
+              >
+                {mapSrc ? (
+                  <iframe
+                    title={`Map for ${row.name || row.username || 'attendance'}`}
+                    src={mapSrc}
+                    loading="lazy"
+                    className="h-36 w-full shrink-0 rounded-lg border-0 bg-neutral-100 sm:h-auto sm:min-h-36 sm:w-48 dark:bg-neutral-800"
+                  />
+                ) : (
+                  <div className="flex h-36 w-full shrink-0 items-center justify-center rounded-lg bg-neutral-100 sm:w-48 dark:bg-neutral-800">
+                    <Icon data={MapPin} size={20} className="text-neutral dark:text-neutral-400" />
+                  </div>
+                )}
+                <div className="flex min-w-0 flex-1 gap-3">
+                  {row.photoUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => setActivePhoto({ url: row.photoUrl, date: row.dateRaw, username: row.username, displayAddress: row.displayAddress, latitude: row.latitude, longitude: row.longitude })}
+                      className="h-20 w-20 shrink-0 cursor-pointer overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800"
+                    >
+                      <img src={row.photoUrl} alt="Attendance photo" className="h-full w-full object-cover" />
+                    </button>
+                  ) : (
+                    <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral dark:bg-neutral-800 dark:text-neutral-400">
+                      <Icon data={Camera} size={18} />
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{row.name || '-'}</p>
+                    {row.username && <p className="truncate text-xs text-neutral dark:text-neutral-400">@{row.username}</p>}
+                    <p className="mt-1.5 text-xs text-neutral-700 dark:text-neutral-300">
+                      {formatDate(row.dateRaw)}
+                      {formatTime(row.dateRaw) ? ` · ${formatTime(row.dateRaw)}` : ''}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs text-neutral dark:text-neutral-400" title={row.displayAddress || row.location || ''}>
+                      {row.displayAddress || row.location || (row.latitude && row.longitude ? `${Number(row.latitude).toFixed(4)}, ${Number(row.longitude).toFixed(4)}` : '-')}
+                    </p>
+                    {row.mapsUrl && (
+                      <a
+                        href={row.mapsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        <Icon data={MapPin} size={12} />
+                        Open in Google Maps
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-start">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      isIconOnly
+                      onPress={() => setDeleteTarget(row)}
+                      aria-label="Delete"
+                      className="text-danger"
+                    >
+                      <Icon data={TrashBin} size={14} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
 
-        <div className="px-4 pb-4">
-          <PagerFooter
-            pageIndex={pageIndex}
-            hasNext={hasNext}
-            onPrev={handlePrev}
-            onNext={handleNext}
-            loading={loading}
-            countLabel={`Page ${pageIndex + 1} · ${items.length} records shown`}
-          />
-        </div>
-      </Card>
+      <PagerFooter
+        pageIndex={pageIndex}
+        hasNext={hasNext}
+        onPrev={handlePrev}
+        onNext={handleNext}
+        loading={loading}
+        countLabel={`Page ${pageIndex + 1} · ${items.length} records shown`}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

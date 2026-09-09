@@ -33,9 +33,15 @@ const ABSENCE_STEPS = [
     placement: 'top',
   },
   {
+    target: '[data-guide="absence-multiday"]',
+    title: 'More Than 1 Day',
+    description: 'Check this if your leave spans multiple days, then pick an end date (from tomorrow up to 3 months out). The period always starts today.',
+    placement: 'top',
+  },
+  {
     target: '[data-guide="absence-submit-btn"]',
     title: 'Submit Absence',
-    description: "After filling in the details, tap this button to submit your absence request.",
+    description: "After filling in the details, tap this button to submit your absence request. When absence is closed, a countdown shows when it opens next.",
     placement: 'top',
   },
 ]
@@ -424,7 +430,7 @@ export default function Absence() {
           </Select>
         </div>
 
-        <div className="mt-4 mb-1">
+        <div data-guide="absence-multiday" className="mt-4 mb-1">
           <Checkbox
             isSelected={isMultiDay}
             onChange={(checked) => {

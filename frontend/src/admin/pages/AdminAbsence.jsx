@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { toast } from 'sonner'
-import { Button, Card, Label, DatePicker, DateField, Calendar } from '@heroui/react'
+import { Button, Label, DatePicker, DateField, Calendar } from '@heroui/react'
 import { parseDate } from '@internationalized/date'
 import { Icon } from '@gravity-ui/uikit'
-import { Check, Xmark, FileText, FileCheck, TrashBin } from '@gravity-ui/icons'
+import { Check, Xmark, FileText, FileCheck, TrashBin, Pencil, ChevronDown, ChevronUp } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { unwrapList, normalizeAbsence } from '../lib/normalize.js'
 import { parseApiDate } from '../lib/dateWindow.js'
@@ -131,6 +131,7 @@ export default function AdminAbsence() {
   const [pendingAction, setPendingAction] = useState(null) // { row, sign, startDate, endDate }
   const [pendingDelete, setPendingDelete] = useState(null) // { row }
   const [processing, setProcessing] = useState(false)
+  const [expandedReason, setExpandedReason] = useState(null)
 
   function openAction(row, sign) {
     setPendingAction({
@@ -329,132 +330,130 @@ export default function AdminAbsence() {
         placeholder="Search name or username…"
       />
 
-      <Card data-guide="absence-table" className="overflow-hidden p-0 shadow-none dark:border-neutral-800">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-app-border/10 dark:divide-white/10">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-neutral dark:text-neutral-400">
-                    Loading data…
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8">
-                    <EmptyState label="No leave submissions yet" />
-                  </td>
-                </tr>
-              ) : (
-                items.map((row) => (
-                  <tr key={row.id} className="hover:bg-neutral-50/60 dark:hover:bg-white/5">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-neutral-900 dark:text-neutral-100">{row.name || row.raw?.nickname || '-'}</p>
-                      {row.username && <p className="text-xs text-neutral dark:text-neutral-400">{row.username}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">
-                      {periodLabel(row)}
-                      {row.isMultiDay && (
-                        <p className="text-xs text-neutral dark:text-neutral-400">Multi-day</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <OptionChip isSick={row.isSick} />
-                    </td>
-                    <td className="px-4 py-3 max-w-[220px] truncate text-neutral-700 dark:text-neutral-300" title={row.reason}>
-                      {row.reason || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <SignChip sign={row.sign} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
-                        {row.fileUrl && (
-                          <button
-                            type="button"
-                            onClick={() => downloadFile(row.fileUrl, row.fileUrl.split('/').pop() || 'attachment')}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-                            aria-label="Download attachment"
-                          >
-                            <Icon data={FileText} size={14} />
-                          </button>
-                        )}
-                        {row.sign === 'pending' ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              isIconOnly
-                              className="text-success"
-                              aria-label="Approve"
-                              onPress={() => openAction(row, 'allow')}
-                            >
-                              <Icon data={Check} size={15} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              isIconOnly
-                              className="text-danger"
-                              aria-label="Reject"
-                              onPress={() => openAction(row, 'reject')}
-                            >
-                              <Icon data={Xmark} size={15} />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onPress={() =>
-                                openAction(row, row.sign === 'allow' ? 'reject' : 'allow')
-                              }
-                            >
-                              Change
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              isIconOnly
-                              className="text-danger"
-                              aria-label="Delete"
-                              onPress={() => setPendingDelete({ row })}
-                            >
-                              <Icon data={TrashBin} size={15} />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div data-guide="absence-table" className="flex flex-col gap-3">
+        {loading ? (
+          <p className="py-8 text-center text-sm text-neutral dark:text-neutral-400">
+            Loading data…
+          </p>
+        ) : items.length === 0 ? (
+          <div className="py-8">
+            <EmptyState label="No leave submissions yet" />
+          </div>
+        ) : (
+          items.map((row) => {
+            const expanded = expandedReason === row.id
+            return (
+              <div
+                key={row.id}
+                className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{row.name || row.raw?.nickname || '-'}</p>
+                    {row.username && <p className="truncate text-xs text-neutral dark:text-neutral-400">@{row.username}</p>}
+                  </div>
+                  <SignChip sign={row.sign} />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
+                  <span>{periodLabel(row)}</span>
+                  {row.isMultiDay && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                      Multi-day
+                    </span>
+                  )}
+                  <OptionChip isSick={row.isSick} />
+                </div>
+                {row.reason && (
+                  <div className="mt-2">
+                    <p className={`text-sm text-neutral-700 dark:text-neutral-300 ${expanded ? '' : 'line-clamp-2'}`}>
+                      {row.reason}
+                    </p>
+                    {row.reason.length > 120 && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedReason(expanded ? null : row.id)}
+                        className="mt-1 inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      >
+                        {expanded ? 'Show less' : 'Show more'}
+                        <Icon data={expanded ? ChevronUp : ChevronDown} size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+                  {row.fileUrl && (
+                    <button
+                      type="button"
+                      onClick={() => downloadFile(row.fileUrl, row.fileUrl.split('/').pop() || 'attachment')}
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                      aria-label="Download attachment"
+                    >
+                      <Icon data={FileText} size={14} />
+                    </button>
+                  )}
+                  {row.sign === 'pending' ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        isIconOnly
+                        className="text-success"
+                        aria-label="Approve"
+                        onPress={() => openAction(row, 'allow')}
+                      >
+                        <Icon data={Check} size={15} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        isIconOnly
+                        className="text-danger"
+                        aria-label="Reject"
+                        onPress={() => openAction(row, 'reject')}
+                      >
+                        <Icon data={Xmark} size={15} />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        isIconOnly
+                        aria-label="Change status"
+                        onPress={() =>
+                          openAction(row, row.sign === 'allow' ? 'reject' : 'allow')
+                        }
+                      >
+                        <Icon data={Pencil} size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        isIconOnly
+                        className="text-danger"
+                        aria-label="Delete"
+                        onPress={() => setPendingDelete({ row })}
+                      >
+                        <Icon data={TrashBin} size={15} />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
 
-        <div className="px-4 pb-4">
-          <PagerFooter
-            pageIndex={pageIndex}
-            hasNext={hasNext}
-            onPrev={handlePrev}
-            onNext={handleNext}
-            loading={loading}
-            countLabel={`Page ${pageIndex + 1} · ${items.length} submissions shown`}
-          />
-        </div>
-      </Card>
+      <PagerFooter
+        pageIndex={pageIndex}
+        hasNext={hasNext}
+        onPrev={handlePrev}
+        onNext={handleNext}
+        loading={loading}
+        countLabel={`Page ${pageIndex + 1} · ${items.length} submissions shown`}
+      />
 
       <ConfirmDialog
         open={Boolean(pendingAction)}

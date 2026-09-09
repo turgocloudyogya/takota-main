@@ -472,6 +472,9 @@ func (ctrl *AdminController) SignatureAbsence(c *gin.Context) {
 
 	// Send push notification to user
 	notifSvc := notification.NewService(ctrl.DB)
+	notifSvc.VAPIDPublicKey = ctrl.Config.VAPID.PublicKey
+	notifSvc.VAPIDPrivateKey = ctrl.Config.VAPID.PrivateKey
+	notifSvc.VAPIDSubject = ctrl.Config.VAPID.Subject
 	notifSvc.SendAbsenceDecision(absence.UserID.String(), req.Sign, adminUser.Nickname)
 
 	utils.RespondSuccess(c, http.StatusOK, gin.H{

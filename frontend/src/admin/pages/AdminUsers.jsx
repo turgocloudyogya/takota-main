@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { toast } from 'sonner'
-import { Button, Card } from '@heroui/react'
+import { Button } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
 import { PersonPlus, Pencil, TrashBin, Persons, Layers, Person, ShieldKeyhole } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
@@ -222,13 +222,13 @@ export default function AdminUsers() {
         }
       />
 
-      <Card className="p-4 shadow-none dark:border-neutral-800">
+      <div className="flex flex-col gap-3">
         {loading ? (
-          <p className="px-2 py-8 text-center text-sm text-neutral dark:text-neutral-400">
+          <p className="py-8 text-center text-sm text-neutral dark:text-neutral-400">
             Loading data…
           </p>
         ) : filteredItems.length === 0 ? (
-          <div className="px-2 py-8">
+          <div className="py-8">
             <EmptyState
               label={
                 items.length === 0
@@ -238,60 +238,56 @@ export default function AdminUsers() {
             />
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {filteredItems.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2.5 dark:bg-neutral-800/60"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                  {(user.nickname || user.username || '?')[0].toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                    {user.nickname}
-                  </p>
-                  <p className="truncate text-xs text-neutral dark:text-neutral-400">
-                    @{user.username}
-                    {user.callname && user.callname !== user.nickname ? ` · ${user.callname}` : ''}
-                  </p>
-                </div>
-                <TypeChip type={user.type} />
-                <div className="flex shrink-0 gap-1.5">
-                  <Button variant="ghost" size="sm" isIconOnly onPress={() => openEdit(user)} aria-label="Edit">
-                    <Icon data={Pencil} size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    isIconOnly
-                    onPress={() => setDeleteTarget(user)}
-                    aria-label="Delete"
-                    className="text-danger"
-                  >
-                    <Icon data={TrashBin} size={14} />
-                  </Button>
-                </div>
+          filteredItems.map((user) => (
+            <div
+              key={user.id}
+              className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                {(user.nickname || user.username || '?')[0].toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  {user.nickname}
+                </p>
+                <p className="truncate text-xs text-neutral dark:text-neutral-400">
+                  @{user.username}
+                  {user.callname && user.callname !== user.nickname ? ` · ${user.callname}` : ''}
+                </p>
               </div>
-            ))}
-          </div>
+              <TypeChip type={user.type} />
+              <div className="flex shrink-0 gap-1.5">
+                <Button variant="ghost" size="sm" isIconOnly onPress={() => openEdit(user)} aria-label="Edit">
+                  <Icon data={Pencil} size={14} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isIconOnly
+                  onPress={() => setDeleteTarget(user)}
+                  aria-label="Delete"
+                  className="text-danger"
+                >
+                  <Icon data={TrashBin} size={14} />
+                </Button>
+              </div>
+            </div>
+          ))
         )}
+      </div>
 
-        <div className="pt-4">
-          <PagerFooter
-            pageIndex={pageIndex}
-            hasNext={hasNext}
-            onPrev={handlePrev}
-            onNext={handleNext}
-            loading={loading}
-            countLabel={
-              typeFilter === 'all'
-                ? `Page ${pageIndex + 1} · ${items.length} users shown`
-                : `Page ${pageIndex + 1} · ${filteredItems.length} of ${items.length} users (${filterNoun})`
-            }
-          />
-        </div>
-      </Card>
+      <PagerFooter
+        pageIndex={pageIndex}
+        hasNext={hasNext}
+        onPrev={handlePrev}
+        onNext={handleNext}
+        loading={loading}
+        countLabel={
+          typeFilter === 'all'
+            ? `Page ${pageIndex + 1} · ${items.length} users shown`
+            : `Page ${pageIndex + 1} · ${filteredItems.length} of ${items.length} users (${filterNoun})`
+        }
+      />
 
       <UserFormModal
         open={formOpen}

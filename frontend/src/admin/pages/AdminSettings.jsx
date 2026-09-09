@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Clock, Check } from '@gravity-ui/icons'
-import { Checkbox } from '@heroui/react'
+import { Clock, Check, Shield } from '@gravity-ui/icons'
+import { Checkbox, Label, TimeField } from '@heroui/react'
+import { parseTime } from '@internationalized/date'
+import SecuritySettings from '../../components/SecuritySettings.jsx'
 
 const DAYS_OF_WEEK = [
   { key: 'monday', label: 'Monday' },
@@ -14,10 +16,45 @@ const DAYS_OF_WEEK = [
   { key: 'sunday', label: 'Sunday' },
 ]
 
-// Convert "HH:MM:SS" to "HH:MM" for input type="time"
+// Convert "HH:MM:SS" to "HH:MM" for the time value state
 function timeToInputFormat(timeStr) {
   if (!timeStr) return '00:00'
   return timeStr.split(':').slice(0, 2).join(':')
+}
+
+// Convert "HH:MM[:SS]" to a Time value for HeroUI TimeField
+function timeToValue(timeStr) {
+  if (!timeStr) return null
+  try {
+    return parseTime(timeToInputFormat(timeStr))
+  } catch {
+    return null
+  }
+}
+
+// Convert a Time value back to "HH:MM" for the backend
+function valueToTime(value) {
+  if (!value) return ''
+  return `${String(value.hour).padStart(2, '0')}:${String(value.minute).padStart(2, '0')}`
+}
+
+function TimeSetting({ label, value, onChange }) {
+  return (
+    <TimeField.Root
+      value={timeToValue(value)}
+      onChange={(time) => onChange(valueToTime(time))}
+      hourCycle={24}
+      fullWidth
+      className="w-full"
+    >
+      <Label>{label}</Label>
+      <TimeField.Group fullWidth className="w-full bg-neutral-100 dark:bg-neutral-900 shadow-none">
+        <TimeField.Input>
+          {(segment) => <TimeField.Segment segment={segment} />}
+        </TimeField.Input>
+      </TimeField.Group>
+    </TimeField.Root>
+  )
 }
 
 export default function AdminSettings() {
@@ -138,29 +175,17 @@ export default function AdminSettings() {
       <div className="space-y-6 rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
         {/* Time Settings */}
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-              Attendance Opens At (in app timezone)
-            </label>
-            <input
-              type="time"
-              value={openTime}
-              onChange={(e) => setOpenTime(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-900 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-          </div>
+          <TimeSetting
+            label="Attendance Opens At (in app timezone)"
+            value={openTime}
+            onChange={setOpenTime}
+          />
 
-          <div>
-            <label className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-              Attendance Closes At (in app timezone)
-            </label>
-            <input
-              type="time"
-              value={closeTime}
-              onChange={(e) => setCloseTime(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-900 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-            />
-          </div>
+          <TimeSetting
+            label="Attendance Closes At (in app timezone)"
+            value={closeTime}
+            onChange={setCloseTime}
+          />
         </div>
 
         {/* Day Selection */}
@@ -206,6 +231,18 @@ export default function AdminSettings() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </div>
+
+      {/* Self security - separate section, operates on this admin only */}
+      <div>
+        <h2 className="flex items-center gap-2 text-lg font-bold text-neutral-900 dark:text-neutral-100">
+          <Icon data={Shield} size={22} />
+          My Security
+        </h2>
+        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+          Two-factor authentication for your own admin account. It cannot be applied to other admins.
+        </p>
+      </div>
+      <SecuritySettings apiBase="/api/admin" />
     </div>
   )
 }

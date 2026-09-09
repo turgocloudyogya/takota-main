@@ -126,6 +126,14 @@ func (ctrl *AllController) GetInfo(c *gin.Context) {
 	})
 }
 
+// GetPushPublicKey returns the VAPID public key so browsers can subscribe
+// to push notifications. Safe to expose - it only identifies the server.
+func (ctrl *AllController) GetPushPublicKey(c *gin.Context) {
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"publicKey": ctrl.Config.VAPID.PublicKey,
+	})
+}
+
 // GetPhotos returns gallery of attendance photos
 func (ctrl *AllController) GetPhotos(c *gin.Context) {
 	limit := 50

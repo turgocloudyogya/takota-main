@@ -11,7 +11,7 @@ const PHOTOS_STEPS = [
   {
     target: '[data-guide="photo-gallery"]',
     title: 'Photo Gallery',
-    description: 'Browse all attendance and absence photos submitted by you and other students. Tap any photo to view it full screen.',
+    description: 'Browse all attendance and absence photos submitted by you and other students. Tap any photo to view it full screen with its time, reporter, address, and location map.',
     placement: 'bottom',
   },
 ]

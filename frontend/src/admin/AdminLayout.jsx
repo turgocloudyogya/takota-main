@@ -9,12 +9,14 @@ import {
   FileCheck,
   FileArrowDown,
   Picture,
+  ArrowDownToLine,
   ArrowRightFromLine,
   LayoutSideContentLeft,
   Xmark,
 } from '@gravity-ui/icons'
 import { getSession, isAdminSession } from './lib/session.js'
 import * as api from './lib/api.js'
+import { usePwaInstall } from '../lib/pwaInstall.js'
 import { ConfirmDialog } from '../components/Modals.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import GuideOverlay from './components/GuideOverlay.jsx'
@@ -128,6 +130,34 @@ function NavList({ onNavigate, collapsed = false }) {
 
 const SIDEBAR_COLLAPSED_KEY = 'admin-sidebar-collapsed'
 
+// Shown above Logout while the PWA is installable but not installed.
+// Hidden when running inside the installed PWA or after installation.
+function InstallAppButton({ collapsed = false, onDone }) {
+  const { canInstall, promptInstall } = usePwaInstall()
+
+  if (!canInstall) return null
+
+  async function handleInstall() {
+    const accepted = await promptInstall()
+    if (accepted) onDone?.()
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleInstall}
+      aria-label={collapsed ? 'Install as App' : undefined}
+      className={`group cursor-pointer relative flex items-center rounded-xl text-sm font-medium text-primary transition hover:bg-primary/10 ${
+        collapsed ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
+      }`}
+    >
+      <Icon data={ArrowDownToLine} size={17} className="shrink-0" />
+      {!collapsed && 'Install as App'}
+      {collapsed && <IconTooltip>Install as App</IconTooltip>}
+    </button>
+  )
+}
+
 export default function AdminLayout() {
   const navigate = useNavigate()
   const [session] = useState(() => getSession())
@@ -221,6 +251,7 @@ export default function AdminLayout() {
             )}
             {collapsed && <IconTooltip>{session.username} · Administrator</IconTooltip>}
           </div>
+          <InstallAppButton collapsed={collapsed} />
           <button
             type="button"
             onClick={handleLogout}
@@ -275,14 +306,17 @@ export default function AdminLayout() {
               </button>
             </div>
             <NavList onNavigate={() => setMobileOpen(false)} />
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="mt-auto flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10"
-            >
-              <Icon data={ArrowRightFromLine} size={17} />
-              Logout
-            </button>
+            <div className="mt-auto flex flex-col gap-1">
+              <InstallAppButton onDone={() => setMobileOpen(false)} />
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/10"
+              >
+                <Icon data={ArrowRightFromLine} size={17} />
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       )}

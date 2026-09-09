@@ -11,6 +11,8 @@ import AttendanceSheet from '../components/AttendanceSheet.jsx'
 import AttendanceDetailDrawer from '../components/AttendanceDetailDrawer.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
+import NotificationBanner from '../components/NotificationBanner.jsx'
+import NotificationToggle from '../components/NotificationToggle.jsx'
 import { ConfirmDialog } from '../components/Modals.jsx'
 
 const MAIN_STEPS = [
@@ -23,13 +25,25 @@ const MAIN_STEPS = [
   {
     target: '[data-guide="today-status"]',
     title: "Today's Status",
-    description: "Your attendance status for today appears here. If you haven't checked in yet, it will show as empty.",
+    description: "Your check-in for today appears here with its photo, time, and location. If you haven't checked in yet, it will show as empty.",
     placement: 'bottom',
+  },
+  {
+    target: '[data-guide="activity"]',
+    title: 'Your Activity',
+    description: 'Your personal attendance heatmap for the last 5 months. Hover a square to see the details for that day.',
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="attendance-list"]',
+    title: 'Attendance History',
+    description: 'Your recent check-ins, each with time and location. Tap any item to open the detail view with the full photo and a location map.',
+    placement: 'top',
   },
   {
     target: '[data-guide="absence-list"]',
     title: 'Absence History',
-    description: 'Your recent leave and sick submissions are listed here with their approval status.',
+    description: 'Your recent leave and sick submissions are listed here with their approval status. Pending requests can be deleted.',
     placement: 'top',
   },
   {
@@ -113,13 +127,21 @@ export default function Main() {
     return 'Location not available'
   }
 
-  function formatTime(timestamp) {
-    if (!timestamp) return '—'
-    return new Date(timestamp).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
+  // Server clock runs in TIMEZONE_APP (Asia/Jakarta) — always render
+  // check-in stamps in WIB so the label matches the attendance window.
+  function formatCheckinHeader(timestamp) {
+    if (!timestamp) return 'Checked in'
+    const d = new Date(timestamp)
+    const time = d
+      .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
+      .replace(':', '.')
+    const date = d.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Jakarta',
     })
+    return `Checked in at ${time} WIB on ${date}`
   }
 
   useEffect(() => {
@@ -281,6 +303,11 @@ export default function Main() {
     navigate('/absence')
   }
 
+  function handlePickSecurity() {
+    setSheetOpen(false)
+    navigate('/main/2fa')
+  }
+
   async function handleConfirmDeleteAbsence() {
     if (!absenceToDelete) return
     setDeletingAbsence(true)
@@ -300,7 +327,7 @@ export default function Main() {
 
   if (loading) {
     return (
-      <main className="mx-auto min-h-dvh w-full max-w-md px-6">
+      <main className="mx-auto min-h-dvh w-full max-w-md px-6 pb-[60px] lg:max-w-6xl">
         <div className="animate-pulse">
           <div className="py-4 pt-8">
             <div className="h-8 w-64 rounded bg-neutral-200 dark:bg-neutral-700" />
@@ -324,7 +351,7 @@ export default function Main() {
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-md px-6">
+    <main className="mx-auto min-h-dvh w-full max-w-md px-6 pb-[60px] lg:max-w-6xl">
       <header data-guide="greeting" className="flex items-start justify-between gap-4 py-4 pt-8">
         <div>
           <h1 className="text-xl font-bold leading-tight text-neutral-900 dark:text-neutral-100">
@@ -334,6 +361,7 @@ export default function Main() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          <NotificationToggle />
           <ThemeToggle className="h-9 w-9 rounded-full" />
           <button
             type="button"
@@ -347,10 +375,16 @@ export default function Main() {
         </div>
       </header>
 
-      <section data-guide="today-status" className="mt-6">
+      <div className="mt-6">
+        <NotificationBanner />
+      </div>
+
+      <div className="lg:grid lg:grid-cols-[500px_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <div className="min-w-0 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pb-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+          <section data-guide="today-status" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Today</h2>
         {todayStatus ? (
-          <div className="flex gap-3 rounded-xl bg-neutral-100 dark:bg-neutral-800/60 p-3">
+          <div className="flex gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
             {todayStatus.photoUrl ? (
               <img
                 src={todayStatus.photoUrl}
@@ -374,20 +408,22 @@ export default function Main() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8 dark:bg-neutral-800/60">
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">No attendance status yet</p>
           </div>
         )}
       </section>
 
-      <section className="mt-6">
+      <section data-guide="activity" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Activity</h2>
-        <div className="rounded-xl bg-neutral-100 dark:bg-neutral-800/60 p-3">
-          <ActivityHeatmap days={activity} />
+        <div className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+          <ActivityHeatmap days={activity} showDetails={false} />
         </div>
       </section>
 
-      <section data-guide="attendance-list" className="mt-6">
+        </div>
+        <div className="min-w-0">
+          <section data-guide="attendance-list" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Attendance</h2>
         {attendanceList.length > 0 ? (
           <div className="flex flex-col gap-2">
@@ -396,19 +432,19 @@ export default function Main() {
                 key={item.id}
                 type="button"
                 onClick={() => setDetailItem(item)}
-                className="block w-full cursor-pointer text-left"
+                className="block w-full cursor-pointer rounded-lg border border-neutral-200 bg-white p-3 text-left dark:border-neutral-700 dark:bg-neutral-900"
               >
-                <AbsenceCard
-                  date={item.timestamp ? formatDate(item.timestamp) : '--/--'}
-                  status="present"
-                  title={item.timestamp ? `Checked in at ${formatTime(item.timestamp)}` : 'Checked in'}
-                  subtitle={locationLabel(item)}
-                />
+                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  {formatCheckinHeader(item.timestamp)}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-neutral dark:text-neutral-400">
+                  {locationLabel(item)}
+                </p>
               </button>
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8 dark:bg-neutral-800/60">
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">There is no attendance list</p>
           </div>
         )}
@@ -431,11 +467,13 @@ export default function Main() {
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8 dark:bg-neutral-800/60">
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">There is no absence list</p>
           </div>
         )}
       </section>
+      </div>
+      </div>
 
       <button
         data-guide="attendance-button"
@@ -453,6 +491,7 @@ export default function Main() {
         onPickAttendance={handlePickAttendance}
         onPickAbsence={handlePickAbsence}
         onPickPhotos={handlePickPhotos}
+        onPickSecurity={handlePickSecurity}
       />
 
       <AttendanceDetailDrawer

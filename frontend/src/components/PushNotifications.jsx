@@ -1,107 +1,44 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Bell, BellSlash, Check } from '@gravity-ui/icons'
+import { Bell, BellSlash } from '@gravity-ui/icons'
+import { getPushEnabled, pushSupported, subscribePush, unsubscribePush } from '../lib/push.js'
 
 export default function PushNotifications() {
-  const [supported, setSupported] = useState(false)
+  const [supported] = useState(() => pushSupported())
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [permission, setPermission] = useState('default')
+  const [permission, setPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default',
+  )
 
   useEffect(() => {
-    checkSupport()
-    checkStatus()
-  }, [])
+    let cancelled = false
+    async function checkStatus() {
+      try {
+        setEnabled(await getPushEnabled())
+      } catch (err) {
+        console.error('Failed to check notification status:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    if (supported) checkStatus()
+    else setLoading(false)
+    return () => {
+      cancelled = true
+    }
+  }, [supported])
 
-  function checkSupport() {
-    const isSupported = 'serviceWorker' in navigator && 'PushManager' in window
-    setSupported(isSupported)
-  }
-
-  async function checkStatus() {
+  async function handleEnable() {
     try {
       setLoading(true)
-
-      // Check browser permission
-      if ('Notification' in window) {
-        setPermission(Notification.permission)
-      }
-
-      // Check if we have a subscription in the backend
-      const response = await fetch('/api/user/push-subscription/status')
-      if (response.ok) {
-        const data = await response.json()
-        setEnabled(data.data.enabled)
-      }
-    } catch (err) {
-      console.error('Failed to check notification status:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function registerServiceWorker() {
-    try {
-      if (!('serviceWorker' in navigator)) {
-        throw new Error('Service Workers not supported')
-      }
-
-      const registration = await navigator.serviceWorker.register('/service-worker.js')
-      return registration
-    } catch (err) {
-      console.error('Service Worker registration failed:', err)
-      throw err
-    }
-  }
-
-  async function subscribeToPushNotifications() {
-    try {
-      setLoading(true)
-
-      // Request permission if not granted
-      if (permission !== 'granted') {
-        const result = await Notification.requestPermission()
-        setPermission(result)
-        if (result !== 'granted') {
-          throw new Error('Notification permission denied')
-        }
-      }
-
-      // Register service worker
-      const registration = await registerServiceWorker()
-
-      // Get push subscription
-      let subscription = await registration.pushManager.getSubscription()
-      if (!subscription) {
-        // Create new subscription
-        const vapidKey = 'YOUR_PUBLIC_VAPID_KEY' // Replace with actual key
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: vapidKey,
-        })
-      }
-
-      // Send subscription to backend
-      const subscriptionData = {
-        endpoint: subscription.endpoint,
-        auth: btoa(new Uint8Array(subscription.getKey('auth')).join(',')),
-        p256dh: btoa(new Uint8Array(subscription.getKey('p256dh')).join(',')),
-      }
-
-      const response = await fetch('/api/user/push-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(subscriptionData),
-      })
-
-      if (!response.ok) throw new Error('Failed to register subscription')
-
+      await subscribePush()
+      setPermission(Notification.permission)
       toast.success('Push notifications enabled!')
       setEnabled(true)
     } catch (err) {
+      setPermission(Notification.permission)
       toast.error(err.message || 'Failed to enable push notifications')
       console.error('Push notification error:', err)
     } finally {
@@ -109,26 +46,10 @@ export default function PushNotifications() {
     }
   }
 
-  async function unsubscribeFromPushNotifications() {
+  async function handleDisable() {
     try {
       setLoading(true)
-
-      // Unsubscribe from service worker
-      if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.ready
-        const subscription = await registration.pushManager.getSubscription()
-        if (subscription) {
-          await subscription.unsubscribe()
-        }
-      }
-
-      // Notify backend
-      const response = await fetch('/api/user/push-subscription', {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) throw new Error('Failed to unregister subscription')
-
+      await unsubscribePush()
       toast.success('Push notifications disabled')
       setEnabled(false)
     } catch (err) {
@@ -177,7 +98,8 @@ export default function PushNotifications() {
             </p>
             {enabled && (
               <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-1">
-                You'll receive notifications 1 and 3 hours before attendance closes, and when absence requests are approved or rejected.
+                You&apos;ll receive a reminder before attendance closes, a notice if you miss it,
+                and updates when absence requests are approved or rejected.
               </p>
             )}
           </div>
@@ -194,7 +116,7 @@ export default function PushNotifications() {
 
       <button
         type="button"
-        onClick={enabled ? unsubscribeFromPushNotifications : subscribeToPushNotifications}
+        onClick={enabled ? handleDisable : handleEnable}
         disabled={loading || permission === 'denied'}
         className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-50 ${
           enabled
