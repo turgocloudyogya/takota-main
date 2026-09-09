@@ -257,7 +257,7 @@ export default function AdminAttendance() {
                       {row.photoUrl ? (
                         <button
                           type="button"
-                          onClick={() => setActivePhoto({ url: row.photoUrl, date: row.dateRaw, username: row.username })}
+                          onClick={() => setActivePhoto({ url: row.photoUrl, date: row.dateRaw, username: row.username, displayAddress: row.displayAddress, latitude: row.latitude, longitude: row.longitude })}
                           className="inline-flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-800"
                         >
                           <img src={row.photoUrl} alt="Attendance photo" className="h-full w-full object-cover" />

@@ -87,7 +87,17 @@ Admin absence period edit:
 - Opt: Secure flag cookie bila prod sudah HTTPS; `takota_profile` tanpa integrity
   (display only, backend sumber kebenaran).
 
-## Follow-up 24:00 — countdown ikut timezone server
+## Follow-up 26:00 — PhotoPreviewModal scroll + tombol download
+
+- Overlay bisa scroll (scrollbar disembunyikan), foto max-h 50dvh.
+- Tombol download pindah ke dalam foto kanan bawah (overlay gelap).
+- Terverifikasi viewport kecil 390x500: scroll sampai peta.
+
+- PhotoPreviewModal (dipakai /photos, /admin/photos, /admin/attendance):
+  iframe Google Maps embed di bawah info waktu+user+alamat.
+- Mapping koordinat dilengkapi di AdminPhotos + AdminAttendance.
+- Terverifikasi: modal user tampil peta Shinjuku; kolom Location admin
+  tampil alamat geo lengkap.
 
 - BE status tambah close_at/next_open_day/next_open_time absolut.
 - FE lib/serverTime.js: offset jam server vs device; buka/tutup + countdown

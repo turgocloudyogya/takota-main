@@ -222,74 +222,62 @@ export default function AdminUsers() {
         }
       />
 
-      <Card className="overflow-hidden p-0 shadow-none dark:border-neutral-800">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-app-border/15 bg-neutral-50 text-xs font-medium text-neutral dark:border-white/10 dark:bg-neutral-800/60 dark:text-neutral-400">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Username</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-app-border/10 dark:divide-white/10">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-neutral dark:text-neutral-400">
-                    Loading data…
-                  </td>
-                </tr>
-              ) : filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8">
-                    <EmptyState
-                      label={
-                        items.length === 0
-                          ? 'No user data yet'
-                          : `No ${filterNoun} accounts on this page`
-                      }
-                    />
-                  </td>
-                </tr>
-              ) : (
-                filteredItems.map((user) => (
-                  <tr key={user.id} className="hover:bg-neutral-50/60 dark:hover:bg-white/5">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-neutral-900 dark:text-neutral-100">{user.nickname}</p>
-                      {user.callname && user.callname !== user.nickname && (
-                        <p className="text-xs text-neutral dark:text-neutral-400">{user.callname}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-neutral-700 dark:text-neutral-300">{user.username}</td>
-                    <td className="px-4 py-3">
-                      <TypeChip type={user.type} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
-                        <Button variant="ghost" size="sm" isIconOnly onPress={() => openEdit(user)} aria-label="Edit">
-                          <Icon data={Pencil} size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          isIconOnly
-                          onPress={() => setDeleteTarget(user)}
-                          aria-label="Delete"
-                          className="text-danger"
-                        >
-                          <Icon data={TrashBin} size={14} />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <Card className="p-4 shadow-none dark:border-neutral-800">
+        {loading ? (
+          <p className="px-2 py-8 text-center text-sm text-neutral dark:text-neutral-400">
+            Loading data…
+          </p>
+        ) : filteredItems.length === 0 ? (
+          <div className="px-2 py-8">
+            <EmptyState
+              label={
+                items.length === 0
+                  ? 'No user data yet'
+                  : `No ${filterNoun} accounts on this page`
+              }
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {filteredItems.map((user) => (
+              <div
+                key={user.id}
+                className="flex items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2.5 dark:bg-neutral-800/60"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                  {(user.nickname || user.username || '?')[0].toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {user.nickname}
+                  </p>
+                  <p className="truncate text-xs text-neutral dark:text-neutral-400">
+                    @{user.username}
+                    {user.callname && user.callname !== user.nickname ? ` · ${user.callname}` : ''}
+                  </p>
+                </div>
+                <TypeChip type={user.type} />
+                <div className="flex shrink-0 gap-1.5">
+                  <Button variant="ghost" size="sm" isIconOnly onPress={() => openEdit(user)} aria-label="Edit">
+                    <Icon data={Pencil} size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    isIconOnly
+                    onPress={() => setDeleteTarget(user)}
+                    aria-label="Delete"
+                    className="text-danger"
+                  >
+                    <Icon data={TrashBin} size={14} />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
-        <div className="px-4 pb-4">
+        <div className="pt-4">
           <PagerFooter
             pageIndex={pageIndex}
             hasNext={hasNext}

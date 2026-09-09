@@ -13,6 +13,11 @@ export default function PhotoPreviewModal({ photo, onClose }) {
     downloadFile(photo.url, filename)
   }
 
+  const mapSrc =
+    photo?.latitude && photo?.longitude
+      ? `https://maps.google.com/maps?q=${encodeURIComponent(photo.latitude)},${encodeURIComponent(photo.longitude)}&z=15&output=embed`
+      : null
+
   return (
     <AnimatePresence>
       {photo && (
@@ -22,7 +27,7 @@ export default function PhotoPreviewModal({ photo, onClose }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           onClick={onClose}
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-6 backdrop-blur-sm"
+          className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-black/40 px-6 py-6 backdrop-blur-sm [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -30,11 +35,11 @@ export default function PhotoPreviewModal({ photo, onClose }) {
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.15 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[280px] sm:max-w-sm"
+            className="my-auto w-full max-w-[280px] sm:max-w-sm"
           >
             <div className="relative">
               <div className="overflow-hidden rounded-xl bg-white shadow-xl dark:bg-neutral-900">
-                <img src={photo.url} alt="" className="w-full object-contain" />
+                <img src={photo.url} alt="" className="max-h-[50dvh] w-full object-contain" />
               </div>
               <button
                 type="button"
@@ -43,6 +48,14 @@ export default function PhotoPreviewModal({ photo, onClose }) {
                 className="absolute -right-2 -top-2 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white text-neutral-900 shadow-md transition active:scale-[0.94] dark:bg-neutral-800 dark:text-neutral-100"
               >
                 <Icon data={Xmark} size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                aria-label="Download photo"
+                className="absolute bottom-2 right-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/50 text-white shadow-md backdrop-blur-sm transition active:scale-[0.94]"
+              >
+                <Icon data={ArrowDownToLine} size={16} />
               </button>
             </div>
 
@@ -65,15 +78,18 @@ export default function PhotoPreviewModal({ photo, onClose }) {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={handleDownload}
-                aria-label="Download photo"
-                className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white text-neutral-900 shadow-lg transition active:scale-[0.94] dark:bg-neutral-800 dark:text-neutral-100"
-              >
-                <Icon data={ArrowDownToLine} size={16} />
-              </button>
             </div>
+
+            {mapSrc && (
+              <div className="mt-3 overflow-hidden rounded-xl shadow-lg">
+                <iframe
+                  title="Attendance location map"
+                  src={mapSrc}
+                  className="h-44 w-full border-0 bg-gray-100 dark:bg-neutral-800"
+                  loading="lazy"
+                />
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
