@@ -260,7 +260,15 @@ export default function AdminDashboard() {
       {/* Trend Chart Data */}
       {trend && trend.length > 0 && (
         <div data-guide="charts" className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">7-Day Trend</h3>
+          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">30-Day Trend</h3>
+          <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+            {(() => {
+              const checkins = trend.reduce((sum, day) => sum + (Number(day.attendance) || 0), 0)
+              const absences = trend.reduce((sum, day) => sum + (Number(day.absence) || 0), 0)
+              const days = trend.length || 1
+              return `${checkins} check-ins total · ${absences} absences total · avg ${(checkins / days).toFixed(1)} check-ins/day over ${trend.length} days`
+            })()}
+          </p>
           <div className="mt-4 h-72">
             <ResponsiveLine
               data={[
@@ -328,7 +336,7 @@ export default function AdminDashboard() {
               }}
             />
           </div>
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 max-h-96 overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-neutral-200 dark:border-neutral-700">
                 <tr>

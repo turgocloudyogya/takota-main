@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Shield, ShieldCheck, Key, Copy, TrashBin, Check, Plus, Fingerprint } from '@gravity-ui/icons'
-import { Input } from '@heroui/react'
+import { Shield, ShieldCheck, Key, Copy, TrashBin, Check, Plus, Fingerprint, FileArrowDown } from '@gravity-ui/icons'
+import { Checkbox } from '@heroui/react'
+import { jsPDF } from 'jspdf'
 import { ConfirmDialog } from './Modals.jsx'
 import { createPasskey, webauthnSupported } from '../lib/webauthn.js'
 
@@ -17,14 +18,82 @@ async function api(base, path, options = {}) {
   return data
 }
 
-function BackupCodesDisplay({ codes, onDone }) {
+function formatGeneratedAt(date) {
+  const d = date instanceof Date ? date : new Date(date)
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function BackupCodesDisplay({ codes, generatedAt, onDone }) {
   const [saved, setSaved] = useState(false)
+  const generatedLabel = formatGeneratedAt(generatedAt || new Date())
 
   function copyAll() {
     navigator.clipboard.writeText(codes.join('\n')).then(
       () => toast.success('Backup codes copied'),
       () => toast.error('Copy failed, please copy manually'),
     )
+  }
+
+  function fileStamp() {
+    const d = generatedAt instanceof Date ? generatedAt : new Date(generatedAt || Date.now())
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
+  }
+
+  function downloadTxt() {
+    const lines = [
+      'Takota Backup Codes',
+      `Generated: ${generatedLabel}`,
+      '',
+      'Each code works ONCE as a replacement for your authenticator',
+      '(e.g. when you lose your phone). Keep them somewhere safe.',
+      '',
+      ...codes,
+      '',
+    ]
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `takota-backup-codes-${fileStamp()}.txt`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    toast.success('Backup codes downloaded (.txt)')
+  }
+
+  function downloadPdf() {
+    try {
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+      let y = 20
+      doc.setFontSize(18)
+      doc.text('Takota Backup Codes', 15, y)
+      y += 8
+      doc.setFontSize(11)
+      doc.text(`Generated: ${generatedLabel}`, 15, y)
+      y += 8
+      doc.text('Each code works ONCE as a replacement for your authenticator.', 15, y)
+      y += 6
+      doc.text('Keep them somewhere safe.', 15, y)
+      y += 10
+      doc.setFont('courier', 'normal')
+      doc.setFontSize(13)
+      codes.forEach((code, i) => {
+        doc.text(`${String(i + 1).padStart(2, '0')}.  ${code}`, 15, y)
+        y += 8
+      })
+      doc.save(`takota-backup-codes-${fileStamp()}.pdf`)
+      toast.success('Backup codes downloaded (.pdf)')
+    } catch {
+      toast.error('PDF download failed')
+    }
   }
 
   return (
@@ -35,13 +104,14 @@ function BackupCodesDisplay({ codes, onDone }) {
       <p className="text-xs text-neutral-600 dark:text-neutral-400">
         Each code works <strong>once</strong> as a replacement for your authenticator
         (e.g. when you lose your phone). They will <strong>never be shown again</strong>.
+        Generated: {generatedLabel}
       </p>
       <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-white p-3 font-mono text-sm dark:bg-neutral-900">
         {codes.map((code) => (
           <span key={code} className="select-all text-neutral-900 dark:text-neutral-100">{code}</span>
         ))}
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
           onClick={copyAll}
@@ -49,6 +119,22 @@ function BackupCodesDisplay({ codes, onDone }) {
         >
           <Icon data={Copy} size={14} />
           Copy all
+        </button>
+        <button
+          type="button"
+          onClick={downloadTxt}
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-700"
+        >
+          <Icon data={FileArrowDown} size={14} />
+          .txt
+        </button>
+        <button
+          type="button"
+          onClick={downloadPdf}
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-700"
+        >
+          <Icon data={FileArrowDown} size={14} />
+          .pdf
         </button>
         <button
           type="button"
@@ -60,15 +146,16 @@ function BackupCodesDisplay({ codes, onDone }) {
           I saved them
         </button>
       </div>
-      <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
-        <input
-          type="checkbox"
-          checked={saved}
-          onChange={(e) => setSaved(e.target.checked)}
-          className="h-4 w-4 accent-[var(--color-primary)]"
-        />
-        I stored these codes somewhere safe
-      </label>
+      <Checkbox isSelected={saved} onChange={setSaved}>
+        <Checkbox.Content>
+          <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
+            <Checkbox.Indicator />
+          </Checkbox.Control>
+          <span className="text-xs text-neutral-600 dark:text-neutral-400">
+            I stored these codes somewhere safe
+          </span>
+        </Checkbox.Content>
+      </Checkbox>
     </div>
   )
 }
@@ -150,7 +237,7 @@ export default function SecuritySettings({ apiBase }) {
       })
       setSetup(null)
       setCode('')
-      setFreshBackup(data.backup_codes || [])
+      setFreshBackup({ codes: data.backup_codes || [], at: new Date() })
       refresh()
     } catch (err) {
       toast.error(err.message)
@@ -191,7 +278,7 @@ export default function SecuritySettings({ apiBase }) {
       })
       setRegenMode(false)
       setCode('')
-      setFreshBackup(data.backup_codes || [])
+      setFreshBackup({ codes: data.backup_codes || [], at: new Date() })
       refresh()
     } catch (err) {
       toast.error(err.message)
@@ -225,7 +312,7 @@ export default function SecuritySettings({ apiBase }) {
         return data
       })
       toast.success(done.message || 'Passkey added successfully')
-      if (done.backup_codes?.length) setFreshBackup(done.backup_codes)
+      if (done.backup_codes?.length) setFreshBackup({ codes: done.backup_codes, at: new Date() })
       setPasskeyName('')
       refresh()
     } catch (err) {
@@ -280,14 +367,14 @@ export default function SecuritySettings({ apiBase }) {
       </div>
 
       {freshBackup && (
-        <BackupCodesDisplay codes={freshBackup} onDone={() => setFreshBackup(null)} />
+        <BackupCodesDisplay codes={freshBackup.codes} generatedAt={freshBackup.at} onDone={() => setFreshBackup(null)} />
       )}
 
       {/* Authenticator app */}
       <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className={`flex h-9 w-9 items-center justify-center rounded-full ${status?.totp ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${status?.totp ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
               <Icon data={status?.totp ? ShieldCheck : Shield} size={18} />
             </span>
             <div>
@@ -301,7 +388,7 @@ export default function SecuritySettings({ apiBase }) {
             <button
               type="button"
               onClick={() => setConfirmTotp(true)}
-              className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-95"
+              className="shrink-0 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-95"
             >
               Enable
             </button>
@@ -309,7 +396,7 @@ export default function SecuritySettings({ apiBase }) {
             <button
               type="button"
               onClick={() => { setDisableMode((v) => !v); setRegenMode(false); setSetup(null); setCode('') }}
-              className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-red-700 active:scale-95"
+              className="shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-red-700 active:scale-95"
             >
               Disable
             </button>
@@ -329,14 +416,14 @@ export default function SecuritySettings({ apiBase }) {
               </button>
             </div>
             <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">2. Enter the 6-digit code to confirm</p>
-            <Input
+            <input
               type="text"
               inputMode="numeric"
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               maxLength={6}
-              className="text-center font-mono"
+              className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-center font-mono text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
             />
             <div className="flex gap-2">
               <button
@@ -363,12 +450,12 @@ export default function SecuritySettings({ apiBase }) {
         {disableMode && status?.totp && (
           <div className="mt-4 space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-700">
             <p className="text-xs text-neutral-600 dark:text-neutral-400">Confirm with your 6-digit code or an unused backup code:</p>
-            <Input
+            <input
               type="text"
               placeholder="6-digit code or XXXX-XXXX"
               value={code}
               onChange={(e) => setCode(e.target.value.slice(0, 9))}
-              className="text-center font-mono"
+              className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-center font-mono text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
             />
             <button
               type="button"
@@ -396,12 +483,12 @@ export default function SecuritySettings({ apiBase }) {
                 <p className="text-xs text-neutral-600 dark:text-neutral-400">
                   Old codes stop working. Confirm with your 6-digit code or an unused backup code:
                 </p>
-                <Input
+                <input
                   type="text"
                   placeholder="6-digit code or XXXX-XXXX"
                   value={code}
                   onChange={(e) => setCode(e.target.value.slice(0, 9))}
-                  className="text-center font-mono"
+                  className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-center font-mono text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
                 />
                 <div className="flex gap-2">
                   <button
@@ -430,7 +517,7 @@ export default function SecuritySettings({ apiBase }) {
       <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className={`flex h-9 w-9 items-center justify-center rounded-full ${status?.passkey ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${status?.passkey ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
               <Icon data={Fingerprint} size={18} />
             </span>
             <div>
@@ -444,7 +531,7 @@ export default function SecuritySettings({ apiBase }) {
             type="button"
             onClick={() => setConfirmPasskey(true)}
             disabled={addingPasskey}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-95 disabled:opacity-50"
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-95 disabled:opacity-50"
           >
             <Icon data={Plus} size={14} />
             {addingPasskey ? 'Waiting...' : status?.passkey ? 'Add another' : 'Enable as Passkey'}
@@ -452,11 +539,12 @@ export default function SecuritySettings({ apiBase }) {
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          <Input
+          <input
             type="text"
             placeholder="Passkey name (e.g. My phone)"
             value={passkeyName}
             onChange={(e) => setPasskeyName(e.target.value.slice(0, 100))}
+            className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
           />
         </div>
 
