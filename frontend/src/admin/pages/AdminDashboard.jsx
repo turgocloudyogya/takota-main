@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { Persons, Check, FileCheck, TriangleExclamation, ArrowRightFromLine } from '@gravity-ui/icons'
@@ -17,16 +17,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([])
   const [activityUser, setActivityUser] = useState('all')
 
-  useEffect(() => {
-    loadDashboardData()
-    loadUserOptions()
-  }, [])
-
-  useEffect(() => {
-    loadActivity(activityUser)
-  }, [activityUser])
-
-  async function loadUserOptions() {
+  const loadUserOptions = useCallback(async () => {
     try {
       const json = await listUsers({ limit: 100 })
       const list = unwrapList(json, 'users').map(normalizeUser).filter(Boolean)
@@ -34,9 +25,9 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error('Failed to load user options:', err)
     }
-  }
+  }, [])
 
-  async function loadActivity(userId) {
+  const loadActivity = useCallback(async (userId) => {
     try {
       setActivityLoading(true)
       const params = new URLSearchParams({ days: '150' })
@@ -55,9 +46,9 @@ export default function AdminDashboard() {
     } finally {
       setActivityLoading(false)
     }
-  }
+  }, [])
 
-  async function loadDashboardData() {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -90,7 +81,22 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    async function init() {
+      await loadDashboardData()
+      await loadUserOptions()
+    }
+    init()
+  }, [loadDashboardData, loadUserOptions])
+
+  useEffect(() => {
+    async function init() {
+      await loadActivity(activityUser)
+    }
+    init()
+  }, [activityUser, loadActivity])
 
   if (loading) {
     return (

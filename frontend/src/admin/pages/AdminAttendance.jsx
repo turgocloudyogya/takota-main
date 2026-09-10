@@ -33,18 +33,6 @@ function formatTime(dateRaw) {
   })
 }
 
-function formatDateTime(dateRaw) {
-  const d = parseApiDate(dateRaw)
-  if (!d) return dateRaw || '-'
-  return d.toLocaleString('en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
 export default function AdminAttendance() {
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')

@@ -166,7 +166,9 @@ export default function GuideOverlay({ onComplete }) {
   }
 
   const goNextRef = useRef(goNext)
-  goNextRef.current = goNext
+  useEffect(() => {
+    goNextRef.current = goNext
+  })
 
   // Navigate to the correct page when the user moves between steps
   useEffect(() => {

@@ -2,7 +2,8 @@
 // Requests pass through to the network untouched.
 self.addEventListener('fetch', () => {})
 
-// Service Worker untuk push notifications
+/* global clients:readonly */
+// Service Worker for push notifications and PWA installability.
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {}
   const options = {
@@ -51,6 +52,6 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
-self.addEventListener('notificationclose', (event) => {
-  // Handle notification close
+self.addEventListener('notificationclose', () => {
+  // Handle notification close (no-op, kept for future analytics)
 })

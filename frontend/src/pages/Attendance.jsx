@@ -59,7 +59,7 @@ export default function Attendance() {
   // null = not checked yet, 'granted' | 'denied' once we know.
   const [locationStatus, setLocationStatus] = useState(null)
   const [cameraStatus, setCameraStatus] = useState(null)
-  const [facingMode, setFacingMode] = useState('environment')
+  const [facingMode] = useState('environment')
   const [availableCameras, setAvailableCameras] = useState([])
   const [selectedCameraId, setSelectedCameraId] = useState(null)
 
@@ -282,9 +282,13 @@ export default function Attendance() {
   }
 
   useEffect(() => {
-    requestLocation()
-    requestCamera().then(() => enumerateCameras())
-    loadSettings()
+    async function init() {
+      requestLocation()
+      await requestCamera()
+      enumerateCameras()
+      loadSettings()
+    }
+    init()
     return () => stopStream()
   }, [])
 

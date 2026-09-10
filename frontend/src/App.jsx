@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { checkAuth, clearSession } from './lib/authGate.js'
@@ -95,7 +95,7 @@ function AuthGate() {
     return () => {
       cancelled = true
     }
-  }, []) // Empty dependency: only run once on mount
+  }, [location.pathname, navigate]) // Re-validate on every route change
 
   return null
 }

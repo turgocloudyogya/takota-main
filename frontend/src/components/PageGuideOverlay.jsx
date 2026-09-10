@@ -99,7 +99,9 @@ export default function PageGuideOverlay({ page, steps }) {
   }
 
   const handleNextRef = useRef(handleNext)
-  handleNextRef.current = handleNext
+  useEffect(() => {
+    handleNextRef.current = handleNext
+  })
 
   useEffect(() => {
     if (!currentStep || done) return

@@ -13,6 +13,10 @@ export default function PushNotifications() {
   )
 
   useEffect(() => {
+    if (!supported) {
+      const timer = setTimeout(() => setLoading(false), 0)
+      return () => clearTimeout(timer)
+    }
     let cancelled = false
     async function checkStatus() {
       try {
@@ -23,8 +27,7 @@ export default function PushNotifications() {
         if (!cancelled) setLoading(false)
       }
     }
-    if (supported) checkStatus()
-    else setLoading(false)
+    checkStatus()
     return () => {
       cancelled = true
     }

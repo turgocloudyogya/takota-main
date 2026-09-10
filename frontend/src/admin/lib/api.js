@@ -91,7 +91,7 @@ async function extractErrorMessage(response) {
 /**
  * Core request helper.
  */
-async function request(path, { method = 'GET', params, body, auth = true, raw = false } = {}) {
+async function request(path, { method = 'GET', params, body, raw = false } = {}) {
   const url = `${getBaseUrl()}${path}${buildQuery(params)}`
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData
 
@@ -144,7 +144,6 @@ export async function login(username, password) {
   // stores it automatically (credentials:"include" in request()).
   const json = await request('/api/auth', {
     method: 'POST',
-    auth: false,
     body: { username, password },
   })
   clearLegacyTokenStorage()

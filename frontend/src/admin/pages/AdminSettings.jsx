@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { Clock, Check, Shield } from '@gravity-ui/icons'
@@ -58,19 +58,13 @@ function TimeSetting({ label, value, onChange }) {
 }
 
 export default function AdminSettings() {
-  const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [openTime, setOpenTime] = useState('06:00')
   const [closeTime, setCloseTime] = useState('21:00')
   const [selectedDays, setSelectedDays] = useState([])
 
-  // Load settings on mount
-  useEffect(() => {
-    loadSettings()
-  }, [])
-
-  async function loadSettings() {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/admin/settings', {
@@ -84,11 +78,10 @@ export default function AdminSettings() {
       const data = await response.json()
 
       if (data.data) {
-        // Convert "HH:MM:SS" from backend to "HH:MM" for input type="time"
+        // Convert "HH:MM:SS" from backend to "HH:MM" for the time fields
         setOpenTime(timeToInputFormat(data.data.attendance_open_time))
         setCloseTime(timeToInputFormat(data.data.attendance_close_time))
         setSelectedDays(data.data.open_days || [])
-        setSettings(data.data)
       }
     } catch (err) {
       toast.error('Failed to load settings')
@@ -96,7 +89,15 @@ export default function AdminSettings() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // Load settings on mount
+  useEffect(() => {
+    async function init() {
+      await loadSettings()
+    }
+    init()
+  }, [loadSettings])
 
   function toggleDay(day) {
     setSelectedDays((prev) =>
@@ -139,7 +140,6 @@ export default function AdminSettings() {
       toast.success('Settings saved successfully')
       const data = await response.json()
       if (data.data) {
-        setSettings(data.data)
         // Update display format after save
         setOpenTime(timeToInputFormat(data.data.attendance_open_time))
         setCloseTime(timeToInputFormat(data.data.attendance_close_time))

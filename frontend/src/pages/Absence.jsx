@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Drawer } from 'vaul'
 import { Icon } from '@gravity-ui/uikit'
-import { Files, Xmark, PaperPlane, TriangleExclamation } from '@gravity-ui/icons'
+import { Files, Xmark, PaperPlane } from '@gravity-ui/icons'
 import { Label, ListBox, Select, TextArea, DatePicker, DateField, Calendar, Checkbox } from '@heroui/react'
 import { parseDate, today, getLocalTimeZone } from '@internationalized/date'
 import BackButton from '../components/BackButton.jsx'
@@ -104,17 +104,6 @@ export default function Absence() {
   const [timeUntilClose, setTimeUntilClose] = useState(null)
   const [absenceClosed, setAbsenceClosed] = useState(false)
 
-  async function loadSettings() {
-    try {
-      const response = await getSettings()
-      deltaRef.current = serverDelta(response.data)
-      setAttendanceSettings(response.data)
-      updateCountdown(response.data)
-    } catch (err) {
-      console.error('Failed to load settings:', err)
-    }
-  }
-
   const wasClosedRef = useRef(null)
   const deltaRef = useRef(0)
 
@@ -192,10 +181,22 @@ export default function Absence() {
     return now < openTime || now >= closeTime
   }
 
-  // "Absence has been taken!" auto-redirects to home after 3 seconds,
-  // counting down 3, 2, 1 in the message as it goes.
+  async function loadSettings() {
+    try {
+      const response = await getSettings()
+      deltaRef.current = serverDelta(response.data)
+      setAttendanceSettings(response.data)
+      updateCountdown(response.data)
+    } catch (err) {
+      console.error('Failed to load settings:', err)
+    }
+  }
+
   useEffect(() => {
-    loadSettings()
+    async function init() {
+      await loadSettings()
+    }
+    init()
     const settingsInterval = setInterval(loadSettings, 60000)
     const countdownInterval = setInterval(() => {
       setAttendanceSettings((prev) => {
