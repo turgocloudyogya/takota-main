@@ -1,6 +1,8 @@
-// Bottom drawer with attendance record details: photo, time, location and
-// an embedded Google Map. Opened by tapping an item in the /main history.
+// Attendance record details: photo, time, location and an embedded
+// Google Map. Opened by tapping an item in the /main history.
+// Mobile: bottom sheet. Desktop (lg+): side panel sliding in from the right.
 
+import { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
 
 function formatFull(timestamp) {
@@ -16,6 +18,18 @@ function formatFull(timestamp) {
 }
 
 export default function AttendanceDetailDrawer({ open, onOpenChange, item }) {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)').matches,
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia?.('(min-width: 1024px)')
+    if (!mq) return
+    const onChange = (e) => setIsDesktop(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
   const address = item?.displayAddress || null
   const coords =
     item?.latitude && item?.longitude ? `${item.latitude}, ${item.longitude}` : null
@@ -25,11 +39,17 @@ export default function AttendanceDetailDrawer({ open, onOpenChange, item }) {
       : null
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange}>
+    <Drawer.Root open={open} onOpenChange={onOpenChange} direction={isDesktop ? 'right' : 'bottom'}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
-        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[85dvh] max-w-md flex-col overflow-y-auto rounded-t-2xl bg-white p-5 pb-8 outline-none dark:bg-neutral-900 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-          <Drawer.Handle className="mx-auto mb-4 h-1.5 w-10 shrink-0 rounded-full bg-app-border/40" />
+        <Drawer.Content
+          className={`fixed z-50 mx-auto flex flex-col overflow-y-auto bg-white p-5 pb-8 outline-none dark:bg-neutral-900 [&::-webkit-scrollbar]:hidden [scrollbar-width:none] ${
+            isDesktop
+              ? 'top-0 right-0 h-dvh w-full max-w-md rounded-l-2xl'
+              : 'inset-x-0 bottom-0 max-h-[85dvh] max-w-md rounded-t-2xl'
+          }`}
+        >
+          <Drawer.Handle className={`mx-auto mb-4 h-1.5 w-10 shrink-0 rounded-full bg-app-border/40 ${isDesktop ? 'hidden' : ''}`} />
           <Drawer.Title className="mb-4 text-base font-bold text-neutral-900 dark:text-neutral-100">
             Attendance Detail
           </Drawer.Title>

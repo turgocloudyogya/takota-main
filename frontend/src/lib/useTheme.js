@@ -2,6 +2,19 @@ import { createContext, useContext } from 'react'
 
 const THEME_STORAGE_KEY = 'takota-theme'
 
+// Browser chrome (address bar) color follows the page theme.
+const THEME_COLORS = { light: '#ffffff', dark: '#0a0a0a' }
+
+export function applyThemeColor(theme) {
+  try {
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', THEME_COLORS[theme] || THEME_COLORS.light)
+  } catch {
+    // ignore (e.g. no DOM during prerender)
+  }
+}
+
 // Resolve the initial theme: an explicitly saved choice wins, otherwise we
 // follow the OS preference. This also runs before first paint via
 // ThemeProvider's lazy initializer, so there is no light-mode flash for

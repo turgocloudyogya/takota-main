@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/carakan/takota/internal/models"
 	"github.com/carakan/takota/internal/utils"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type DashboardStats struct {
@@ -72,9 +74,12 @@ func (ctrl *AdminController) GetDashboardStats(c *gin.Context) {
 		return
 	}
 
-	// Get today's absence (approved or pending counts as non-alpha)
+	// Get today's absence: submitted today (pending or approved), plus
+	// approved multi-day leaves from earlier days still covering today.
+	dayEnd := dayStart.Add(24 * time.Hour)
 	if err := ctrl.DB.Model(&models.Attendance{}).
-		Where("type = ? AND created_at >= ? AND (sign_status IS NULL OR sign_status = ?)", "absence", dayStart, "allow").
+		Where("type = ? AND ((created_at >= ? AND (sign_status IS NULL OR sign_status = ?)) OR (sign_status = ? AND absence_start_date < ? AND absence_end_date >= ?))",
+			"absence", dayStart, "allow", "allow", dayEnd, dayStart).
 		Count(&stats.AbsenceToday).Error; err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Failed to get today absence count", "DB_ERROR")
 		return
@@ -114,7 +119,8 @@ func (ctrl *AdminController) GetDashboardStats(c *gin.Context) {
 	}
 	var attendedUsersCount int64
 	if err := ctrl.DB.Model(&models.Attendance{}).
-		Where("created_at >= ? AND ((type = ?) OR (type = ? AND (sign_status IS NULL OR sign_status = ?)))", dayStart, "attendance", "absence", "allow").
+		Where("(created_at >= ? AND ((type = ?) OR (type = ? AND (sign_status IS NULL OR sign_status = ?)))) OR (type = ? AND sign_status = ? AND absence_start_date < ? AND absence_end_date >= ?)",
+			dayStart, "attendance", "absence", "allow", "absence", "allow", dayEnd, dayStart).
 		Distinct("user_id").
 		Count(&attendedUsersCount).Error; err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Failed to calculate alpha", "DB_ERROR")
@@ -153,19 +159,20 @@ func (ctrl *AdminController) GetDashboardStats(c *gin.Context) {
 		stats.AverageAttendance = float64(stats.TotalAttendance) / float64(stats.TotalUsers)
 	}
 
-	// Weekly daily averages (last 7 days / 7)
+	// Weekly daily averages (last 7 days / 7). Absences count leave-days:
+	// a multi-day leave contributes every day inside its range.
 	weekAgo := utils.Now().AddDate(0, 0, -7)
-	var weekCheckins, weekAbsences int64
+	var weekCheckins int64
 	if err := ctrl.DB.Model(&models.Attendance{}).
 		Where("type = ? AND created_at >= ?", "attendance", weekAgo).
 		Count(&weekCheckins).Error; err == nil {
 		stats.WeeklyAvgCheckins = float64(weekCheckins) / 7
 	}
-	if err := ctrl.DB.Model(&models.Attendance{}).
-		Where("type = ? AND created_at >= ?", "absence", weekAgo).
-		Count(&weekAbsences).Error; err == nil {
-		stats.WeeklyAvgAbsences = float64(weekAbsences) / 7
+	weekLeaveDays := int64(0)
+	for _, count := range leaveDayCounts(ctrl.DB, weekAgo, utils.Now()) {
+		weekLeaveDays += count
 	}
+	stats.WeeklyAvgAbsences = float64(weekLeaveDays) / 7
 
 	utils.RespondSuccess(c, http.StatusOK, gin.H{
 		"data": stats,
@@ -181,11 +188,15 @@ func (ctrl *AdminController) GetAttendanceTrend(c *gin.Context) {
 	}
 	var rows []row
 
-	sevenDaysAgo := utils.Now().AddDate(0, 0, -7)
+	loc := utils.AppLocation()
+	now := utils.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	windowStart := todayStart.AddDate(0, 0, -29)
+	thirtyDaysAgo := now.AddDate(0, 0, -30)
 
 	if err := ctrl.DB.Model(&models.Attendance{}).
 		Select("TO_CHAR(created_at, 'YYYY-MM-DD') as date, type, COUNT(*) as count").
-		Where("created_at >= ?", sevenDaysAgo).
+		Where("type = ? AND created_at >= ?", "attendance", thirtyDaysAgo).
 		Group("TO_CHAR(created_at, 'YYYY-MM-DD'), type").
 		Order("date").
 		Scan(&rows).Error; err != nil {
@@ -194,14 +205,25 @@ func (ctrl *AdminController) GetAttendanceTrend(c *gin.Context) {
 	}
 
 	merged := map[string]map[string]int64{}
-	var order []string
 	for _, r := range rows {
 		if _, ok := merged[r.Date]; !ok {
 			merged[r.Date] = map[string]int64{}
-			order = append(order, r.Date)
 		}
 		merged[r.Date][r.Type] = r.Count
 	}
+	// Absences span their whole approved/pending period: a multi-day leave
+	// counts on every day inside its range, not just the submission day.
+	for day, count := range leaveDayCounts(ctrl.DB, windowStart, now) {
+		if _, ok := merged[day]; !ok {
+			merged[day] = map[string]int64{}
+		}
+		merged[day]["absence"] += count
+	}
+	order := make([]string, 0, len(merged))
+	for d := range merged {
+		order = append(order, d)
+	}
+	sort.Strings(order)
 	trends := []gin.H{}
 	for _, d := range order {
 		trends = append(trends, gin.H{
@@ -217,6 +239,54 @@ func (ctrl *AdminController) GetAttendanceTrend(c *gin.Context) {
 	utils.RespondSuccess(c, http.StatusOK, gin.H{
 		"data": trends,
 	})
+}
+
+// leaveDayCounts counts non-rejected absence rows covering each day in
+// [from, to] (app timezone day keys). Single-day absences count on their
+// start (or submission) day; multi-day absences count on every day of their
+// range, capped at `to` so future days never leak in.
+func leaveDayCounts(db *gorm.DB, from, to time.Time) map[string]int64 {
+	loc := utils.AppLocation()
+	type absenceRow struct {
+		CreatedAt time.Time
+		Start     *time.Time
+		End       *time.Time
+		Sign      *string
+	}
+	var rows []absenceRow
+	db.Model(&models.Attendance{}).
+		Select("created_at, absence_start_date AS start, absence_end_date AS end, sign_status AS sign").
+		Where("type = ? AND (created_at >= ? OR absence_end_date >= ?)", "absence", from, from).
+		Find(&rows)
+
+	out := map[string]int64{}
+	fromKey := from.In(loc).Format("2006-01-02")
+	toKey := to.In(loc).Format("2006-01-02")
+	for _, r := range rows {
+		if r.Sign != nil && strings.ToLower(*r.Sign) == "reject" {
+			continue
+		}
+		spanStart := r.CreatedAt
+		if r.Start != nil {
+			spanStart = *r.Start
+		}
+		spanEnd := spanStart
+		if r.End != nil && r.End.After(spanEnd) {
+			spanEnd = *r.End
+		}
+		startDay := spanStart.In(loc).Truncate(24 * time.Hour)
+		endDay := spanEnd.In(loc).Truncate(24 * time.Hour)
+		for d := startDay; !d.After(endDay); d = d.AddDate(0, 0, 1) {
+			k := d.Format("2006-01-02")
+			if k > toKey {
+				break
+			}
+			if k >= fromKey {
+				out[k]++
+			}
+		}
+	}
+	return out
 }
 
 type ActivityDay struct {

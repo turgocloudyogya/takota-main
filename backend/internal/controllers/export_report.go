@@ -20,6 +20,24 @@ type exportAPIError struct {
 
 func (e *exportAPIError) Error() string { return e.Message }
 
+// daysBetween lists YYYY-MM-DD day keys from start through end inclusive.
+func daysBetween(start, end string) []string {
+	const layout = "2006-01-02"
+	s, err := time.Parse(layout, start)
+	if err != nil {
+		return []string{start}
+	}
+	e, err := time.Parse(layout, end)
+	if err != nil || e.Before(s) {
+		return []string{start}
+	}
+	var out []string
+	for d := s; !d.After(e); d = d.AddDate(0, 0, 1) {
+		out = append(out, d.Format(layout))
+	}
+	return out
+}
+
 // weekdayOrder fixes the natural Monday-first weekly ordering used to build
 // the work-day pattern (Senin..Minggu), regardless of what order the
 // selected weekdays were supplied in.
@@ -165,9 +183,13 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 	// Fetch every attendance/absence record inside the requested range only
 	// -- anything outside [start_date, end_date] is blank by contract
 	// regardless of what data exists, so there is no need to query further.
+	// Multi-day absences submitted earlier still count when their period
+	// overlaps the range, so they are fetched by overlap as well.
+	rangeEndExclusive := p.EndDate.AddDate(0, 0, 1)
 	var records []models.Attendance
 	ctrl.DB.Where("user_id IN ?", studentIDList).
-		Where("created_at >= ? AND created_at < ?", p.StartDate, p.EndDate.AddDate(0, 0, 1)).
+		Where("(created_at >= ? AND created_at < ?) OR (type = ? AND absence_start_date < ? AND absence_end_date >= ?)",
+			p.StartDate, rangeEndExclusive, "absence", rangeEndExclusive, p.StartDate).
 		Find(&records)
 
 	index := make(map[uuid.UUID]map[string]attendanceMark)
@@ -176,14 +198,12 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 	// approved or not). A date with no record from anyone is treated as a
 	// non-school day (holiday/libur) rather than "everyone was Alpa".
 	dayHasRecord := make(map[string]bool)
-	for _, rec := range records {
-		if index[rec.UserID] == nil {
-			index[rec.UserID] = make(map[string]attendanceMark)
+	markDay := func(userID uuid.UUID, dateKey string, rec models.Attendance) {
+		if index[userID] == nil {
+			index[userID] = make(map[string]attendanceMark)
 		}
-		dateKey := rec.CreatedAt.Format("2006-01-02")
 		dayHasRecord[dateKey] = true
-		entry := index[rec.UserID][dateKey]
-
+		entry := index[userID][dateKey]
 		switch rec.Type {
 		case "attendance":
 			entry.Hadir = true
@@ -192,7 +212,24 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 				entry.ApprovedOption = *rec.Option
 			}
 		}
-		index[rec.UserID][dateKey] = entry
+		index[userID][dateKey] = entry
+	}
+	for _, rec := range records {
+		// Approved multi-day absences cover every day of their period, not
+		// just the submission day.
+		if rec.Type == "absence" && isMultiDayAbsence(rec.AbsenceStartDate, rec.AbsenceEndDate) {
+			startDay := rec.AbsenceStartDate.Format("2006-01-02")
+			endDay := rec.AbsenceEndDate.Format("2006-01-02")
+			for _, d := range daysBetween(startDay, endDay) {
+				if d < p.StartStr || d > p.EndStr {
+					continue
+				}
+				markDay(rec.UserID, d, rec)
+			}
+			continue
+		}
+		dateKey := rec.CreatedAt.Format("2006-01-02")
+		markDay(rec.UserID, dateKey, rec)
 	}
 
 	todayStr := time.Now().UTC().Format("2006-01-02")

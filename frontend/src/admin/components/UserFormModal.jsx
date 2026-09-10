@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Button } from '@heroui/react'
+import { Button, Checkbox, Input, Label, ListBox, Select, TextField } from '@heroui/react'
+import { Icon } from '@gravity-ui/uikit'
+import { Eye, EyeSlash } from '@gravity-ui/icons'
 import { toast } from 'sonner'
 import { AppModal } from '../../components/Modals.jsx'
-import { TextInput, PasswordInput, SelectInput, ToggleField } from './FormField.jsx'
 import * as api from '../lib/api.js'
 
 const emptyForm = {
@@ -18,6 +19,7 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
   const isEdit = Boolean(user)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [showPw, setShowPw] = useState(false)
   const typeLabel = form.type === 'admin' ? 'Admin' : 'Student'
 
   // Reset the form whenever the modal transitions from closed -> open, so a
@@ -29,6 +31,7 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
   if (open !== prevOpen) {
     setPrevOpen(open)
     if (open) {
+      setShowPw(false)
       setForm(
         user
           ? {
@@ -159,45 +162,68 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <TextInput
-          label="Nickname"
-          placeholder="e.g. Ahnaf"
-          value={form.nickname}
-          onChange={(e) => setField('nickname', e.target.value)}
-        />
-        <TextInput
-          label="Full Name"
-          placeholder="e.g. Ahnaf Farras"
-          value={form.callname}
-          onChange={(e) => setField('callname', e.target.value)}
-        />
-        <TextInput
-          label="Username"
-          placeholder="e.g. user001"
-          value={form.username}
-          onChange={(e) => setField('username', e.target.value)}
-          autoComplete="off"
-        />
-        <PasswordInput
-          label={isEdit ? 'New Password (optional)' : 'Password'}
-          placeholder={isEdit ? 'Leave blank to keep unchanged' : 'Account password'}
-          value={form.password}
-          onChange={(e) => setField('password', e.target.value)}
-          autoComplete="new-password"
-        />
-        <SelectInput
-          label="Account Type"
-          value={form.type}
-          onChange={(e) => setField('type', e.target.value)}
-        >
-          <option value="user">Student</option>
-          <option value="admin">Admin</option>
-        </SelectInput>
-        <ToggleField
-          label="Require password change on first login"
-          checked={form.changeAsLogin}
-          onChange={(v) => setField('changeAsLogin', v)}
-        />
+        <TextField fullWidth name="nickname" value={form.nickname} onChange={(v) => setField('nickname', v)}>
+          <Label>Nickname</Label>
+          <Input className="bg-neutral-100 shadow-none dark:bg-neutral-800" placeholder="e.g. Ahnaf" />
+        </TextField>
+        <TextField fullWidth name="callname" value={form.callname} onChange={(v) => setField('callname', v)}>
+          <Label>Full Name</Label>
+          <Input className="bg-neutral-100 shadow-none dark:bg-neutral-800" placeholder="e.g. Ahnaf Farras" />
+        </TextField>
+        <TextField fullWidth name="username" value={form.username} onChange={(v) => setField('username', v)}>
+          <Label>Username</Label>
+          <Input className="bg-neutral-100 shadow-none dark:bg-neutral-800" placeholder="e.g. user001" autoComplete="off" />
+        </TextField>
+        <TextField fullWidth name="password" type={showPw ? 'text' : 'password'} value={form.password} onChange={(v) => setField('password', v)}>
+          <Label>{isEdit ? 'New Password (optional)' : 'Password'}</Label>
+          <div className="relative">
+            <Input
+              className="bg-neutral-100 shadow-none dark:bg-neutral-800 pr-10"
+              placeholder={isEdit ? 'Leave blank to keep unchanged' : 'Account password'}
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((v) => !v)}
+              aria-label={showPw ? 'Hide password' : 'Show password'}
+              className="absolute top-1/2 right-3 -translate-y-1/2 shrink-0 text-neutral dark:text-neutral-400"
+            >
+              <Icon data={showPw ? EyeSlash : Eye} size={16} />
+            </button>
+          </div>
+        </TextField>
+        <Select fullWidth value={form.type} onChange={(v) => setField('type', String(v))} placeholder="Select account type">
+          <Label>Account Type</Label>
+          <Select.Trigger className="bg-neutral-100 shadow-none dark:bg-neutral-800">
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              <ListBox.Item id="user" textValue="Student">
+                Student
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
+              <ListBox.Item id="admin" textValue="Admin">
+                Admin
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
+            </ListBox>
+          </Select.Popover>
+        </Select>
+        <label className="flex items-center gap-2 text-sm text-neutral-900 dark:text-neutral-100">
+          <Checkbox
+            isSelected={form.changeAsLogin}
+            onChange={(v) => setField('changeAsLogin', v)}
+          >
+            <Checkbox.Content>
+              <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              Require password change on first login
+            </Checkbox.Content>
+          </Checkbox>
+        </label>
       </form>
     </AppModal>
   )

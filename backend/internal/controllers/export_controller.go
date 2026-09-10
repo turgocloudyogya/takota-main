@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ type ExportData struct {
 	TimeGMT       string
 	AbsenceType   string
 	AbsenceReason string
+	TypeLeave     string
 	Location      string
 	PhotoFile     string
 	DocumentFile  string
@@ -94,34 +96,41 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 	startDate := time.Date(yearNum, time.Month(monthNum), 1, 0, 0, 0, 0, time.UTC)
 	endDate := startDate.AddDate(0, 1, 0)
 
-	// Fetch attendance data
+	// Fetch records: attendances submitted in the month, plus absences
+	// overlapping the month (a multi-day leave submitted earlier still
+	// covers days inside the month).
+	monthEndExclusive := endDate
 	var attendances []models.Attendance
-	ctrl.DB.Where("created_at >= ? AND created_at < ?", startDate, endDate).
+	ctrl.DB.Where("(created_at >= ? AND created_at < ?) OR (type = ? AND absence_start_date < ? AND absence_end_date >= ?)",
+		startDate, monthEndExclusive, "absence", monthEndExclusive, startDate).
 		Preload("User").
 		Order("created_at ASC").
 		Find(&attendances)
 
-	// Prepare CSV data (time/date shown in the configured app timezone)
+	// Prepare export rows (time/date shown in the configured app timezone).
+	// Multi-day absences expand to one row per covered day inside the month.
 	loc := utils.AppLocation()
 	timeGMT := utils.GMTOffset()
-	var exportData []ExportData
-	for i, att := range attendances {
+	monthStartKey := startDate.Format("2006-01-02")
+	monthEndKey := monthEndExclusive.AddDate(0, 0, -1).Format("2006-01-02")
+
+	buildRow := func(att models.Attendance, date time.Time, typeLeave string) ExportData {
 		localTime := att.CreatedAt.In(loc)
 		data := ExportData{
-			No:            i + 1,
 			Nickname:      att.User.Nickname,
 			UserID:        att.UserID.String(),
 			Name:          att.User.Callname,
 			Username:      att.User.Username,
 			Attendance:    att.Type,
 			Time:          localTime.Format("15:04:05"),
-			Date:          localTime.Format("2006-01-02"),
+			Date:          date.In(loc).Format("2006-01-02"),
 			Latitude:      "",
 			Longitude:     "",
 			TimeISO:       att.CreatedAt.Format(time.RFC3339),
 			TimeGMT:       timeGMT,
 			AbsenceType:   "",
 			AbsenceReason: "",
+			TypeLeave:     typeLeave,
 		}
 
 		if att.Latitude != nil {
@@ -153,7 +162,39 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 			data.PhotoFile = s3.BucketOpenURL(*att.Photo)
 		}
 
-		exportData = append(exportData, data)
+		return data
+	}
+
+	type datedRow struct {
+		data ExportData
+		key  string
+	}
+	var dated []datedRow
+	for _, att := range attendances {
+		if att.Type == "absence" && isMultiDayAbsence(att.AbsenceStartDate, att.AbsenceEndDate) {
+			startDay := att.AbsenceStartDate.In(loc).Truncate(24 * time.Hour)
+			endDay := att.AbsenceEndDate.In(loc).Truncate(24 * time.Hour)
+			for d := startDay; !d.After(endDay); d = d.AddDate(0, 0, 1) {
+				k := d.Format("2006-01-02")
+				if k < monthStartKey || k > monthEndKey {
+					continue
+				}
+				dated = append(dated, datedRow{data: buildRow(att, d, "multiday"), key: k})
+			}
+			continue
+		}
+		typeLeave := ""
+		if att.Type == "absence" {
+			typeLeave = "singleday"
+		}
+		dated = append(dated, datedRow{data: buildRow(att, att.CreatedAt, typeLeave), key: att.CreatedAt.In(loc).Format("2006-01-02")})
+	}
+	sort.SliceStable(dated, func(i, j int) bool { return dated[i].key < dated[j].key })
+
+	var exportData []ExportData
+	for i, dr := range dated {
+		dr.data.No = i + 1
+		exportData = append(exportData, dr.data)
 	}
 
 	// JSON export: structured object with metadata and items
@@ -173,6 +214,7 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 			TimeGMT       string `json:"time_gmt"`
 			AbsenceType   string `json:"absence_type"`
 			AbsenceReason string `json:"absence_reason"`
+			TypeLeave     string `json:"type_leave"`
 			Location      string `json:"location"`
 			PhotoFile     string `json:"photo_file"`
 			Document      string `json:"document"`
@@ -208,6 +250,7 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 				TimeGMT:       data.TimeGMT,
 				AbsenceType:   data.AbsenceType,
 				AbsenceReason: data.AbsenceReason,
+				TypeLeave:     data.TypeLeave,
 				Location:      data.Location,
 				PhotoFile:     data.PhotoFile,
 				Document:      data.DocumentFile,
@@ -246,11 +289,11 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 	var headers []string
 	switch lang {
 	case "id":
-		headers = []string{"No", "ID", "Nickname", "Nama", "Username", "Kehadiran", "Waktu", "Tanggal", "Latitude", "Longitude", "Waktu ISO", "Waktu GMT", "Jenis Ketidakhadiran", "Alasan Izin", "Lokasi", "File Foto", "Dokumen"}
+		headers = []string{"No", "ID", "Nickname", "Nama", "Username", "Kehadiran", "Waktu", "Tanggal", "Latitude", "Longitude", "Waktu ISO", "Waktu GMT", "Jenis Ketidakhadiran", "Alasan Izin", "Tipe Izin", "Lokasi", "File Foto", "Dokumen"}
 	case "params":
-		headers = []string{"no", "id", "nickname", "name", "username", "attendance", "time", "date", "latitude", "longitude", "time_iso", "time_gmt", "absence_type", "absence_reason", "location", "photo_file", "document"}
+		headers = []string{"no", "id", "nickname", "name", "username", "attendance", "time", "date", "latitude", "longitude", "time_iso", "time_gmt", "absence_type", "absence_reason", "type_leave", "location", "photo_file", "document"}
 	default:
-		headers = []string{"No", "ID", "Nickname", "Name", "Username", "Attendance", "Time", "Date", "Latitude", "Longitude", "Time ISO", "Time GMT", "Absence Type", "Absence Reason", "Location", "Photo File", "Document"}
+		headers = []string{"No", "ID", "Nickname", "Name", "Username", "Attendance", "Time", "Date", "Latitude", "Longitude", "Time ISO", "Time GMT", "Absence Type", "Absence Reason", "Type Leave", "Location", "Photo File", "Document"}
 	}
 	writer.Write(headers)
 
@@ -271,6 +314,7 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 			data.TimeGMT,
 			data.AbsenceType,
 			data.AbsenceReason,
+			data.TypeLeave,
 			data.Location,
 			data.PhotoFile,
 			data.DocumentFile,

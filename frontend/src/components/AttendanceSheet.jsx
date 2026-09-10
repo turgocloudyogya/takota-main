@@ -6,7 +6,7 @@ export default function AttendanceSheet({ open, onOpenChange, onPickAttendance, 
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
-        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-md flex-col rounded-t-2xl bg-white p-5 pb-8 outline-none dark:bg-neutral-900">
+        <Drawer.Content className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-w-xl flex-col rounded-t-2xl bg-white p-5 pb-8 outline-none dark:bg-neutral-900">
           <Drawer.Handle className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-app-border/40" />
           <Drawer.Title className="mb-4 text-sm font-medium text-neutral-500 dark:text-neutral-400">
             Select option
