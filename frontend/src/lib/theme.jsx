@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ThemeContext, getInitialTheme, saveTheme } from './useTheme.js'
+import { ThemeContext, applyThemeColor, getInitialTheme, saveTheme } from './useTheme.js'
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(getInitialTheme)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
+    applyThemeColor(theme)
     saveTheme(theme)
   }, [theme])
 

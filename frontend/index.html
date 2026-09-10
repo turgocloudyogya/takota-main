@@ -5,16 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/takota-icon.svg" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#DD5C00" />
+    <meta name="theme-color" content="#ffffff" />
     <title>Absensi</title>
     <script>
       // Apply the saved/system theme before React paints to avoid a
       // light-mode flash. Matches src/lib/useTheme.js getInitialTheme().
+      // The browser chrome color follows the same theme.
       (function () {
         try {
           var stored = localStorage.getItem('takota-theme')
           var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
           if (dark) document.documentElement.classList.add('dark')
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', dark ? '#0a0a0a' : '#ffffff')
         } catch (e) {}
       })()
     </script>
