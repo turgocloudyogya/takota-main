@@ -164,21 +164,21 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <TextField fullWidth name="nickname" value={form.nickname} onChange={(v) => setField('nickname', v)}>
           <Label>Nickname</Label>
-          <Input placeholder="e.g. Ahnaf" />
+          <Input className="bg-neutral-100 dark:bg-neutral-900" placeholder="e.g. Ahnaf" />
         </TextField>
         <TextField fullWidth name="callname" value={form.callname} onChange={(v) => setField('callname', v)}>
           <Label>Full Name</Label>
-          <Input placeholder="e.g. Ahnaf Farras" />
+          <Input className="bg-neutral-100 dark:bg-neutral-900" placeholder="e.g. Ahnaf Farras" />
         </TextField>
         <TextField fullWidth name="username" value={form.username} onChange={(v) => setField('username', v)}>
           <Label>Username</Label>
-          <Input placeholder="e.g. user001" autoComplete="off" />
+          <Input className="bg-neutral-100 dark:bg-neutral-900" placeholder="e.g. user001" autoComplete="off" />
         </TextField>
         <TextField fullWidth name="password" type={showPw ? 'text' : 'password'} value={form.password} onChange={(v) => setField('password', v)}>
           <Label>{isEdit ? 'New Password (optional)' : 'Password'}</Label>
           <div className="relative">
             <Input
-              className="pr-10"
+              className="bg-neutral-100 dark:bg-neutral-900 pr-10"
               placeholder={isEdit ? 'Leave blank to keep unchanged' : 'Account password'}
               autoComplete="new-password"
             />
@@ -194,7 +194,7 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
         </TextField>
         <Select fullWidth value={form.type} onChange={(v) => setField('type', String(v))} placeholder="Select account type">
           <Label>Account Type</Label>
-          <Select.Trigger>
+          <Select.Trigger className="bg-neutral-100 dark:bg-neutral-900">
             <Select.Value />
             <Select.Indicator />
           </Select.Trigger>
