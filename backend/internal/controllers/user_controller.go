@@ -25,9 +25,10 @@ type HomeResponse struct {
 }
 
 type HomeData struct {
-	GreetingWidget GreetingWidget       `json:"greeting_widget"`
-	Today          *TodayAttendance     `json:"today"`
-	Absence        []AbsenceItem        `json:"absence"`
+	GreetingWidget GreetingWidget          `json:"greeting_widget"`
+	Today          *TodayAttendance        `json:"today"`
+	Absence        []AbsenceItem           `json:"absence"`
+	Attendance     []AttendanceHistoryItem `json:"attendance"`
 }
 
 type GreetingWidget struct {
@@ -39,7 +40,11 @@ type GreetingWidget struct {
 type TodayAttendance struct {
 	Type           string    `json:"type"`
 	Timestamp      time.Time `json:"timestamp"`
-	DisplayAddress *string   `json:"display_address"` // reverse-geocoded location label
+	DisplayAddress *string   `json:"display_address"`
+	Photo          *string   `json:"photo"`           // S3 object key
+	PhotoURL       *string   `json:"photo_url"`       // Signed URL for display
+	Latitude       *string   `json:"latitude"`
+	Longitude      *string   `json:"longitude"`
 }
 
 type AbsenceItem struct {
@@ -57,14 +62,26 @@ type VerifierInfo struct {
 	SignStatus *string `json:"sign_status"` // allow, reject, or null (pending)
 }
 
+type AttendanceHistoryItem struct {
+	ID             string  `json:"id"`
+	Timestamp      string  `json:"timestamp"`
+	DisplayAddress *string `json:"display_address"`
+	PhotoURL       *string `json:"photo_url"`
+	Latitude       *string `json:"latitude"`
+	Longitude      *string `json:"longitude"`
+	GmapsEmbed     *string `json:"gmaps_embed"`
+}
+
 type AttendanceRequest struct {
 	Latitude  string `form:"latitude"`
 	Longitude string `form:"longitude"`
 }
 
 type AbsenceRequest struct {
-	Reason string `form:"reason"`
-	Option string `form:"option"`
+	Reason           string `form:"reason"`
+	Option           string `form:"option"`
+	AbsenceStartDate string `form:"absence_start_date"` // ISO 8601 format: YYYY-MM-DD
+	AbsenceEndDate   string `form:"absence_end_date"`   // ISO 8601 format: YYYY-MM-DD
 }
 
 // Home returns user home dashboard data
@@ -97,14 +114,26 @@ func (ctrl *UserController) Home(c *gin.Context) {
 			Type:           attendance.Type,
 			Timestamp:      attendance.CreatedAt,
 			DisplayAddress: attendance.DisplayAddress,
+			Photo:          attendance.Photo,
+			Latitude:       attendance.Latitude,
+			Longitude:      attendance.Longitude,
+		}
+
+		// Generate signed URL for photo if it exists
+		if attendance.Photo != nil {
+			ctx := context.Background()
+			photoURL, err := s3.GetSignedURL(ctx, *attendance.Photo, time.Hour)
+			if err == nil {
+				todayAttendance.PhotoURL = &photoURL
+			}
 		}
 	}
 
-	// Get recent absences (last 4, only type absence)
+	// Get recent absences (last 20, only type absence)
 	var absences []models.Attendance
 	ctrl.DB.Where("user_id = ? AND type = ?", uid, "absence").
 		Order("created_at DESC").
-		Limit(4).
+		Limit(20).
 		Preload("Verifier").
 		Find(&absences)
 
@@ -142,11 +171,39 @@ func (ctrl *UserController) Home(c *gin.Context) {
 		absenceItems = append(absenceItems, item)
 	}
 
+	// Get recent attendance history (last 20, only type attendance)
+	var history []models.Attendance
+	ctrl.DB.Where("user_id = ? AND type = ?", uid, "attendance").
+		Order("created_at DESC").
+		Limit(20).
+		Find(&history)
+
+	historyItems := []AttendanceHistoryItem{}
+	for _, h := range history {
+		item := AttendanceHistoryItem{
+			ID:             h.ID.String(),
+			Timestamp:      h.CreatedAt.Format(time.RFC3339),
+			DisplayAddress: h.DisplayAddress,
+			Latitude:       h.Latitude,
+			Longitude:      h.Longitude,
+			GmapsEmbed:     h.GmapsEmbed,
+		}
+		if h.Photo != nil {
+			ctx := context.Background()
+			photoURL, err := s3.GetSignedURL(ctx, *h.Photo, time.Hour)
+			if err == nil {
+				item.PhotoURL = &photoURL
+			}
+		}
+		historyItems = append(historyItems, item)
+	}
+
 	utils.RespondSuccess(c, http.StatusOK, HomeResponse{
 		Data: HomeData{
 			GreetingWidget: greetingWidget,
 			Today:          todayAttendance,
 			Absence:        absenceItems,
+			Attendance:     historyItems,
 		},
 	})
 }
@@ -182,36 +239,38 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 		return
 	}
 
-	// Handle photo upload
+	// Handle photo upload (REQUIRED)
 	var photoPath *string
 	file, fileHeader, err := c.Request.FormFile("photo")
-	if err == nil {
-		defer file.Close()
-
-		// Validate file type
-		contentType := fileHeader.Header.Get("Content-Type")
-		if !s3.ValidateFileType(contentType, s3.GetAllowedAttendanceTypes()) {
-			utils.RespondError(c, http.StatusBadRequest, "Invalid file format. Allowed formats: JPG, JPEG, PNG", utils.ErrInvalidFileFormat)
-			return
-		}
-
-		// Validate file size
-		if !s3.ValidateFileSize(fileHeader.Size, ctrl.Config.FileUpload.MaxAttendanceFileSizeMB) {
-			utils.RespondError(c, http.StatusBadRequest, 
-				fmt.Sprintf("Photo file size exceeds maximum limit of %d MB", ctrl.Config.FileUpload.MaxAttendanceFileSizeMB), 
-				utils.ErrInvalidFileFormat)
-			return
-		}
-
-		// Upload to S3
-		ctx := context.Background()
-		objectKey, err := s3.UploadFile(ctx, file, fileHeader, "attendance")
-		if err != nil {
-			utils.RespondError(c, http.StatusInternalServerError, "Failed to upload file", "UPLOAD_ERROR")
-			return
-		}
-		photoPath = &objectKey
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Photo is required for attendance", "PHOTO_REQUIRED")
+		return
 	}
+	defer file.Close()
+
+	// Validate file type
+	contentType := fileHeader.Header.Get("Content-Type")
+	if !s3.ValidateFileType(contentType, s3.GetAllowedAttendanceTypes()) {
+		utils.RespondError(c, http.StatusBadRequest, "Invalid file format. Allowed formats: JPG, JPEG, PNG", utils.ErrInvalidFileFormat)
+		return
+	}
+
+	// Validate file size
+	if !s3.ValidateFileSize(fileHeader.Size, ctrl.Config.FileUpload.MaxAttendanceFileSizeMB) {
+		utils.RespondError(c, http.StatusBadRequest,
+			fmt.Sprintf("Photo file size exceeds maximum limit of %d MB", ctrl.Config.FileUpload.MaxAttendanceFileSizeMB),
+			utils.ErrInvalidFileFormat)
+		return
+	}
+
+	// Upload to S3
+	ctx := context.Background()
+	objectKey, err := s3.UploadFile(ctx, file, fileHeader, "attendance")
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to upload file", "UPLOAD_ERROR")
+		return
+	}
+	photoPath = &objectKey
 
 	// Generate Google Maps link
 	gmapsLink := utils.GenerateGoogleMapsLink(req.Latitude, req.Longitude)
@@ -332,6 +391,48 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 		File:      filePath,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
+	}
+
+	// Handle multi-day absence. The period always starts today (the moment the
+	// request is submitted); the user only picks the end date. An explicit
+	// start date is still accepted for backward compatibility.
+	if req.AbsenceEndDate != "" {
+		endDate, err := time.Parse("2006-01-02", req.AbsenceEndDate)
+		if err != nil {
+			utils.RespondError(c, http.StatusBadRequest, "Invalid end date format, use YYYY-MM-DD", "INVALID_DATE_FORMAT")
+			return
+		}
+
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		startDate := today
+		if req.AbsenceStartDate != "" {
+			startDate, err = time.Parse("2006-01-02", req.AbsenceStartDate)
+			if err != nil {
+				utils.RespondError(c, http.StatusBadRequest, "Invalid start date format, use YYYY-MM-DD", "INVALID_DATE_FORMAT")
+				return
+			}
+			tomorrow := today.AddDate(0, 0, 1)
+			if startDate.Before(tomorrow) {
+				utils.RespondError(c, http.StatusBadRequest, "Start date must be at least tomorrow", "INVALID_START_DATE")
+				return
+			}
+		}
+
+		// Validate: end date must be after start date (at least tomorrow)
+		if !endDate.After(startDate) {
+			utils.RespondError(c, http.StatusBadRequest, "End date must be after start date", "INVALID_END_DATE")
+			return
+		}
+
+		// Validate: max 3 months duration
+		maxEndDate := startDate.AddDate(0, 3, 0)
+		if endDate.After(maxEndDate) {
+			utils.RespondError(c, http.StatusBadRequest, "Absence duration cannot exceed 3 months", "DURATION_EXCEEDS_MAX")
+			return
+		}
+
+		absence.AbsenceStartDate = &startDate
+		absence.AbsenceEndDate = &endDate
 	}
 
 	if err := ctrl.DB.Create(&absence).Error; err != nil {

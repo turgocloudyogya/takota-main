@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { ArrowRightFromSquare, Paperclip } from '@gravity-ui/icons'
-import { getUserHome, logout, deleteAbsence } from '../lib/api.js'
+import { getUserHome, getUserActivity, logout, deleteAbsence } from '../lib/api.js'
 import { isPageTipDone } from '../lib/userGuide.js'
 import AbsenceCard from '../components/AbsenceCard.jsx'
+import ActivityHeatmap from '../admin/components/ActivityHeatmap.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
+import AttendanceDetailDrawer from '../components/AttendanceDetailDrawer.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
+import NotificationBanner from '../components/NotificationBanner.jsx'
+import NotificationToggle from '../components/NotificationToggle.jsx'
 import { ConfirmDialog } from '../components/Modals.jsx'
 
 const MAIN_STEPS = [
@@ -21,13 +25,25 @@ const MAIN_STEPS = [
   {
     target: '[data-guide="today-status"]',
     title: "Today's Status",
-    description: "Your attendance status for today appears here. If you haven't checked in yet, it will show as empty.",
+    description: "Your check-in for today appears here with its photo, time, and location. If you haven't checked in yet, it will show as empty.",
     placement: 'bottom',
+  },
+  {
+    target: '[data-guide="activity"]',
+    title: 'Your Activity',
+    description: 'Your personal attendance heatmap for the last 5 months. Hover a square to see the details for that day.',
+    placement: 'bottom',
+  },
+  {
+    target: '[data-guide="attendance-list"]',
+    title: 'Attendance History',
+    description: 'Your recent check-ins, each with time and location. Tap any item to open the detail view with the full photo and a location map.',
+    placement: 'top',
   },
   {
     target: '[data-guide="absence-list"]',
     title: 'Absence History',
-    description: 'Your recent leave and sick submissions are listed here with their approval status.',
+    description: 'Your recent leave and sick submissions are listed here with their approval status. Pending requests can be deleted.',
     placement: 'top',
   },
   {
@@ -99,8 +115,34 @@ export default function Main() {
   const [userName, setUserName] = useState('')
   const [todayStatus, setTodayStatus] = useState(null)
   const [absenceList, setAbsenceList] = useState([])
+  const [attendanceList, setAttendanceList] = useState([])
   const [absenceToDelete, setAbsenceToDelete] = useState(null)
   const [deletingAbsence, setDeletingAbsence] = useState(false)
+  const [detailItem, setDetailItem] = useState(null)
+  const [activity, setActivity] = useState(null)
+
+  function locationLabel(item) {
+    if (item?.displayAddress) return item.displayAddress
+    if (item?.latitude && item?.longitude) return `${item.latitude}, ${item.longitude}`
+    return 'Location not available'
+  }
+
+  // Server clock runs in TIMEZONE_APP (Asia/Jakarta) — always render
+  // check-in stamps in WIB so the label matches the attendance window.
+  function formatCheckinHeader(timestamp) {
+    if (!timestamp) return 'Checked in'
+    const d = new Date(timestamp)
+    const time = d
+      .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
+      .replace(':', '.')
+    const date = d.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Jakarta',
+    })
+    return `Checked in at ${time} WIB on ${date}`
+  }
 
   useEffect(() => {
     let isInitialLoad = true
@@ -128,22 +170,25 @@ export default function Main() {
         // Only show as "present" if type is "attendance", not "absence"
         if (data.today && data.today.type === 'attendance') {
           const timestamp = data.today.timestamp
-          const displayAddress = data.today.display_address
-          setTodayStatus({
+          const today = {
             date: formatDate(timestamp),
             status: 'present',
             title: `Present on ${formatFullDate(timestamp)}`,
-            subtitle: displayAddress
-              ? `Location on ${displayAddress}`
-              : 'Location on Yogyakarta, Sleman',
-          })
+            photoUrl: data.today.photo_url || null,
+            timestamp,
+            displayAddress: data.today.display_address || null,
+            latitude: data.today.latitude || null,
+            longitude: data.today.longitude || null,
+          }
+          today.subtitle = `Location at ${locationLabel(today)}`
+          setTodayStatus(today)
         } else {
           setTodayStatus(null)
         }
         
-        // Map absence history from API (max 3 items)
+        // Map absence history from API (last 20 items)
         if (data.absence && Array.isArray(data.absence)) {
-          const mappedAbsences = data.absence.slice(0, 3).map((item) => {
+          const mappedAbsences = data.absence.slice(0, 6).map((item) => {
             // Determine status based on verify info
             let status = 'pending'
             let subtitle = 'Submitting an absence request'
@@ -154,10 +199,10 @@ export default function Main() {
               
               if (signStatus === 'allow') {
                 status = 'approved'
-                subtitle = `${item.option === 'sick' ? 'S' : 'I'} • Verified by ${verifierName}`
+                subtitle = `${item.option === 'sick' ? 'Sick' : 'Leave'} • Verified by ${verifierName}`
               } else if (signStatus === 'reject' || signStatus === 'rejected') {
                 status = 'rejected'
-                subtitle = `${item.option === 'sick' ? 'S' : 'I'} • Verified by ${verifierName}`
+                subtitle = `${item.option === 'sick' ? 'Sick' : 'Leave'} • Verified by ${verifierName}`
               }
             }
             
@@ -178,10 +223,31 @@ export default function Main() {
           setAbsenceList([])
         }
         
+        // Map attendance history from API (last 20 items)
+        if (data.attendance && Array.isArray(data.attendance)) {
+          setAttendanceList(data.attendance.slice(0, 6).map((item) => ({
+            id: item.id || Math.random().toString(),
+            timestamp: item.timestamp,
+            displayAddress: item.display_address || null,
+            photoUrl: item.photo_url || null,
+            latitude: item.latitude || null,
+            longitude: item.longitude || null,
+            gmapsEmbed: item.gmaps_embed || null,
+          })))
+        } else {
+          setAttendanceList([])
+        }
+
         // Mark as no longer initial load after first success
         if (isInitialLoad) {
           isInitialLoad = false
           setLoading(false)
+          try {
+            const activityRes = await getUserActivity()
+            setActivity(activityRes?.data || activityRes || [])
+          } catch {
+            // Non-fatal: activity heatmap just stays empty.
+          }
         }
       } catch (err) {
         // Only show error toast on initial load, silent fail on polling
@@ -237,6 +303,11 @@ export default function Main() {
     navigate('/absence')
   }
 
+  function handlePickSecurity() {
+    setSheetOpen(false)
+    navigate('/main/2fa')
+  }
+
   async function handleConfirmDeleteAbsence() {
     if (!absenceToDelete) return
     setDeletingAbsence(true)
@@ -256,7 +327,7 @@ export default function Main() {
 
   if (loading) {
     return (
-      <main className="mx-auto min-h-dvh w-full max-w-md px-6">
+      <main className="mx-auto min-h-dvh w-full max-w-md px-6 pb-[60px] lg:max-w-6xl">
         <div className="animate-pulse">
           <div className="py-4 pt-8">
             <div className="h-8 w-64 rounded bg-neutral-200 dark:bg-neutral-700" />
@@ -280,7 +351,7 @@ export default function Main() {
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-md px-6">
+    <main className="mx-auto min-h-dvh w-full max-w-md px-6 pb-[60px] lg:max-w-6xl">
       <header data-guide="greeting" className="flex items-start justify-between gap-4 py-4 pt-8">
         <div>
           <h1 className="text-xl font-bold leading-tight text-neutral-900 dark:text-neutral-100">
@@ -290,6 +361,7 @@ export default function Main() {
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          <NotificationToggle />
           <ThemeToggle className="h-9 w-9 rounded-full" />
           <button
             type="button"
@@ -303,13 +375,77 @@ export default function Main() {
         </div>
       </header>
 
-      <section data-guide="today-status" className="mt-6">
+      <div className="mt-6">
+        <NotificationBanner />
+      </div>
+
+      <div className="lg:grid lg:grid-cols-[500px_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <div className="min-w-0 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pb-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+          <section data-guide="today-status" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Today</h2>
         {todayStatus ? (
-          <AbsenceCard {...todayStatus} />
+          <div className="flex gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+            {todayStatus.photoUrl ? (
+              <img
+                src={todayStatus.photoUrl}
+                alt="Today's attendance"
+                className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex-shrink-0" />
+            )}
+            <div className="flex-1 flex flex-col justify-center gap-1">
+              <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                {todayStatus.timestamp ? new Date(todayStatus.timestamp).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                }) : '—'}
+              </p>
+              <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                {todayStatus ? locationLabel(todayStatus) : 'Location not available'}
+              </p>
+            </div>
+          </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8 dark:bg-neutral-800/60">
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">No attendance status yet</p>
+          </div>
+        )}
+      </section>
+
+      <section data-guide="activity" className="mt-6">
+        <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Activity</h2>
+        <div className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+          <ActivityHeatmap days={activity} showDetails={false} />
+        </div>
+      </section>
+
+        </div>
+        <div className="min-w-0">
+          <section data-guide="attendance-list" className="mt-6">
+        <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Attendance</h2>
+        {attendanceList.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {attendanceList.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setDetailItem(item)}
+                className="block w-full cursor-pointer rounded-lg border border-neutral-200 bg-white p-3 text-left dark:border-neutral-700 dark:bg-neutral-900"
+              >
+                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  {formatCheckinHeader(item.timestamp)}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-neutral dark:text-neutral-400">
+                  {locationLabel(item)}
+                </p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
+            <p className="text-sm text-neutral dark:text-neutral-400">There is no attendance list</p>
           </div>
         )}
       </section>
@@ -331,11 +467,13 @@ export default function Main() {
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-xl bg-neutral-100 p-8 dark:bg-neutral-800/60">
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">There is no absence list</p>
           </div>
         )}
       </section>
+      </div>
+      </div>
 
       <button
         data-guide="attendance-button"
@@ -353,6 +491,13 @@ export default function Main() {
         onPickAttendance={handlePickAttendance}
         onPickAbsence={handlePickAbsence}
         onPickPhotos={handlePickPhotos}
+        onPickSecurity={handlePickSecurity}
+      />
+
+      <AttendanceDetailDrawer
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => !open && setDetailItem(null)}
+        item={detailItem}
       />
 
       <ConfirmDialog

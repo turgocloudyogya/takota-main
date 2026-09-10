@@ -297,8 +297,8 @@ func ReadFile(ctx context.Context, objectKey string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// GetSignedURL generates a presigned URL for accessing a file
-// expiry is in time.Duration (e.g., 30*time.Minute for 30 minutes)
+// GetSignedURL generates a presigned URL for accessing a file.
+// It works with private buckets (MinIO/R2/S3); the URL expires after expiry.
 func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
 	if objectKey == "" {
 		return "", nil
@@ -309,11 +309,20 @@ func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (
 		return SignedURLAsCloudfront(objectKey, expiry)
 	}
 
-	// For non-CloudFront, return the public URL
-	// Note: For public buckets, BucketOpenURL is sufficient.
-	// For presigned URLs with temporary access, implement using s3.service.PresignClient
-	// when needed. For now, this returns the public URL which is acceptable for public buckets.
-	return BucketOpenURL(objectKey), nil
+	if Client == nil {
+		return "", fmt.Errorf("s3 client not initialized")
+	}
+
+	presigner := s3.NewPresignClient(Client)
+	req, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(Config.BucketName),
+		Key:    aws.String(objectKey),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", err
+	}
+
+	return req.URL, nil
 }
 
 // SignedURLAsCloudfront generates CloudFront signed URL using AWS SDK library

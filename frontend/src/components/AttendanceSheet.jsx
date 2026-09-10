@@ -1,7 +1,7 @@
 import { Drawer } from 'vaul'
 
 
-export default function AttendanceSheet({ open, onOpenChange, onPickAttendance, onPickAbsence, onPickPhotos }) {
+export default function AttendanceSheet({ open, onOpenChange, onPickAttendance, onPickAbsence, onPickPhotos, onPickSecurity }) {
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
@@ -35,6 +35,15 @@ export default function AttendanceSheet({ open, onOpenChange, onPickAttendance, 
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
           >
             Photos
+          </button>
+
+          <hr className="my-4 border-t-2 border-gray-200 rounded-md dark:border-neutral-800" />
+          <button
+            type="button"
+            onClick={onPickSecurity}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-neutral-800 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] dark:bg-neutral-100 dark:text-neutral-900"
+          >
+            Authentication Security
           </button>
 
         </Drawer.Content>

@@ -48,11 +48,15 @@ type PhotosResponse struct {
 }
 
 type PhotoItem struct {
-	ID          string        `json:"id"`
-	URL         string        `json:"url"`
-	Description string        `json:"description"`
-	Timestamp   string        `json:"timestamp"`
-	User        *ListItemUser `json:"user"`
+	ID             string        `json:"id"`
+	URL            string        `json:"url"`
+	Description    string        `json:"description"`
+	Timestamp      string        `json:"timestamp"`
+	User           *ListItemUser `json:"user"`
+	DisplayAddress *string       `json:"display_address,omitempty"`
+	Latitude       *string       `json:"latitude,omitempty"`
+	Longitude      *string       `json:"longitude,omitempty"`
+	GmapsEmbed     *string       `json:"gmaps_embed,omitempty"`
 }
 
 // GetInfo returns global user info with validation check
@@ -62,11 +66,13 @@ func (ctrl *AllController) GetInfo(c *gin.Context) {
 	
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
-		c.JSON(http.StatusOK, InfoResponse{
-			Unvalid:  true,
-			Redirect: "/",
-		})
-		return
+		if cookie, err := c.Cookie("takota_token"); err != nil || cookie == "" {
+			c.JSON(http.StatusOK, InfoResponse{
+				Unvalid:  true,
+				Redirect: "/",
+			})
+			return
+		}
 	}
 
 	// Try to get user info from context (set by auth middleware if valid)
@@ -120,6 +126,14 @@ func (ctrl *AllController) GetInfo(c *gin.Context) {
 	})
 }
 
+// GetPushPublicKey returns the VAPID public key so browsers can subscribe
+// to push notifications. Safe to expose - it only identifies the server.
+func (ctrl *AllController) GetPushPublicKey(c *gin.Context) {
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"publicKey": ctrl.Config.VAPID.PublicKey,
+	})
+}
+
 // GetPhotos returns gallery of attendance photos
 func (ctrl *AllController) GetPhotos(c *gin.Context) {
 	limit := 50
@@ -169,11 +183,15 @@ func (ctrl *AllController) GetPhotos(c *gin.Context) {
 			att.CreatedAt.Format("2006-01-02 15:04:05"))
 
 		items = append(items, PhotoItem{
-			ID:          att.ID.String(),
-			URL:         photoURL,
-			Description: description,
-			Timestamp:   att.CreatedAt.Format(time.RFC3339),
-			User:        buildListItemUser(att.User),
+			ID:             att.ID.String(),
+			URL:            photoURL,
+			Description:    description,
+			Timestamp:      att.CreatedAt.Format(time.RFC3339),
+			User:           buildListItemUser(att.User),
+			DisplayAddress: att.DisplayAddress,
+			Latitude:       att.Latitude,
+			Longitude:      att.Longitude,
+			GmapsEmbed:     att.GmapsEmbed,
 		})
 	}
 

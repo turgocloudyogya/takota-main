@@ -89,6 +89,20 @@ export default function PageGuideOverlay({ page, steps }) {
   const currentStep = steps[stepIndex]
   const totalSteps = steps.length
 
+  function handleNext() {
+    if (stepIndex < totalSteps - 1) {
+      setStepIndex(stepIndex + 1)
+    } else {
+      markPageTipDone(page)
+      setDone(true)
+    }
+  }
+
+  const handleNextRef = useRef(handleNext)
+  useEffect(() => {
+    handleNextRef.current = handleNext
+  })
+
   useEffect(() => {
     if (!currentStep || done) return
 
@@ -100,10 +114,15 @@ export default function PageGuideOverlay({ page, steps }) {
       if (cancelled) return
       const rect = measureTarget(currentStep.target)
       if (!rect) {
+        // The target may be conditional (e.g. camera picker only renders
+        // with 2+ cameras) — skip the step instead of stranding the user.
         if (retryCount < 10) {
           retryCount++
           timer = setTimeout(tryFind, 500)
+          return
         }
+        setTargetRect(null)
+        handleNextRef.current()
         return
       }
       requestAnimationFrame(() => {
@@ -136,15 +155,6 @@ export default function PageGuideOverlay({ page, steps }) {
   if (done || !currentStep || !targetRect) return null
 
   const tooltipPos = computeTooltipPos(targetRect, currentStep.placement)
-
-  function handleNext() {
-    if (stepIndex < totalSteps - 1) {
-      setStepIndex(stepIndex + 1)
-    } else {
-      markPageTipDone(page)
-      setDone(true)
-    }
-  }
 
   function handlePrev() {
     if (stepIndex > 0) {

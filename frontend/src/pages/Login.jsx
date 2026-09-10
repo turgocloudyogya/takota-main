@@ -2,27 +2,30 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { At, Key, Eye, EyeSlash } from '@gravity-ui/icons'
+import { At, Key, Eye, EyeSlash, Shield, Fingerprint } from '@gravity-ui/icons'
 
 // Import API and session utilities from admin
+import { clearLegacyTokenStorage } from '../lib/cookies.js'
+import { getPasskey, webauthnSupported } from '../lib/webauthn.js'
+
 const API_BASE = localStorage.getItem('api-base-url') || ''
 
-async function loginAPI(username, password) {
-  const response = await fetch(`${API_BASE}/api/auth`, {
+async function postJSON(path, body, extraHeaders = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'key-request': 'web-login'
+      'key-request': 'web-login',
+      ...extraHeaders,
     },
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify(body),
   })
-
+  const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData.message || 'Login failed. Check your username and password.')
+    throw new Error(data.message || data?.error?.message || 'Login failed. Check your username and password.')
   }
-
-  return response.json()
+  return data
 }
 
 export default function Login() {
@@ -31,6 +34,29 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  // Second-factor step (stays on "/" - no session exists yet).
+  const [challenge, setChallenge] = useState(null)
+  const [methods, setMethods] = useState([])
+  const [code, setCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
+
+  function enterApp(data, name) {
+    clearLegacyTokenStorage()
+    const redirectPath = data.redirect || (data.login_as === 'admin' ? '/admin' : '/main')
+
+    if (redirectPath === '/chpw') {
+      toast.info('You must change your password first.')
+      navigate('/change-password', { replace: true })
+    } else {
+      toast.success(`Welcome, ${name}!`)
+      if (data.login_as === 'admin') {
+        navigate('/admin/dashboard', { replace: true })
+      } else {
+        navigate('/main', { replace: true })
+      }
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -42,33 +68,16 @@ export default function Login() {
 
     setSubmitting(true)
     try {
-      const data = await loginAPI(username.trim(), password)
-      
-      // Clear any old session keys first
-      localStorage.removeItem('takota-token')
-      
-      // Save session using the same key as admin (takota_admin_token)
-      localStorage.setItem('takota_admin_token', data.token)
-      localStorage.setItem('takota_token', data.token) // Also save with this key for compatibility
-      localStorage.setItem('takota-username', username.trim())
-      localStorage.setItem('takota-role', data.login_as)
+      const data = await postJSON('/api/auth', { username: username.trim(), password })
 
-      // Check if password change is required
-      const redirectPath = data.redirect || (data.login_as === 'admin' ? '/admin' : '/main')
-      
-      if (redirectPath === '/chpw') {
-        toast.info('You must change your password first.')
-        navigate('/change-password', { replace: true })
-      } else {
-        toast.success(`Welcome, ${username}!`)
-        
-        // Redirect based on backend response or role
-        if (data.login_as === 'admin') {
-          navigate('/admin/dashboard', { replace: true })
-        } else {
-          navigate('/main', { replace: true })
-        }
+      if (data.require_2fa) {
+        setChallenge(data.challenge)
+        setMethods(data.methods || [])
+        setCode('')
+        toast.info('Enter your second-factor code to continue.')
+        return
       }
+      enterApp(data, username.trim())
     } catch (err) {
       toast.error(err.message || 'Login failed. Check your connection or API address.')
     } finally {
@@ -76,6 +85,119 @@ export default function Login() {
     }
   }
 
+  async function handleVerifyCode(e) {
+    e?.preventDefault()
+    if (!code.trim()) {
+      toast.error('Enter your 6-digit code or a backup code.')
+      return
+    }
+    setVerifying(true)
+    try {
+      const data = await postJSON('/api/auth/2fa', { challenge, code: code.trim() })
+      enterApp(data, username.trim())
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  async function handlePasskeyLogin(withUsername) {
+    const name = withUsername || username.trim()
+    if (!name) {
+      toast.error('Enter your username first to use a passkey.')
+      return
+    }
+    if (!webauthnSupported()) {
+      toast.error('Passkeys are not supported in this browser.')
+      return
+    }
+    setVerifying(true)
+    try {
+      const begin = await postJSON('/api/auth/passkey/begin', { username: name })
+      const assertion = await getPasskey(begin.options)
+      const response = await fetch(`${API_BASE}/api/auth/passkey/finish`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'key-request': 'web-login',
+          'X-Passkey-Challenge': begin.challenge,
+        },
+        body: JSON.stringify(assertion),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error?.message || data?.message || 'Passkey login failed.')
+      enterApp(data, name)
+    } catch (err) {
+      if (err?.name === 'NotAllowedError') toast.error('Passkey login was cancelled.')
+      else toast.error(err.message)
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  // ---- second-factor step -------------------------------------------------
+  if (challenge) {
+    const passkeyOffered = methods.includes('passkey')
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
+        <div className="mb-8 flex flex-col items-center">
+          <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
+            <Icon data={Shield} size={36} className="text-primary" />
+          </div>
+          <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Two-factor verification</h1>
+          <p className="mt-2 max-w-[280px] text-center text-sm text-neutral dark:text-neutral-400">
+            Enter the 6-digit code from your authenticator app, a backup code, or use your passkey.
+          </p>
+        </div>
+
+        <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
+          <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
+            <Icon data={Key} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value.slice(0, 9))}
+              placeholder="000000 or XXXX-XXXX"
+              autoComplete="one-time-code"
+              className="w-full bg-transparent text-center font-mono text-sm tracking-widest text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
+            />
+          </label>
+
+          <button
+            type="submit"
+            disabled={verifying || !code.trim()}
+            className="mt-1 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
+          >
+            {verifying ? 'Verifying…' : 'Verify'}
+          </button>
+
+          {passkeyOffered && (
+            <button
+              type="button"
+              onClick={() => handlePasskeyLogin(username.trim())}
+              disabled={verifying}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 active:scale-[0.98] disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-800"
+            >
+              <Icon data={Fingerprint} size={16} />
+              Use passkey instead
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => { setChallenge(null); setMethods([]); setCode('') }}
+            className="text-sm font-medium text-neutral hover:underline dark:text-neutral-400"
+          >
+            Back to login
+          </button>
+        </form>
+      </main>
+    )
+  }
+
+  // ---- password step ------------------------------------------------------
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
       <div className="mb-8 flex flex-col items-center">
@@ -130,6 +252,16 @@ export default function Login() {
           className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white cursor-pointer transition active:scale-[0.98] disabled:opacity-60"
         >
           {submitting ? 'Logging in…' : 'Login'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handlePasskeyLogin()}
+          disabled={verifying || submitting}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 active:scale-[0.98] disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-800"
+        >
+          <Icon data={Fingerprint} size={16} />
+          {verifying ? 'Waiting for passkey…' : 'Sign in with passkey'}
         </button>
       </form>
     </main>

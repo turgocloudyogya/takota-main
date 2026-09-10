@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Drawer } from 'vaul'
+import { Label, ListBox, Select } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
 import {
   Camera as CameraIcon,
@@ -9,29 +10,30 @@ import {
   TriangleExclamation,
   PaperPlane,
 } from '@gravity-ui/icons'
-import { Checkbox } from '@heroui/react'
 import BackButton from '../components/BackButton.jsx'
 import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
-import { submitAttendance } from '../lib/api.js'
+import WaitingCountdown from '../components/WaitingCountdown.jsx'
+import { submitAttendance, getSettings } from '../lib/api.js'
+import { serverDelta, serverNow, parseAbsolute, formatDuration } from '../lib/serverTime.js'
 import { isPageTipDone } from '../lib/userGuide.js'
 
 const ATTENDANCE_STEPS = [
   {
     target: '[data-guide="camera-preview"]',
     title: 'Camera Preview',
-    description: 'Your camera preview appears here. The app will capture a photo when you check in.',
+    description: 'Your camera preview appears here. Photo is required for attendance, and your location is captured automatically.',
     placement: 'bottom',
   },
   {
-    target: '[data-guide="use-camera-checkbox"]',
-    title: 'Camera Tracking',
-    description: 'Enable this option to include a photo with your attendance. The photo is taken when you press "Take Attendance".',
+    target: '[data-guide="camera-select"]',
+    title: 'Choose a Camera',
+    description: 'If your device has more than one camera, pick front, back, or another lens here. This only appears when multiple cameras are available.',
     placement: 'bottom',
   },
   {
     target: '[data-guide="take-attendance-btn"]',
     title: 'Submit Attendance',
-    description: 'Tap this button to submit your attendance. Make sure you have granted camera and location permissions first.',
+    description: 'Tap this button to submit your attendance. Make sure you have granted camera and location permissions first. When attendance is closed, a countdown shows when it opens next.',
     placement: 'top',
   },
 ]
@@ -57,14 +59,20 @@ export default function Attendance() {
   // null = not checked yet, 'granted' | 'denied' once we know.
   const [locationStatus, setLocationStatus] = useState(null)
   const [cameraStatus, setCameraStatus] = useState(null)
-  const [facingMode, setFacingMode] = useState('environment')
-  const [useCameraTracking, setUseCameraTracking] = useState(true)
+  const [facingMode] = useState('environment')
+  const [availableCameras, setAvailableCameras] = useState([])
+  const [selectedCameraId, setSelectedCameraId] = useState(null)
 
   const [gpsCoords, setGpsCoords] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [countdown, setCountdown] = useState(3)
+
+  // Countdown to attendance close time
+  const [attendanceSettings, setAttendanceSettings] = useState(null)
+  const [timeUntilClose, setTimeUntilClose] = useState(null)
+  const [attendanceClosed, setAttendanceClosed] = useState(false)
 
   // Frozen frame captured when "Take Attendance!" is clicked.
   const [capturedPhoto, setCapturedPhoto] = useState(null)
@@ -75,16 +83,15 @@ export default function Attendance() {
     streamRef.current = null
   }
 
-  // Attaches the active camera stream once the <video> element is mounted.
-  // Without this the preview stays black when getUserMedia resolves before
-  // the element renders (e.g. when permission was granted from the
-  // permissions screen).
-  function setVideoElement(el) {
+  // Stable ref callback: a fresh function identity every render makes React
+  // detach/reattach the <video> element, which resets srcObject and makes the
+  // preview flicker on every countdown tick. useCallback keeps it mounted.
+  const setVideoElement = useCallback((el) => {
     videoRef.current = el
-    if (el && streamRef.current) {
+    if (el && streamRef.current && el.srcObject !== streamRef.current) {
       el.srcObject = streamRef.current
     }
-  }
+  }, [])
 
   async function requestLocation() {
     try {
@@ -104,13 +111,17 @@ export default function Attendance() {
     }
   }
 
-  async function requestCamera(mode = facingMode) {
+  async function requestCamera(mode = facingMode, deviceId = null) {
     try {
       stopStream()
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints = {
         video: { facingMode: mode },
         audio: false,
-      })
+      }
+      if (deviceId) {
+        constraints.video = { deviceId: { exact: deviceId } }
+      }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
       streamRef.current = stream
       if (videoRef.current) videoRef.current.srcObject = stream
       setCameraStatus('granted')
@@ -119,17 +130,175 @@ export default function Attendance() {
     }
   }
 
+  async function enumerateCameras() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const cameras = devices.filter((d) => d.kind === 'videoinput')
+      setAvailableCameras(cameras)
+      if (cameras.length > 0 && !selectedCameraId) {
+        setSelectedCameraId(cameras[0].deviceId)
+      }
+    } catch {
+      console.error('Failed to enumerate cameras')
+    }
+  }
+
+  function cameraLabel(camera, index) {
+    const raw = (camera.label || '').toLowerCase()
+    if (raw.includes('front') || raw.includes('user')) return 'Front camera'
+    if (raw.includes('back') || raw.includes('rear') || raw.includes('environment')) return 'Back camera'
+    if (index === 0) return 'Front camera'
+    if (index === 1) return 'Back camera'
+    return `Camera ${index + 1}`
+  }
+
+  async function captureFrame() {
+    try {
+      const video = videoRef.current
+      if (!video || !video.videoWidth) return null
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d').drawImage(video, 0, 0)
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+      if (!blob) return null
+      const file = new File([blob], `attendance-${Date.now()}.jpg`, { type: 'image/jpeg' })
+      return { file, previewUrl: URL.createObjectURL(blob) }
+    } catch (err) {
+      console.error('captureFrame error:', err)
+      return null
+    }
+  }
+
+  async function loadSettings() {
+    try {
+      const response = await getSettings()
+      deltaRef.current = serverDelta(response.data)
+      setAttendanceSettings(response.data)
+      updateCountdown(response.data)
+    } catch (err) {
+      console.error('Failed to load settings:', err)
+    }
+  }
+
+  // Offset between the server clock (TIMEZONE_APP) and this device, measured
+  // on every settings fetch. All open/close math uses server time so clients
+  // in any timezone see the same window as the server.
+  const deltaRef = useRef(0)
+  // Tracks the last closed state so a closed -> open transition refreshes
+  // settings from the backend immediately (fresh close time), instead of
+  // waiting for the next poll.
+  const wasClosedRef = useRef(null)
+
+  function updateCountdown(settings) {
+    if (!settings) return
+
+    const now = serverNow(deltaRef.current)
+    const nextOpen = parseAbsolute(settings.next_open)
+    const closeAt = parseAbsolute(settings.close_at)
+
+    let closed
+    if (wasClosedRef.current === null) {
+      closed = !(settings.is_open === true)
+      if (settings.is_open === undefined) {
+        closed = attendanceIsClosed(settings, now)
+      }
+    } else if (wasClosedRef.current && nextOpen && now >= nextOpen) {
+      closed = false
+    } else if (!wasClosedRef.current && closeAt && now >= closeAt) {
+      closed = true
+    } else if (!nextOpen || !closeAt) {
+      closed = attendanceIsClosed(settings, now)
+    } else {
+      closed = wasClosedRef.current
+    }
+
+    if (wasClosedRef.current === true && !closed) {
+      loadSettings()
+    }
+    if (wasClosedRef.current === false && closed) {
+      loadSettings()
+    }
+    wasClosedRef.current = closed
+
+    if (closed) {
+      setAttendanceClosed(true)
+      if (nextOpen && nextOpen > now) {
+        setTimeUntilClose(`Opens in ${formatDuration(nextOpen - now)}`)
+      } else {
+        setTimeUntilClose(closedFallbackText(settings, now))
+      }
+      return
+    }
+
+    setAttendanceClosed(false)
+    if (closeAt && closeAt > now) {
+      setTimeUntilClose(formatDuration(closeAt - now))
+    } else {
+      const closeStr = settings.attendance_close_time || settings.close_time || '21:00:00'
+      const [closeHour, closeMinute] = closeStr.split(':')
+      const closeTime = new Date()
+      closeTime.setHours(parseInt(closeHour), parseInt(closeMinute), 0)
+      const diff = closeTime - now
+      const hours = Math.floor(diff / 3600000)
+      const minutes = Math.floor((diff % 3600000) / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setTimeUntilClose(`${hours}h ${minutes}m ${seconds}s`)
+    }
+  }
+
+  // Evaluated live every tick from the current time, so the page flips to
+  // open automatically the moment the opening time passes (no reload needed).
+  // The backend `is_open` flag is only a stale snapshot, so it is ignored.
+  function attendanceIsClosed(settings, now) {
+    const openDays = (settings.open_days || []).map((d) => String(d).toLowerCase())
+    const currentDay = now.toLocaleString('en-US', { weekday: 'long' }).toLowerCase()
+    if (!openDays.includes(currentDay)) return true
+    const openStr = settings.attendance_open_time || settings.open_time || '06:00:00'
+    const closeStr = settings.attendance_close_time || settings.close_time || '21:00:00'
+    const [openHour, openMinute] = openStr.split(':')
+    const [closeHour, closeMinute] = closeStr.split(':')
+    const openTime = new Date(now)
+    openTime.setHours(parseInt(openHour), parseInt(openMinute), 0)
+    const closeTime = new Date(now)
+    closeTime.setHours(parseInt(closeHour), parseInt(closeMinute), 0)
+    return now < openTime || now >= closeTime
+  }
+
+  function closedFallbackText(settings, now) {
+    const openDays = (settings.open_days || []).map((d) => String(d).toLowerCase())
+    const daysAhead = nextOpenDayDistance(now, openDays)
+    if (daysAhead <= 1) return 'Attendance will be taken again tomorrow'
+    return `There are ${daysAhead} more days of Attendance`
+  }
+
+  function nextOpenDayDistance(fromDate, openDays, startOffset = 0) {
+    for (let i = startOffset; i < 8; i++) {
+      const d = new Date(fromDate.getTime() + i * 86400000)
+      const name = d.toLocaleString('en-US', { weekday: 'long' }).toLowerCase()
+      if (openDays.includes(name)) return i <= 0 ? 1 : i
+    }
+    return 1
+  }
+
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- these call browser
-       permission APIs (geolocation/camera) and only set state once their
-       promises resolve; they are not synchronous setState calls. */
-    requestLocation()
-    requestCamera()
-    /* eslint-enable react-hooks/set-state-in-effect */
+    async function init() {
+      requestLocation()
+      await requestCamera()
+      enumerateCameras()
+      loadSettings()
+    }
+    init()
     return () => stopStream()
-    // Only run once on mount - facingMode changes are handled by handleToggleCamera.
-    /* eslint-disable-next-line react-hooks/exhaustive-deps -- permission requests intentionally run once on mount; facingMode changes go through handleToggleCamera. */
   }, [])
+
+  // Update countdown every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      updateCountdown(attendanceSettings)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [attendanceSettings])
 
   // "Attendance has been taken!" auto-redirects to home after 3 seconds,
   // counting down 3, 2, 1 in the message as it goes.
@@ -167,50 +336,31 @@ export default function Attendance() {
     requestCamera()
   }
 
-  function handleToggleCamera() {
-    const next = facingMode === 'environment' ? 'user' : 'environment'
-    setFacingMode(next)
-    requestCamera(next)
-  }
-
-  // Captures the current camera frame at full sensor resolution and returns
-  // both the JPEG File for upload and a data URL for the frozen preview.
-  function captureFrame() {
-    const video = videoRef.current
-    if (!video || !streamRef.current || !video.videoWidth) return Promise.resolve(null)
-
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0)
-
-    const previewUrl = canvas.toDataURL('image/jpeg', 0.85)
-
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          resolve(null)
-          return
-        }
-        resolve({
-          file: new File([blob], `attendance-${Date.now()}.jpg`, { type: 'image/jpeg' }),
-          previewUrl,
-        })
-      }, 'image/jpeg', 0.85)
-    })
+  function handleSelectCamera(deviceId) {
+    setSelectedCameraId(deviceId)
+    requestCamera(facingMode, deviceId)
   }
 
   async function handleTakeAttendance() {
-    // Freeze the current frame at full resolution right now, so the uploaded
-    // photo reflects the moment "Take Attendance!" was pressed, not submit.
-    if (useCameraTracking && cameraStatus === 'granted' && videoRef.current && streamRef.current) {
+    if (attendanceClosed) {
+      toast.error('Attendance is currently closed')
+      return
+    }
+
+    // Photo is mandatory - capture it
+    if (cameraStatus === 'granted' && videoRef.current && streamRef.current) {
       const captured = await captureFrame()
       if (captured) {
         setCapturedPhoto(captured.file)
         setCapturedPreview(captured.previewUrl)
         stopStream()
+      } else {
+        toast.error('Failed to capture photo')
+        return
       }
+    } else {
+      toast.error('Camera is not available')
+      return
     }
     setConfirmOpen(true)
   }
@@ -221,14 +371,19 @@ export default function Attendance() {
       return
     }
 
+    if (!capturedPhoto) {
+      toast.error('Photo is required for attendance')
+      return
+    }
+
     setSubmitting(true)
 
     try {
-      // Use the frame captured when "Take Attendance!" was clicked.
+      // Photo is now mandatory
       await submitAttendance({
         latitude: String(gpsCoords.latitude),
         longitude: String(gpsCoords.longitude),
-        photo: useCameraTracking ? capturedPhoto || undefined : undefined,
+        photo: capturedPhoto,
       })
 
       toast.success('Attendance submitted successfully!')
@@ -276,6 +431,27 @@ export default function Attendance() {
             <div className="mt-4 h-4 w-56 max-w-full rounded bg-neutral-200 dark:bg-neutral-700" />
             <div className="mt-4 h-11 w-full rounded-xl bg-neutral-200 dark:bg-neutral-700" />
           </div>
+        </div>
+      </main>
+    )
+  }
+
+  // Closed takes precedence over missing permissions: no point asking for
+  // camera/location when submissions are not accepted right now.
+  if (attendanceClosed) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
+        <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
+          <BackButton label="Attendance" />
+          <span className="h-8 w-8 shrink-0" />
+        </header>
+
+        <div className="flex flex-1 flex-col items-center justify-center px-6 pb-[80px]">
+          <WaitingCountdown
+            title="Attendance"
+            settings={attendanceSettings}
+            countdownText={timeUntilClose}
+          />
         </div>
       </main>
     )
@@ -348,7 +524,7 @@ export default function Attendance() {
                   />
                 </div>
               ) : (
-              <div data-guide="camera-preview" className="relative overflow-hidden rounded-2xl bg-neutral-900">
+              <div data-guide="camera-preview" className="overflow-hidden rounded-2xl bg-neutral-900">
                   <video
                     ref={setVideoElement}
                     autoPlay
@@ -356,50 +532,60 @@ export default function Attendance() {
                     playsInline
                     className="aspect-square w-full object-cover"
                   />
-                  <button
-                    type="button"
-                    onClick={handleToggleCamera}
-                    className="absolute inset-x-0 bottom-0 flex cursor-pointer items-center justify-center gap-1.5 bg-gradient-to-t from-black/60 via-black/25 to-transparent px-4 pb-3 pt-8 text-xs font-medium text-white"
-                  >
-                    <Icon data={CameraIcon} size={14} />
-                    Change to {facingMode === 'environment' ? 'front' : 'back'} camera
-                  </button>
                 </div>
               )
             ) : (
-              <div className="flex aspect-square w-full flex-col items-center justify-center rounded-2xl bg-neutral-900 text-center">
-                <Icon data={CameraIcon} size={28} className="text-white/50" />
-                <p className="mt-3 max-w-[220px] text-sm text-white/70">
-                  Camera is off. Start it to attach a photo to your attendance
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
+                  <Icon data={CameraIcon} size={32} className="text-neutral-900 dark:text-neutral-100" />
+                </div>
+                <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Camera Required</h1>
+                <p className="mt-2 max-w-[260px] text-center text-sm text-neutral dark:text-neutral-400">
+                  Camera is required for attendance. Please allow camera access from your browser&apos;s site settings, then reload this page
                 </p>
-                <button
-                  type="button"
-                  onClick={handleRequestCameraPermission}
-                  className="mt-4 cursor-pointer rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white transition active:scale-[0.98]"
-                >
-                  Start Camera
-                </button>
               </div>
             )}
 
-            <div data-guide="use-camera-checkbox" className="mt-4">
-              <label className="flex items-center gap-2 text-sm text-neutral-900 dark:text-neutral-100">
-                <Checkbox name="use-camera-for-attedance" isSelected={useCameraTracking} onChange={(e) => setUseCameraTracking(e)}>
-                  <Checkbox.Content>
-                    <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
-                    Use the camera for attendance tracking
-                  </Checkbox.Content>
-                </Checkbox>
-              </label>
-            </div>
+            {timeUntilClose && (
+              <div className="mt-4 rounded-lg bg-neutral-100 p-3 text-center dark:bg-neutral-800">
+                <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                  Time until attendance closes: <span className="font-bold text-neutral-900 dark:text-neutral-100">{timeUntilClose}</span>
+                </p>
+              </div>
+            )}
+
+            {cameraStatus === 'granted' && availableCameras.length > 1 && !attendanceClosed && (
+              <div data-guide="camera-select" className="mt-4">
+                <Select
+                  selectedKey={selectedCameraId}
+                  onSelectionChange={(key) => handleSelectCamera(String(key))}
+                  fullWidth
+                >
+                  <Label>Select a camera</Label>
+                  <Select.Trigger className="bg-neutral-100 dark:bg-neutral-900 shadow-none">
+                    <Select.Value />
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover>
+                    <ListBox>
+                      {availableCameras.map((cam, idx) => (
+                        <ListBox.Item key={cam.deviceId} id={cam.deviceId} textValue={cameraLabel(cam, idx)}>
+                          <Label>{cameraLabel(cam, idx)}</Label>
+                          <ListBox.ItemIndicator />
+                        </ListBox.Item>
+                      ))}
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
+              </div>
+            )}
 
             <button
               data-guide="take-attendance-btn"
               type="button"
               onClick={handleTakeAttendance}
-              className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
+              disabled={cameraStatus !== 'granted'}
+              className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Icon data={PaperPlane} size={16} />
               Take Attendance!

@@ -3,7 +3,8 @@
 // All API calls go directly to the real backend at the configured Base URL.
 // Mock mode has been permanently disabled as the backend is ready.
 
-import { getToken, setToken, clearSession } from './session.js'
+import { clearSession } from './session.js'
+import { clearLegacyTokenStorage } from '../../lib/cookies.js'
 
 const BASE_URL_KEY = 'takota_api_base_url'
 const DEFAULT_BASE_URL = ''
@@ -90,7 +91,7 @@ async function extractErrorMessage(response) {
 /**
  * Core request helper.
  */
-async function request(path, { method = 'GET', params, body, auth = true, raw = false } = {}) {
+async function request(path, { method = 'GET', params, body, raw = false } = {}) {
   const url = `${getBaseUrl()}${path}${buildQuery(params)}`
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData
 
@@ -98,16 +99,13 @@ async function request(path, { method = 'GET', params, body, auth = true, raw = 
     'Key-Request': 'web',
   }
   if (!isForm) headers['Content-Type'] = 'application/json'
-  if (auth) {
-    const token = getToken()
-    if (token) headers['Authorization'] = `Bearer ${token}`
-  }
 
   let response
   try {
     response = await fetch(url, {
       method,
       headers,
+      credentials: 'include',
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     })
   } catch {
@@ -141,30 +139,15 @@ async function request(path, { method = 'GET', params, body, auth = true, raw = 
 // Auth
 // ---------------------------------------------------------------------------
 
-function pickToken(json) {
-  return (
-    json?.token ||
-    json?.data?.token ||
-    json?.access_token ||
-    json?.data?.access_token ||
-    json?.bearer ||
-    json?.jwt ||
-    (typeof json === 'string' ? json : null)
-  )
-}
-
 export async function login(username, password) {
+  // The backend sets the HttpOnly session cookie on success; the browser
+  // stores it automatically (credentials:"include" in request()).
   const json = await request('/api/auth', {
     method: 'POST',
-    auth: false,
     body: { username, password },
   })
-  const token = pickToken(json)
-  if (!token) {
-    throw new ApiError('Login succeeded but no token was found in the server response.')
-  }
-  setToken(token)
-  return token
+  clearLegacyTokenStorage()
+  return json
 }
 
 export async function logout() {
@@ -249,8 +232,13 @@ export async function listAbsence({ limit = 50, lastId = '', search = '' } = {})
   return request('/api/admin/absences', { params: { limit, last_id: lastId, search } })
 }
 
-export async function signAbsence(id, sign) {
-  return request('/api/admin/absence', { method: 'PATCH', body: { id, sign } })
+export async function signAbsence(id, sign, { startDate, endDate } = {}) {
+  const body = { id, sign }
+  if (startDate && endDate) {
+    body.absence_start_date = startDate
+    body.absence_end_date = endDate
+  }
+  return request('/api/admin/absence', { method: 'PATCH', body })
 }
 
 export async function deleteAbsence(id) {

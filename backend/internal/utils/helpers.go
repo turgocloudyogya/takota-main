@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/png"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -122,4 +125,19 @@ func GetMonthNumber(monthName string) int {
 		return month
 	}
 	return 0
+}
+
+// GetNowInUTC returns current time in UTC
+func GetNowInUTC() time.Time {
+	return time.Now().UTC()
+}
+
+// ImageToPNG converts an image.Image to PNG bytes
+func ImageToPNG(img image.Image) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := png.Encode(buf, img)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

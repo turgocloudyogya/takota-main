@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -16,6 +17,8 @@ type Config struct {
 	JWT        JWTConfig
 	App        AppConfig
 	FileUpload FileUploadConfig
+	VAPID      VAPIDConfig
+	Security   SecurityConfig
 }
 
 type ServerConfig struct {
@@ -76,6 +79,18 @@ type AppConfig struct {
 type FileUploadConfig struct {
 	MaxAttendanceFileSizeMB int64
 	MaxAbsenceFileSizeMB    int64
+}
+
+type VAPIDConfig struct {
+	PublicKey  string
+	PrivateKey string
+	Subject    string
+}
+
+type SecurityConfig struct {
+	// Extra allowed WebAuthn origins (comma-separated fully qualified
+	// origins). The request origin itself is always allowed.
+	WebauthnOrigins []string
 }
 
 var GlobalConfig *Config
@@ -141,6 +156,14 @@ func LoadConfig() (*Config, error) {
 			MaxAttendanceFileSizeMB: int64(getEnvAsInt("MAX_ATTENDANCE_FILE_SIZE_MB", 10)),
 			MaxAbsenceFileSizeMB:    int64(getEnvAsInt("MAX_ABSENCE_FILE_SIZE_MB", 50)),
 		},
+		VAPID: VAPIDConfig{
+			PublicKey:  getEnv("VAPID_PUBLIC_KEY", ""),
+			PrivateKey: getEnv("VAPID_PRIVATE_KEY", ""),
+			Subject:    getEnv("VAPID_SUBJECT", "mailto:admin@takota.local"),
+		},
+		Security: SecurityConfig{
+			WebauthnOrigins: splitCSV(getEnv("WEBAUTHN_ORIGINS", "")),
+		},
 	}
 
 	GlobalConfig = config
@@ -177,6 +200,17 @@ func getEnvAsFloat(key string, defaultValue float64) float64 {
 		return value
 	}
 	return defaultValue
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 func (c *Config) GetDSN() string {

@@ -134,6 +134,9 @@ export function normalizeAbsence(raw) {
     isSick: SICK_OPTIONS.has(String(option).toLowerCase()),
     sign: sign ? String(sign).toLowerCase() : 'pending',
     fileUrl: firstDefined(raw.file, raw.file_url, raw.attachment, raw.photo),
+    startDate: firstDefined(raw.absence_start_date, raw.start_date),
+    endDate: firstDefined(raw.absence_end_date, raw.end_date),
+    isMultiDay: Boolean(raw.is_multi_day),
     raw,
   }
 }

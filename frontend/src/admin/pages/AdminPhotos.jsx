@@ -38,6 +38,9 @@ export default function AdminPhotos() {
           date: photo.timestamp || photo.created_at || '',
           nickname: photo.user?.name || 'Student',
           username: photo.user?.username || 'Student', // For modal compatibility
+          displayAddress: photo.display_address || null,
+          latitude: photo.latitude || null,
+          longitude: photo.longitude || null,
         }))
         
         if (isLoadingMore) {

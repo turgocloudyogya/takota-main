@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"github.com/carakan/takota/pkg/redis"
 	"github.com/carakan/takota/pkg/s3"
 	"github.com/carakan/takota/pkg/seed"
+	"github.com/carakan/takota/pkg/notification"
 	"github.com/gin-gonic/gin"
 )
 
@@ -66,6 +68,14 @@ func main() {
 	// Setup routes
 	setupRoutes(router, cfg)
 
+	// Start notification scheduler
+	ctx, cancel := context.WithCancel(context.Background())
+	scheduler := notification.NewScheduler(database.GetDB())
+	scheduler.VAPIDPublicKey = cfg.VAPID.PublicKey
+	scheduler.VAPIDPrivateKey = cfg.VAPID.PrivateKey
+	scheduler.VAPIDSubject = cfg.VAPID.Subject
+	scheduler.Start(ctx)
+
 	// Graceful shutdown
 	go func() {
 		if err := router.Run(":" + cfg.Server.Port); err != nil {
@@ -81,6 +91,7 @@ func main() {
 	<-quit
 
 	log.Println("Shutting down server...")
+	cancel()
 }
 
 func setupRoutes(router *gin.Engine, cfg *config.Config) {
@@ -90,6 +101,10 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 	authCtrl := &controllers.AuthController{DB: db, Config: cfg}
 	userCtrl := &controllers.UserController{DB: db, Config: cfg}
 	adminCtrl := &controllers.AdminController{DB: db, Config: cfg}
+	adminSettingsCtrl := &controllers.AdminSettingsController{DB: db, Config: cfg}
+	twoFACtrl := &controllers.TwoFAController{DB: db, Config: cfg}
+	passkeyCtrl := &controllers.PasskeyController{DB: db, Config: cfg}
+	notificationCtrl := &controllers.NotificationController{DB: db, Config: cfg}
 	allCtrl := &controllers.AllController{DB: db, Config: cfg}
 
 	// Global middleware
@@ -105,6 +120,9 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 	{
 		// Auth routes (no auth required)
 		api.POST("/auth", authCtrl.Login)
+		api.POST("/auth/2fa", authCtrl.VerifyLogin2FA)
+		api.POST("/auth/passkey/begin", passkeyCtrl.BeginPasskeyLogin)
+		api.POST("/auth/passkey/finish", passkeyCtrl.FinishPasskeyLogin)
 		
 		// Change password (auth required, no password change validation)
 		api.POST("/auth-chpw", middlewares.AuthMiddleware(db), authCtrl.ChangePassword)
@@ -119,9 +137,29 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		user.Use(middlewares.RequirePasswordChanged(db))
 		{
 			user.GET("/home", userCtrl.Home)
-			user.POST("/attendance", userCtrl.Attendance)
+			user.GET("/dashboard/activity", userCtrl.GetUserActivityHeatmap)
+			user.POST("/attendance", middlewares.AttendanceTimeMiddleware(db), userCtrl.Attendance)
 			user.POST("/absence", userCtrl.Absence)
 			user.DELETE("/absence/:absence_id", userCtrl.DeleteAbsence)
+
+			// 2FA routes (setup requires a settled password - the
+			// RequirePasswordChanged middleware blocks change_as_login users)
+			user.POST("/2fa/setup", twoFACtrl.Setup2FA)
+			user.POST("/2fa/verify", twoFACtrl.Verify2FA)
+			user.POST("/2fa/disable", twoFACtrl.Disable2FA)
+			user.GET("/2fa/status", twoFACtrl.Check2FAStatus)
+			user.POST("/2fa/backup-codes/regenerate", twoFACtrl.RegenerateBackupCodes)
+
+			// Passkey routes (self only)
+			user.POST("/passkey/register/begin", passkeyCtrl.BeginPasskeyRegistration)
+			user.POST("/passkey/register/finish", passkeyCtrl.FinishPasskeyRegistration)
+			user.GET("/passkey", passkeyCtrl.ListPasskeys)
+			user.DELETE("/passkey/:id", passkeyCtrl.DeletePasskey)
+
+			// Push notification routes
+			user.POST("/push-subscription", notificationCtrl.RegisterPushSubscription)
+			user.DELETE("/push-subscription", notificationCtrl.UnregisterPushSubscription)
+			user.GET("/push-subscription/status", notificationCtrl.GetPushSubscriptionStatus)
 		}
 
 		// Admin routes (auth required + admin role + password changed)
@@ -130,6 +168,11 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		admin.Use(middlewares.RequireRole("admin"))
 		admin.Use(middlewares.RequirePasswordChanged(db))
 		{
+			// Dashboard
+			admin.GET("/dashboard/stats", adminCtrl.GetDashboardStats)
+			admin.GET("/dashboard/trend", adminCtrl.GetAttendanceTrend)
+			admin.GET("/dashboard/activity", adminCtrl.GetActivityHeatmap)
+
 			// Attendance & Absence management
 			admin.GET("/attendances", adminCtrl.ListAttendances)
 			admin.GET("/absences", adminCtrl.ListAbsences)
@@ -143,6 +186,22 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			admin.POST("/user/:user_id", adminCtrl.UpdateUser)
 			admin.DELETE("/user/:user_id", adminCtrl.DeleteUser)
 
+			// Settings management
+			admin.GET("/settings", adminSettingsCtrl.GetSettings)
+			admin.PATCH("/settings", adminSettingsCtrl.UpdateSettings)
+
+			// Self security: same 2FA/passkey controllers operate on the
+			// logged-in admin (user_id from token), never on other admins.
+			admin.POST("/2fa/setup", twoFACtrl.Setup2FA)
+			admin.POST("/2fa/verify", twoFACtrl.Verify2FA)
+			admin.POST("/2fa/disable", twoFACtrl.Disable2FA)
+			admin.GET("/2fa/status", twoFACtrl.Check2FAStatus)
+			admin.POST("/2fa/backup-codes/regenerate", twoFACtrl.RegenerateBackupCodes)
+			admin.POST("/passkey/register/begin", passkeyCtrl.BeginPasskeyRegistration)
+			admin.POST("/passkey/register/finish", passkeyCtrl.FinishPasskeyRegistration)
+			admin.GET("/passkey", passkeyCtrl.ListPasskeys)
+			admin.DELETE("/passkey/:id", passkeyCtrl.DeletePasskey)
+
 			// Export
 			admin.GET("/export", adminCtrl.ExportAttendance)
 			admin.GET("/export/report-data", adminCtrl.ExportAttendanceReportData)
@@ -154,6 +213,8 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 		{
 			all.GET("/info", allCtrl.GetInfo)
 			all.GET("/photos", allCtrl.GetPhotos)
+			all.GET("/settings/status", adminSettingsCtrl.GetPublicStatus)
+			all.GET("/push-public-key", allCtrl.GetPushPublicKey)
 		}
 	}
 }

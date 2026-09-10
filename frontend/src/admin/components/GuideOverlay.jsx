@@ -9,49 +9,49 @@ const STEPS = [
     page: '/admin/dashboard',
     target: '[data-guide="stat-cards"]',
     title: 'Dashboard Overview',
-    description: 'Here you can see the key stats at a glance: Total Students, Present Today, Pending Leave, and Not Checked In Today.',
+    description: 'Key stats at a glance: total users, today\'s check-ins and absences, pending approvals, peak check-in time, and 7-day daily averages. Weekends follow your open-days setting and never count as alpha.',
     placement: 'bottom',
   },
   {
     page: '/admin/dashboard',
     target: '[data-guide="charts"]',
-    title: 'Attendance Charts',
-    description: 'View the attendance trend over the last 14 days and today\'s status breakdown with interactive charts.',
+    title: '7-Day Trend',
+    description: 'Check-ins vs absences over the last 7 days. Hover any date to compare both series, with totals listed below the chart.',
     placement: 'bottom',
   },
   {
     page: '/admin/dashboard',
-    target: '[data-guide="recent-activity"]',
-    title: 'Recent Activity',
-    description: 'See the latest attendance and leave submissions from students here.',
+    target: '[data-guide="activity-heatmap"]',
+    title: 'Activity Heatmap',
+    description: 'Daily attendance activity for the last 5 months, GitHub-style. Hover a square for present, leave, alpha, and unreported percentages. Use the filter to focus on one student.',
     placement: 'top',
   },
   {
     page: '/admin/users',
     target: '[data-guide="add-user-btn"]',
     title: 'Add New Users',
-    description: 'Click this button to add a new student or admin account to the system.',
+    description: 'Click this button to add a new student or admin account. Each user card shows the account type — tap the pencil to edit or the trash icon to delete.',
     placement: 'bottom',
   },
   {
     page: '/admin/attendance',
     target: '[data-guide="attendance-table"]',
-    title: 'Attendance Timeline',
-    description: 'View who has checked in today and their attendance history. You can search and filter by name.',
+    title: 'Attendance Cards',
+    description: 'Each check-in is a card: location map on the left, attendance photo, who checked in, date and time, and full address on the right. Tap the photo for a full preview, or the trash icon to delete.',
     placement: 'bottom',
   },
   {
     page: '/admin/absence',
     target: '[data-guide="absence-table"]',
     title: 'Leave & Sick Requests',
-    description: 'Review and manage leave and sick submissions from students. Approve or reject requests here.',
+    description: 'Each submission is a card showing who reported, the period (single-day or multi-day), the type, and the reason — expand long reasons with Show more. Approve or reject pending items, use the pencil to change a decided status or edit a multi-day period, and the trash icon to delete.',
     placement: 'bottom',
   },
   {
     page: '/admin/photos',
     target: '[data-guide="photo-gallery"]',
     title: 'Photo Gallery',
-    description: 'Browse attendance photos submitted by students for verification.',
+    description: 'Browse attendance photos submitted by students. Tap any photo to preview it with the time, reporter, address, and location map.',
     placement: 'bottom',
   },
   {
@@ -147,13 +147,32 @@ export default function GuideOverlay({ onComplete }) {
   const [visible, setVisible] = useState(false)
   const [animating, setAnimating] = useState(false)
   const tooltipRef = useRef(null)
+  // Only navigate on user-initiated step changes (Next/Back), never on
+  // mount — otherwise deep links like /admin/settings get hijacked back
+  // to /admin/dashboard on every fresh page load.
+  const userSteppedRef = useRef(false)
 
   const currentStep = STEPS[stepIndex]
   const totalSteps = STEPS.length
 
-  // Navigate to the correct page when step changes
+  function goNext() {
+    if (stepIndex < totalSteps - 1) {
+      userSteppedRef.current = true
+      setStepIndex(stepIndex + 1)
+    } else {
+      markGuideDone()
+      onComplete?.()
+    }
+  }
+
+  const goNextRef = useRef(goNext)
   useEffect(() => {
-    if (!currentStep) return
+    goNextRef.current = goNext
+  })
+
+  // Navigate to the correct page when the user moves between steps
+  useEffect(() => {
+    if (!currentStep || !userSteppedRef.current) return
     const currentPath = window.location.pathname
     if (currentPath !== currentStep.page) {
       navigate(currentStep.page, { replace: true })
@@ -174,10 +193,16 @@ export default function GuideOverlay({ onComplete }) {
       if (cancelled) return
       const rect = measureTarget(currentStep.target)
       if (!rect) {
+        // Conditional targets (e.g. trend chart with no data yet) —
+        // skip the step instead of stranding the user.
         if (retryCount < 10) {
           retryCount++
           timer = setTimeout(tryFind, 500)
+          return
         }
+        setTargetRect(null)
+        setVisible(false)
+        goNextRef.current()
         return
       }
       requestAnimationFrame(() => {
@@ -216,6 +241,7 @@ export default function GuideOverlay({ onComplete }) {
 
   function handleNext() {
     if (stepIndex < totalSteps - 1) {
+      userSteppedRef.current = true
       setStepIndex(stepIndex + 1)
     } else {
       markGuideDone()
@@ -225,6 +251,7 @@ export default function GuideOverlay({ onComplete }) {
 
   function handlePrev() {
     if (stepIndex > 0) {
+      userSteppedRef.current = true
       setStepIndex(stepIndex - 1)
     }
   }

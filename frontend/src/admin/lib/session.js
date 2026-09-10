@@ -1,46 +1,30 @@
 // Session/auth helpers for the admin dashboard.
 //
-// Takota's /api/auth login returns a bearer JWT. The token payload (see the
-// example in the Bruno collection, opencollection.yml -> EX_AUTHBEARER)
-// looks like:
-//   { user_id, username, type, auth_id, change_as_login, exp, nbf, iat }
-//
-// "type" is what distinguishes an admin account ("admin") from a regular
-// student/user account ("user"). We decode it client-side (no signature
-// verification - that's the backend's job) purely to know who is logged in
-// and to gate the /admin/* routes to admin accounts.
+// Auth uses the HttpOnly `takota_token` cookie (set by the backend at login,
+// sent automatically with `credentials: "include"`). JS never sees the JWT;
+// route gating reads only the non-sensitive `takota_profile` cookie
+// ("username|role"). The backend remains the source of truth — an invalid or
+// expired session is bounced to login by AuthGate via GET /api/all/info.
+
+import { getProfile, clearAuthCookies, clearLegacyTokenStorage } from '../../lib/cookies.js'
 
 const TOKEN_KEY = 'takota_admin_token'
 
 export function getToken() {
-  try {
-    return localStorage.getItem(TOKEN_KEY) || null
-  } catch {
-    return null
-  }
+  return null
 }
 
-export function setToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token)
-    else localStorage.removeItem(TOKEN_KEY)
-  } catch {
-    // Ignore storage failures (e.g. private browsing) - session just won't persist.
-  }
+export function setToken() {
+  // No-op: tokens live in the HttpOnly cookie now.
 }
 
 export function clearSession() {
-  setToken(null)
-  // The login flow stores the token under multiple keys; clearing only
-  // takota_admin_token lets AuthGate find the still-valid token via
-  // takota_token and bounce the user back in (logout loop). Remove them all.
-  const legacyKeys = ['takota_token', 'token', 'takota-username', 'takota-role']
-  for (const key of legacyKeys) {
-    try {
-      localStorage.removeItem(key)
-    } catch {
-      // ignore storage failures
-    }
+  clearAuthCookies()
+  clearLegacyTokenStorage()
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // ignore storage failures
   }
 }
 
@@ -68,20 +52,15 @@ export function decodeToken(token) {
 }
 
 export function getSession() {
-  const token = getToken()
-  const claims = decodeToken(token)
-  if (!token || !claims) return null
-
-  if (claims.exp && Date.now() / 1000 > claims.exp) {
-    return null
-  }
+  const profile = getProfile()
+  if (!profile) return null
 
   return {
-    token,
-    userId: claims.user_id,
-    username: claims.username,
-    type: claims.type,
-    changeAsLogin: Boolean(claims.change_as_login),
+    token: null,
+    userId: null,
+    username: profile.username,
+    type: profile.role,
+    changeAsLogin: false,
   }
 }
 

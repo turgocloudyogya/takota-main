@@ -17,7 +17,7 @@ export default function AbsenceCard({ date, status, title, subtitle, onDelete })
   const colorClass = statusBadgeStyles[status] || statusBadgeStyles.alpha
 
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-neutral-100 pr-3 dark:bg-neutral-800/60">
+    <div className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
       <span className={`flex h-13 w-15 shrink-0 items-center justify-center rounded-lg text-xs font-semibold text-white ${colorClass}`}>
         {date}
       </span>

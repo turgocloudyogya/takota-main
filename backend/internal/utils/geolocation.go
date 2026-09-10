@@ -16,13 +16,15 @@ const (
 
 // reverseGeocodeResponse is the JSON shape returned by Nominatim's reverse endpoint.
 type reverseGeocodeResponse struct {
-	DisplayName string `json:"display_name"`
-	Error       string `json:"error,omitempty"`
+	DisplayName string            `json:"display_name"`
+	Address     map[string]string `json:"address"`
+	Error       string            `json:"error,omitempty"`
 }
 
-// ReverseGeocode resolves a latitude/longitude pair to a human-readable
-// address using the OpenStreetMap Nominatim reverse geocoding API. It returns
-// nil when no address can be determined (bad coordinates or API error).
+// ReverseGeocode resolves a latitude/longitude pair to the complete original
+// human-readable address (Nominatim display_name) using the OpenStreetMap
+// Nominatim reverse geocoding API. It returns nil when no address can be
+// determined (bad coordinates or API error).
 func ReverseGeocode(latitude, longitude string) (*string, error) {
 	lat := strings.TrimSpace(latitude)
 	lon := strings.TrimSpace(longitude)

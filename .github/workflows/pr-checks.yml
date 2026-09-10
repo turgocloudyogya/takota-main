@@ -231,11 +231,23 @@ jobs:
 
       - name: Test user attendance
         run: |
+          # Attendance requires a photo and an open time window. The window
+          # depends on the wall clock, so open it fully first to make this
+          # test time-independent (CI database is throwaway).
+          echo "=== Opening attendance window for the test ==="
+          curl -sf -X PATCH http://localhost/api/admin/settings \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"attendance_open_time":"00:00","attendance_close_time":"23:59","open_days":["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]}' \
+            | grep -q '"message"' || exit 1
+
           echo "=== Testing POST /api/user/attendance ==="
+          echo 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > /tmp/ci-photo.png
           ATTENDANCE_RESPONSE=$(curl -sf -X POST http://localhost/api/user/attendance \
             -H "Authorization: Bearer $USER_TOKEN" \
             -F "latitude=-6.2088" \
-            -F "longitude=106.8456")
+            -F "longitude=106.8456" \
+            -F "photo=@/tmp/ci-photo.png;type=image/png")
           echo "Attendance response: $ATTENDANCE_RESPONSE"
           echo "$ATTENDANCE_RESPONSE" | grep -q '"message"' || exit 1
 

@@ -7,6 +7,8 @@ A Go backend for attendance and absence management, built with Gin, GORM, Postgr
 - **Web**: Gin 1.9.1 (`github.com/gin-gonic/gin`)
 - **ORM**: GORM with pgx driver (`gorm.io/gorm`, `gorm.io/driver/pgx`)
 - **Auth**: JWT HS256 (`github.com/golang-jwt/jwt/v5`)
+- **2FA**: TOTP (`github.com/pquerna/otp`), WebAuthn/passkey (`github.com/go-webauthn/webauthn`)
+- **Push**: Web Push sender written in-house on stdlib + `golang.org/x/crypto` (RFC 8291 aes128gcm + RFC 8292 VAPID, no extra dependency)
 - **Validation**: go-playground/validator/v10
 - **Storage**: AWS SDK v2 S3 client (S3-compatible: AWS, MinIO, Cloudflare R2)
 - **UUID**: google/uuid (v6)
@@ -65,6 +67,68 @@ Response 200:
   "message": "Password changed successfully"
 }
 ```
+
+When the account has TOTP or a passkey, `POST /api/auth` answers `202`
+instead of logging in directly:
+
+```
+Response 202:
+{
+  "require_2fa": true,
+  "challenge": "<5-minute-challenge>",
+  "methods": ["totp", "passkey"]
+}
+```
+
+Complete it with one of:
+
+```
+POST /api/auth/2fa
+Content-Type: application/json
+
+Request:
+{
+  "challenge": "<challenge>",
+  "code": "123456 | XXXX-XXXX backup code (single use, consumed)"
+}
+
+POST /api/auth/passkey/begin   {"username": "user001"} -> {challenge, options}
+POST /api/auth/passkey/finish  (raw assertion JSON, X-Passkey-Challenge header)
+```
+
+### Two-Factor & Passkey Endpoints (self only; `/api/user/...` or `/api/admin/...`)
+
+```
+POST /2fa/setup                        Start TOTP setup (pending secret + QR)
+POST /2fa/verify          {"code"}     Enable TOTP, returns 10 backup codes (shown once)
+POST /2fa/disable         {"code"}     Disable TOTP (TOTP or backup code)
+GET  /2fa/status                       {totp_enabled, passkey_enabled, passkey_count, backup_remaining}
+POST /2fa/backup-codes/regenerate {"code"}   Fresh backup codes, old ones void
+
+POST /passkey/register/begin           Start adding a passkey
+POST /passkey/register/finish          Raw credential JSON (X-Passkey-Challenge, X-Passkey-Name);
+                                       first passkey also returns backup codes
+GET  /passkey                          List own passkeys (metadata)
+DELETE /passkey/:id                    Remove a passkey
+```
+
+Setup routes require a settled password (`change_as_login` must be false).
+
+### Push Endpoints
+
+```
+GET  /api/all/push-public-key         VAPID public key (safe to expose)
+
+POST   /api/user/push-subscription    {endpoint, auth, p256dh} (replaces device)
+DELETE /api/user/push-subscription    Remove subscription
+GET    /api/user/push-subscription/status
+```
+
+An in-process scheduler (every 5 minutes, app timezone, open days only)
+sends a reminder 2 hours before close (60% into windows of 2 hours or less)
+to subscribed users who neither checked in nor hold approved leave, plus a
+missed-attendance notice 5 minutes after close. Stale endpoints (404/410)
+are cleared automatically.
 
 ### User Endpoints
 
@@ -371,6 +435,14 @@ DB_SSL_MODE=disable
 JWT_SECRET=your-secret-key-change-in-production
 JWT_EXPIRY_HOURS=24
 
+# Web Push (VAPID) - generate with scripts/generate-vapid.sh
+VAPID_PUBLIC_KEY=change-me-vapid-public-key
+VAPID_PRIVATE_KEY=change-me-vapid-private-key
+VAPID_SUBJECT=mailto:admin@example.com
+
+# WebAuthn extra origins (request origin is always allowed)
+WEBAUTHN_ORIGINS=
+
 # S3 (MinIO example)
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY=minioadmin
@@ -404,9 +476,10 @@ User:   user001 / testing123
 cmd/api/              Entry point
 internal/
   config/             Env-based configuration
-  controllers/        HTTP handlers (auth, user, admin, export, all)
+  controllers/        HTTP handlers (auth, user, admin, export, all, twofa, passkey)
   middlewares/         JWT auth, role enforcement, password change check
-  models/             GORM models (User, Attendance)
+  models/             GORM models (User, Attendance, WebauthnCredential)
+  twofactor/          2FA challenge store + backup code helpers
   utils/              bcrypt, greetings, response helpers, geocoding
 pkg/
   database/           PostgreSQL connection + pool tuning
@@ -414,7 +487,8 @@ pkg/
   redis/              Optional cache (falls back to PostgreSQL)
   s3/                 S3 upload, validation, signed URLs
   migrator/           Embedded SQL migration runner
-migrations/           Versioned SQL files (applied on startup)
+  notification/       Web Push sender (RFC 8291/8292) + reminder scheduler
+migrations/           Versioned SQL files (applied on startup, now through 008)
 ```
 
 ## Testing

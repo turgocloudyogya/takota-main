@@ -9,6 +9,7 @@ import (
 	"github.com/carakan/takota/internal/config"
 	"github.com/carakan/takota/internal/models"
 	"github.com/carakan/takota/internal/utils"
+	"github.com/carakan/takota/pkg/notification"
 	"github.com/carakan/takota/pkg/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -43,14 +44,17 @@ type AbsenceListResponse struct {
 }
 
 type AbsenceListItem struct {
-	ID        string        `json:"id"`
-	UserID    string        `json:"user_id"`
-	User      *ListItemUser `json:"user"`
-	File      string        `json:"file"`
-	Reason    string        `json:"reason"`
-	Option    string        `json:"option"`
-	Verify    *VerifyDetail `json:"verify"`
-	Timestamp string        `json:"timestamp"`
+	ID               string        `json:"id"`
+	UserID           string        `json:"user_id"`
+	User             *ListItemUser `json:"user"`
+	File             string        `json:"file"`
+	Reason           string        `json:"reason"`
+	Option           string        `json:"option"`
+	Verify           *VerifyDetail `json:"verify"`
+	Timestamp        string        `json:"timestamp"`
+	AbsenceStartDate *string       `json:"absence_start_date,omitempty"`
+	AbsenceEndDate   *string       `json:"absence_end_date,omitempty"`
+	IsMultiDay       bool          `json:"is_multi_day"`
 }
 
 type ListItemUser struct {
@@ -69,8 +73,10 @@ type DeleteRequest struct {
 }
 
 type SignatureRequest struct {
-	ID   string `json:"id" binding:"required"`
-	Sign string `json:"sign" binding:"required"`
+	ID               string `json:"id" binding:"required"`
+	Sign             string `json:"sign" binding:"required"`
+	AbsenceStartDate string `json:"absence_start_date"`  // Optional: new start date for absence (ISO 8601)
+	AbsenceEndDate   string `json:"absence_end_date"`    // Optional: new end date for absence (ISO 8601)
 }
 
 // ListAttendances returns list of all attendances
@@ -241,14 +247,17 @@ func (ctrl *AdminController) ListAbsences(c *gin.Context) {
 		}
 
 		items = append(items, AbsenceListItem{
-			ID:        abs.ID.String(),
-			UserID:    abs.UserID.String(),
-			User:      buildListItemUser(abs.User),
-			File:      fileURL,
-			Reason:    reason,
-			Option:    option,
-			Verify:    verify,
-			Timestamp: abs.CreatedAt.Format(time.RFC3339),
+			ID:               abs.ID.String(),
+			UserID:           abs.UserID.String(),
+			User:             buildListItemUser(abs.User),
+			File:             fileURL,
+			Reason:           reason,
+			Option:           option,
+			Verify:           verify,
+			Timestamp:        abs.CreatedAt.Format(time.RFC3339),
+			AbsenceStartDate: formatAbsenceDate(abs.AbsenceStartDate),
+			AbsenceEndDate:   formatAbsenceDate(abs.AbsenceEndDate),
+			IsMultiDay:       isMultiDayAbsence(abs.AbsenceStartDate, abs.AbsenceEndDate),
 		})
 	}
 
@@ -313,6 +322,23 @@ func buildListItemUser(u models.User) *ListItemUser {
 	}
 }
 
+func formatAbsenceDate(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format("2006-01-02")
+	return &s
+}
+
+// isMultiDayAbsence reports whether the stored period spans more than one day.
+// Single-day requests (no stored dates, or start == end) are not editable.
+func isMultiDayAbsence(start, end *time.Time) bool {
+	if start == nil || end == nil {
+		return false
+	}
+	return end.After(start.Add(23*time.Hour + 59*time.Minute))
+}
+
 // DeleteAbsence deletes an absence record by its ID path parameter
 func (ctrl *AdminController) DeleteAbsence(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("absence_id"))
@@ -351,7 +377,7 @@ func (ctrl *AdminController) DeleteAbsence(c *gin.Context) {
 	})
 }
 
-// SignatureAbsence signs an absence record with allow/reject
+// SignatureAbsence signs an absence record with allow/reject and optionally updates dates
 func (ctrl *AdminController) SignatureAbsence(c *gin.Context) {
 	var req SignatureRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -384,9 +410,55 @@ func (ctrl *AdminController) SignatureAbsence(c *gin.Context) {
 		return
 	}
 
+	// Handle date modification if provided
+	if req.AbsenceStartDate != "" || req.AbsenceEndDate != "" {
+		if req.AbsenceStartDate == "" || req.AbsenceEndDate == "" {
+			utils.RespondError(c, http.StatusBadRequest, "Both start date and end date are required to edit the period", "INVALID_DATE_RANGE")
+			return
+		}
+		if !isMultiDayAbsence(absence.AbsenceStartDate, absence.AbsenceEndDate) {
+			utils.RespondError(c, http.StatusBadRequest, "Only multi-day absence periods can be edited", "CANNOT_EDIT_SINGLE_DAY")
+			return
+		}
+		if req.Sign != "allow" {
+			utils.RespondError(c, http.StatusBadRequest, "Changing the period requires approving the request", "DATE_CHANGE_REQUIRES_APPROVAL")
+			return
+		}
+		startDate, err := time.Parse("2006-01-02", req.AbsenceStartDate)
+		if err != nil {
+			utils.RespondError(c, http.StatusBadRequest, "Invalid start date format, use YYYY-MM-DD", "INVALID_DATE_FORMAT")
+			return
+		}
+
+		endDate, err := time.Parse("2006-01-02", req.AbsenceEndDate)
+		if err != nil {
+			utils.RespondError(c, http.StatusBadRequest, "Invalid end date format, use YYYY-MM-DD", "INVALID_DATE_FORMAT")
+			return
+		}
+
+		// Validate: end date must be after or equal to start date
+		if endDate.Before(startDate) {
+			utils.RespondError(c, http.StatusBadRequest, "End date must be after or equal to start date", "INVALID_END_DATE")
+			return
+		}
+
+		// Validate: max 3 months duration
+		maxEndDate := startDate.AddDate(0, 3, 0)
+		if endDate.After(maxEndDate) {
+			utils.RespondError(c, http.StatusBadRequest, "Absence duration cannot exceed 3 months", "DURATION_EXCEEDS_MAX")
+			return
+		}
+
+		absence.AbsenceStartDate = &startDate
+		absence.AbsenceEndDate = &endDate
+	}
+
 	// Get admin user ID
 	adminUserID, _ := c.Get("user_id")
 	adminUID, _ := uuid.Parse(adminUserID.(string))
+
+	var adminUser models.User
+	ctrl.DB.Where("id = ?", adminUID).First(&adminUser)
 
 	// Update verify_by and sign_status
 	absence.VerifyBy = &adminUID
@@ -397,6 +469,13 @@ func (ctrl *AdminController) SignatureAbsence(c *gin.Context) {
 		utils.RespondError(c, http.StatusInternalServerError, "Failed to update", "DB_ERROR")
 		return
 	}
+
+	// Send push notification to user
+	notifSvc := notification.NewService(ctrl.DB)
+	notifSvc.VAPIDPublicKey = ctrl.Config.VAPID.PublicKey
+	notifSvc.VAPIDPrivateKey = ctrl.Config.VAPID.PrivateKey
+	notifSvc.VAPIDSubject = ctrl.Config.VAPID.Subject
+	notifSvc.SendAbsenceDecision(absence.UserID.String(), req.Sign, adminUser.Nickname)
 
 	utils.RespondSuccess(c, http.StatusOK, gin.H{
 		"message": "Absence signature updated successfully",
