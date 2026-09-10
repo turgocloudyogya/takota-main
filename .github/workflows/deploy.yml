@@ -39,6 +39,16 @@ jobs:
         run: |
           echo "IMAGE=$(echo 'ghcr.io/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
+      - name: Read release version from .tagversioning
+        run: |
+          VERSION_TAG=$(tr -d '[:space:]' < .tagversioning)
+          if [ -z "$VERSION_TAG" ]; then
+            echo ".tagversioning is empty" >&2
+            exit 1
+          fi
+          echo "VERSION_TAG=$VERSION_TAG" >> "$GITHUB_ENV"
+          echo "Release version: $VERSION_TAG"
+
       # ---------- Build (multi-stage: frontend + backend) ----------
       - name: Build image (load into local docker for testing)
         uses: docker/build-push-action@v6
@@ -124,8 +134,10 @@ jobs:
       - name: Push image to GitHub Container Registry
         run: |
           docker tag "${{ env.IMAGE }}:${{ env.IMAGE_TAG }}" "${{ env.IMAGE }}:latest"
+          docker tag "${{ env.IMAGE }}:${{ env.IMAGE_TAG }}" "${{ env.IMAGE }}:${{ env.VERSION_TAG }}"
           docker push "${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
           docker push "${{ env.IMAGE }}:latest"
+          docker push "${{ env.IMAGE }}:${{ env.VERSION_TAG }}"
 
       - name: Clean up test containers
         if: always()
