@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Button } from '@heroui/react'
 import { toast } from 'sonner'
 import { AppModal } from '../../components/Modals.jsx'
-import { TextInput, PasswordInput, SelectInput, ToggleField } from './FormField.jsx'
+import { Checkbox } from '@heroui/react'
+import { TextInput, PasswordInput, SelectInput } from './FormField.jsx'
 import * as api from '../lib/api.js'
 
 const emptyForm = {
@@ -193,11 +194,19 @@ export default function UserFormModal({ open, onOpenChange, user, onSaved, defau
           <option value="user">Student</option>
           <option value="admin">Admin</option>
         </SelectInput>
-        <ToggleField
-          label="Require password change on first login"
-          checked={form.changeAsLogin}
-          onChange={(v) => setField('changeAsLogin', v)}
-        />
+        <label className="flex items-center gap-2 text-sm text-neutral-900 dark:text-neutral-100">
+          <Checkbox
+            isSelected={form.changeAsLogin}
+            onChange={(v) => setField('changeAsLogin', v)}
+          >
+            <Checkbox.Content>
+              <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              Require password change on first login
+            </Checkbox.Content>
+          </Checkbox>
+        </label>
       </form>
     </AppModal>
   )

@@ -54,17 +54,3 @@ export function SelectInput({ label, className = '', children, ...selectProps })
     </label>
   )
 }
-
-export function ToggleField({ label, checked, onChange, className = '' }) {
-  return (
-    <label className={`flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3.5 py-2.5 dark:bg-neutral-800/60 ${className}`}>
-      <span className="text-sm text-neutral-900 dark:text-neutral-100">{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 accent-primary"
-      />
-    </label>
-  )
-}
