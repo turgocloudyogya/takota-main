@@ -1,11 +1,12 @@
 // Client-side renderer for the attendance recap PDF.
 //
-// This replaces the old server-side chromedp/Chromium pipeline: the backend
-// now only returns the assembled recap as JSON (see api.js ->
-// fetchAttendanceReportData, hitting GET /api/admin/export/report-data), and
+// The backend only returns the assembled recap as JSON (see api.js ->
+// fetchAttendanceReportData, hitting GET /api/admin/export/report-data);
 // this module renders that JSON into the *exact same markup and CSS* as
-// templates/absensi_template.html, then converts that live DOM node to a PDF
-// in the browser using html2pdf.js (html2canvas + jsPDF under the hood).
+// templates/absensi_template.html, then rasterizes it into a PDF in the
+// browser using html2canvas + jsPDF directly (see the big comment on
+// downloadAttendanceReportPdf below for why it's html2canvas/jsPDF directly
+// and not the html2pdf.js wrapper).
 //
 // Keeping the HTML/CSS below in sync with templates/absensi_template.html
 // (visually) is what guarantees the PDF still looks like the old
@@ -13,36 +14,49 @@
 
 const REPORT_STYLE_ID = 'attendance-report-print-style'
 
-// Pixel width the report is laid out and measured at, and the width we
-// force html2canvas to capture at (via its `width`/`windowWidth` options)
-// so the two always match -- if they didn't, cell heights measured at one
-// width could mismatch text wrapping at a different capture width.
+// Pixel width each logical page is laid out and measured at, and the width
+// we force html2canvas to capture at (via its `width`/`windowWidth`
+// options) so the two always match -- if they didn't, cell heights measured
+// at one width could mismatch text wrapping at a different capture width.
 const REPORT_WIDTH_PX = 1600
+
+// F4 landscape paper size, in mm -- same physical page this recap has
+// always used (F4 isn't a named jsPDF format, so it's passed as an explicit
+// [width, height] pair; jsPDF swaps them to landscape based on
+// `orientation`).
+const PDF_FORMAT_MM = [215, 330]
+const PDF_ORIENTATION = 'landscape'
+
+// [top, left, bottom, right] mm margins -- matches the reference template's
+// @page margins (1cm top / 2.5cm left / 1cm bottom / 1cm right), so the
+// table sits much closer to the top of the page than a naive default would.
+const PDF_MARGIN_MM = { top: 8, left: 25, bottom: 8, right: 10 }
 
 // Adapted from templates/absensi_template.html <style> block. The @page rule
 // is harmless to keep (ignored during on-screen/canvas rendering); actual
-// PDF margins/paper size are applied via html2pdf's own `margin`/`jsPDF`
-// options below (F4 landscape, same cm values as this @page rule).
+// PDF margins/paper size are applied when placing each page's image into
+// the jsPDF document (see downloadAttendanceReportPdf below).
 //
 // IMPORTANT: every table cell's text content is centered using an inner
 // `.cell-inner` flex wrapper (see cellTag() below) instead of the CSS
-// `vertical-align` property. html2canvas -- the library html2pdf.js uses to
-// rasterize the DOM into the PDF -- does not reliably honor
-// `vertical-align` on <td>/<th>, especially on rowspan'd cells (No, Nama
-// Peserta Didik, S, I, A), which made every cell's text render pinned to
-// the bottom of the cell instead of vertically centered. Flexbox centering
-// is measured from real layout boxes, so it renders correctly.
+// `vertical-align` property. html2canvas -- which rasterizes the DOM into
+// the PDF -- does not reliably honor `vertical-align` on <td>/<th>,
+// especially on rowspan'd cells (No, Nama Peserta Didik, S, I, A), which
+// made every cell's text render pinned to the bottom of the cell instead of
+// vertically centered. Flexbox centering is measured from real layout
+// boxes, so it renders correctly.
+//
+// Note there's no `.page { page-break-after: ... }` rule here (unlike
+// earlier versions of this file): each logical page is now rendered and
+// captured into its own canvas and placed on its own jsPDF page (see
+// downloadAttendanceReportPdf), so no page-break CSS is needed at all.
 const REPORT_CSS = `
 .attendance-report-root {
   font-family: Arial, Helvetica, sans-serif;
   font-size: 11.5pt;
   color: #000;
 }
-.attendance-report-root .page {
-  page-break-after: always;
-  background: #fff;
-}
-.attendance-report-root .page:last-child { page-break-after: auto; }
+.attendance-report-root .page { background: #fff; }
 
 .attendance-report-root .info { margin-bottom: 10pt; }
 .attendance-report-root .info-row { display: flex; margin-bottom: 2pt; }
@@ -199,7 +213,9 @@ function renderBlock(block) {
   </table>`
 }
 
-function renderPage(page) {
+// Renders a single logical page's markup -- the info block, its 1-2
+// attendance tables, and the ttd (signature) block.
+function renderPageHtml(page) {
   const blocks = (page.blocks || []).map(renderBlock).join('')
   return `
   <div class="page">
@@ -225,108 +241,138 @@ function renderPage(page) {
   </div>`
 }
 
-function buildPagesHtml(doc) {
-  return (doc?.pages || []).map(renderPage).join('')
+// Builds one logical page's DOM (off-screen), bakes in real cell heights
+// (see the .cell-inner comment on REPORT_CSS above), captures it with
+// html2canvas, and cleans up after itself. Returns the resulting canvas.
+async function renderPageToCanvas(page, html2canvas) {
+  const container = document.createElement('div')
+  container.className = 'attendance-report-root'
+  container.style.background = '#fff'
+  container.style.width = `${REPORT_WIDTH_PX}px`
+  container.innerHTML = renderPageHtml(page)
+
+  // Attach off-screen (opacity:0 + fixed position, not display:none) so the
+  // browser computes real layout/box sizes -- including the height of
+  // rowspan'd cells (No, Nama Peserta Didik, S, I, A) -- while nothing is
+  // visibly painted on screen. html2canvas needs the element to actually be
+  // part of the live document to read accurate computed styles/geometry.
+  const host = document.createElement('div')
+  host.style.position = 'fixed'
+  host.style.top = '0'
+  host.style.left = '0'
+  host.style.opacity = '0'
+  host.style.pointerEvents = 'none'
+  host.style.zIndex = '-1'
+  host.appendChild(container)
+  document.body.appendChild(host)
+
+  try {
+    container.querySelectorAll('table.absensi th, table.absensi td').forEach((cell) => {
+      const inner = cell.querySelector(':scope > .cell-inner')
+      if (inner) inner.style.height = `${cell.clientHeight}px`
+    })
+
+    return await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      // Force the capture width to match the width we measured cell
+      // heights at (REPORT_WIDTH_PX) -- otherwise html2canvas may render at
+      // a different width than what we laid out and measured, causing text
+      // to wrap differently than the baked-in pixel heights above expect.
+      width: REPORT_WIDTH_PX,
+      windowWidth: REPORT_WIDTH_PX,
+      // html2canvas clones the *entire* document (not just our container)
+      // to compute layout/styles. If the app's global CSS uses modern
+      // color functions (e.g. Tailwind v4's oklch() theme variables),
+      // html2canvas's own color parser chokes on them with "unsupported
+      // color function oklch" even though our report template itself never
+      // uses anything but plain black/white. Fix: before it rasterizes,
+      // strip every other stylesheet from the clone and leave only our own
+      // plain-color REPORT_CSS.
+      onclone: (clonedDoc) => {
+        clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((el) => el.remove())
+        clonedDoc.querySelectorAll('style').forEach((el) => {
+          if (el.id !== REPORT_STYLE_ID) el.remove()
+        })
+        clonedDoc.body.style.backgroundColor = '#ffffff'
+        clonedDoc.body.style.color = '#000000'
+      },
+    })
+  } finally {
+    host.remove()
+  }
 }
 
 /**
  * Renders the recap JSON (from fetchAttendanceReportData) into the same
  * markup as absensi_template.html, then converts it to a PDF and triggers a
  * download -- entirely in the browser, no server-side Chromium involved.
+ *
+ * This renders and captures each logical page (each entry in doc.pages)
+ * into its own canvas via html2canvas, then places each one on its own
+ * jsPDF page directly -- rather than handing html2pdf.js one giant
+ * multi-page canvas plus CSS `page-break-after` hints, which is what a
+ * previous version of this function did.
+ *
+ * That previous approach produced a large blank gap starting from the 2nd
+ * PDF page onward. Root cause: html2pdf.js's pagebreak plugin decides where
+ * to insert page breaks by comparing each `.page` element's real
+ * `getBoundingClientRect()` (measured while our DOM is laid out at
+ * REPORT_WIDTH_PX = 1600px, chosen deliberately for crisp captured text)
+ * against a fixed "1 page = N px" threshold that the plugin derives purely
+ * from the PDF's physical paper size/margins assuming ~96dpi -- i.e.
+ * assuming the content is laid out at the *physical* page width (roughly
+ * 1114px for this F4 landscape size + margins), not 1600px. Because our
+ * report is intentionally laid out ~44% wider than that assumption, the
+ * plugin's math no longer lines up with where the content actually ends,
+ * so the padding it inserts to "finish off" each page overshoots -- landing
+ * mid-page instead of exactly at the page boundary, and leaving a large
+ * blank strip before the next page's real content begins.
+ *
+ * Capturing and placing one full logical page at a time sidesteps that
+ * calculation entirely: there is no cross-page measurement to get wrong,
+ * because each canvas simply *becomes* one whole PDF page, scaled to fit.
  */
 export async function downloadAttendanceReportPdf(doc, filename) {
   ensureStyleInjected()
 
-  const container = document.createElement('div')
-  container.className = 'attendance-report-root'
-  container.style.background = '#fff'
-  container.style.width = `${REPORT_WIDTH_PX}px`
-  container.innerHTML = buildPagesHtml(doc)
+  const pages = doc?.pages || []
+  if (pages.length === 0) {
+    throw new Error('No attendance data to render.')
+  }
 
-  // --- Phase 1: measure real cell heights -----------------------------
-  // Temporarily attach with visibility:hidden (not display:none, which
-  // skips layout entirely -- and not position:fixed/absolute with an
-  // off-screen offset, see below) purely so the browser computes real box
-  // sizes, including the height of rowspan'd cells (No, Nama Peserta
-  // Didik, S, I, A). visibility:hidden keeps full layout while skipping
-  // paint, so getBoundingClientRect still reports accurate numbers. We
-  // bake each cell's real height into its .cell-inner wrapper as an
-  // inline style, then immediately detach this measuring host again --
-  // BEFORE html2pdf ever touches the container.
-  //
-  // Earlier versions instead kept the container attached (with
-  // position:fixed/absolute + an off-screen offset) all the way through
-  // the .from()/.save() call below. That conflicts with html2pdf.js's own
-  // internal capture mechanism: it clones whatever `.from()` receives into
-  // its *own* hidden overlay + positioned container appended to
-  // document.body. Having our own manually-positioned live element in the
-  // document at the same time produced a blank/white PDF -- so now the
-  // container is a plain, unattached node by the time html2pdf sees it.
-  const measureHost = document.createElement('div')
-  measureHost.style.position = 'absolute'
-  measureHost.style.top = '0'
-  measureHost.style.left = '0'
-  measureHost.style.visibility = 'hidden'
-  measureHost.style.pointerEvents = 'none'
-  measureHost.appendChild(container)
-  document.body.appendChild(measureHost)
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ])
 
-  container.querySelectorAll('table.absensi th, table.absensi td').forEach((cell) => {
-    const inner = cell.querySelector(':scope > .cell-inner')
-    if (inner) inner.style.height = `${cell.clientHeight}px`
-  })
+  const pdf = new jsPDF({ unit: 'mm', format: PDF_FORMAT_MM, orientation: PDF_ORIENTATION })
+  const pageWidthMm = pdf.internal.pageSize.getWidth()
+  const pageHeightMm = pdf.internal.pageSize.getHeight()
+  const innerWidthMm = pageWidthMm - PDF_MARGIN_MM.left - PDF_MARGIN_MM.right
+  const innerHeightMm = pageHeightMm - PDF_MARGIN_MM.top - PDF_MARGIN_MM.bottom
 
-  measureHost.remove() // container is now a plain, detached node again
+  for (let i = 0; i < pages.length; i += 1) {
+    const canvas = await renderPageToCanvas(pages[i], html2canvas)
 
-  // --- Phase 2: generate the PDF ---------------------------------------
-  // Hand the untouched container to html2pdf.js and let it manage its own
-  // attach/clone/cleanup entirely -- we no longer position or attach
-  // anything ourselves here.
-  const { default: html2pdf } = await import('html2pdf.js')
-  await html2pdf()
-    .set({
-      filename,
-      // [top, left, bottom, right] in mm -- matches the reference template's
-      // @page margins (1cm top / 2.5cm left / 1cm bottom / 1cm right), so
-      // the table sits much closer to the top of the page than before.
-      margin: [8, 25, 8, 10],
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        // Force the capture width to match the width we measured cell
-        // heights at (REPORT_WIDTH_PX) -- otherwise html2canvas/html2pdf
-        // may render at a different width than what we laid out and
-        // measured, causing text to wrap differently and the baked-in
-        // pixel heights from Phase 1 to no longer match.
-        width: REPORT_WIDTH_PX,
-        windowWidth: REPORT_WIDTH_PX,
-        // html2canvas clones the *entire* document (not just our
-        // container) to compute layout/styles. If the app's global CSS
-        // uses modern color functions (e.g. Tailwind v4's oklch() theme
-        // variables), html2canvas's own color parser chokes on them with
-        // "unsupported color function oklch" even though our report
-        // template itself never uses anything but plain black/white.
-        // Fix: before it rasterizes, strip every other stylesheet from
-        // the clone and leave only our own plain-color REPORT_CSS.
-        onclone: (clonedDoc) => {
-          clonedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((el) => el.remove())
-          clonedDoc.querySelectorAll('style').forEach((el) => {
-            if (el.id !== REPORT_STYLE_ID) el.remove()
-          })
-          clonedDoc.body.style.backgroundColor = '#ffffff'
-          clonedDoc.body.style.color = '#000000'
-        },
-      },
-      // F4 (215mm x 330mm) isn't one of jsPDF's built-in named formats, so
-      // it's passed as an explicit [width, height] pair in mm; jsPDF swaps
-      // them to landscape automatically based on the `orientation` option.
-      jsPDF: { unit: 'mm', format: [215, 330], orientation: 'landscape' },
-      // '.page' already carries page-break-after: always in REPORT_CSS,
-      // so the default 'css' pagebreak mode splits pages automatically.
-      pagebreak: { mode: ['css', 'legacy'] },
-    })
-    .from(container)
-    .save()
+    // Fit the captured page into the printable area, preserving aspect
+    // ratio (uniform scale, no distortion). In the normal case this block
+    // was designed to fit (backend caps each page at 2 tables), so width
+    // stays at the full innerWidthMm and no letterboxing happens; the
+    // height-clamp branch is just a safety net against a page overflowing
+    // its printable area.
+    let imgWidthMm = innerWidthMm
+    let imgHeightMm = (canvas.height / canvas.width) * imgWidthMm
+    if (imgHeightMm > innerHeightMm) {
+      imgHeightMm = innerHeightMm
+      imgWidthMm = (canvas.width / canvas.height) * imgHeightMm
+    }
+
+    if (i > 0) pdf.addPage(PDF_FORMAT_MM, PDF_ORIENTATION)
+    const imgData = canvas.toDataURL('image/jpeg', 0.98)
+    pdf.addImage(imgData, 'JPEG', PDF_MARGIN_MM.left, PDF_MARGIN_MM.top, imgWidthMm, imgHeightMm)
+  }
+
+  pdf.save(filename)
 }

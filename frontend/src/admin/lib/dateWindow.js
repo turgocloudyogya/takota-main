@@ -26,6 +26,36 @@ export const WEEKDAY_OPTIONS = [
   { value: 0, label: 'Minggu' },
 ]
 
+// Maps the lowercase day-name strings used by the "Attendance Available On"
+// setting (GET /api/admin/settings -> open_days, e.g. ["monday", "tuesday"])
+// to the same 0=Minggu..6=Sabtu weekday numbering used everywhere else in
+// this file and expected by the backend's `work_days` query param.
+export const DAY_NAME_TO_WEEKDAY = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+}
+
+/**
+ * Converts the `open_days` string array from /api/admin/settings into the
+ * numeric work-day list this module (and the recap backend) expect, so the
+ * PDF recap's day-columns always mirror whatever the admin configured in
+ * Settings -> Attendance Available On, instead of a separate picker. Falls
+ * back to DEFAULT_WORK_DAYS when the setting is missing/empty/unrecognized
+ * so the recap always has at least one work day selected.
+ */
+export function weekdaysFromDayNames(dayNames) {
+  if (!Array.isArray(dayNames) || dayNames.length === 0) return DEFAULT_WORK_DAYS
+  const weekdays = dayNames
+    .map((name) => DAY_NAME_TO_WEEKDAY[String(name).trim().toLowerCase()])
+    .filter((value) => value !== undefined)
+  return weekdays.length > 0 ? weekdays.sort((a, b) => a - b) : DEFAULT_WORK_DAYS
+}
+
 const BLOCKS_PER_PAGE = 2
 
 export function formatShortDate(date) {

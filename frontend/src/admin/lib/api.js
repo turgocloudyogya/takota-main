@@ -246,6 +246,19 @@ export async function deleteAbsence(id) {
 }
 
 // ---------------------------------------------------------------------------
+// Admin - Settings
+// ---------------------------------------------------------------------------
+
+// Fetches the attendance time-window / open-days configured in
+// /admin/settings ("Attendance Available On"). AdminReports uses `open_days`
+// from this to drive the PDF recap's work-day columns, instead of a
+// separate day picker duplicating the same setting.
+export async function getAdminSettings() {
+  const response = await request('/api/admin/settings')
+  return response?.data || response
+}
+
+// ---------------------------------------------------------------------------
 // Admin - Export
 // ---------------------------------------------------------------------------
 
