@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
 import { Button, Card, Input, Label, ListBox, Select, TextField, DatePicker, DateField } from '@heroui/react'
 import { Calendar } from '@heroui/react'
 import { parseDate as parseCalDate } from '@internationalized/date'
@@ -12,6 +13,7 @@ import {
   estimatePageCount,
   DEFAULT_WORK_DAYS,
   WEEKDAY_OPTIONS,
+  weekdaysFromDayNames,
 } from '../lib/dateWindow.js'
 import { downloadBlob } from '../lib/download.js'
 import { downloadAttendanceReportPdf } from '../lib/attendanceReportHtml.js'
@@ -100,22 +102,30 @@ export default function AdminReports() {
   const [buildingPdf, setBuildingPdf] = useState(false)
 
   // Which weekdays count as "work days" / table columns in the recap.
-  // Defaults to Senin-Sabtu (the previous fixed behavior); toggling days
-  // off/on changes how many day-columns each block has (e.g. Senin-Jumat =
-  // 10 columns per block, Senin-Sabtu = 12, add Minggu = 14).
+  // This mirrors Settings -> Attendance Available On (open_days) rather
+  // than a separate picker, so the two stay in sync automatically; toggling
+  // days there changes how many day-columns each block has (e.g.
+  // Senin-Jumat = 10 columns per block, Senin-Sabtu = 12, add Minggu = 14).
+  // Defaults to Senin-Sabtu until the setting has loaded (or if it fails to
+  // load), matching the recap's historical fixed behavior.
   const [workDays, setWorkDays] = useState(DEFAULT_WORK_DAYS)
 
-  function toggleWorkDay(value) {
-    setWorkDays((prev) => {
-      const isSelected = prev.includes(value)
-      if (isSelected) {
-        // Keep at least one work day selected at all times.
-        if (prev.length === 1) return prev
-        return prev.filter((d) => d !== value)
+  useEffect(() => {
+    let cancelled = false
+    async function loadWorkDaysFromSettings() {
+      try {
+        const settings = await api.getAdminSettings()
+        if (!cancelled) setWorkDays(weekdaysFromDayNames(settings?.open_days))
+      } catch {
+        // Keep the Senin-Sabtu default -- the recap still works, it just
+        // won't reflect a custom day selection until settings can load.
       }
-      return [...prev, value].sort((a, b) => a - b)
-    })
-  }
+    }
+    loadWorkDaysFromSettings()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const rangeIsValid = Boolean(startDate) && Boolean(endDate) && startDate <= endDate
   const workingDays = useMemo(
@@ -280,7 +290,7 @@ export default function AdminReports() {
               Build PDF Attendance Recap
             </p>
             <p className="text-sm text-neutral dark:text-neutral-400">
-              Fill in the workplace (DU/DI) details, date range, and working days, and the system will automatically populate all student data, attendance statuses (√/S/I/A), and totals from existing records—marking a student absent ("A") only when peers are active, while leaving days with zero overall attendance blank as holidays—and automatically splitting ranges longer than two working weeks into a multi-page layout with up to two tables per page.
+              Fill in the workplace (DU/DI) details and date range, and the system will automatically populate all student data, attendance statuses (√/S/I/A), and totals from existing records—marking a student absent ("A") only when peers are active, while leaving days with zero overall attendance blank as holidays—and automatically splitting ranges longer than two working weeks into a multi-page layout with up to two tables per page. Work days (the report's day-columns) follow the "Attendance Available On" setting.
             </p>
           </div>
 
@@ -382,21 +392,16 @@ export default function AdminReports() {
             <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
               Work days (report columns)
             </span>
-            <div className="flex flex-wrap gap-2">
-              {WEEKDAY_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.value}
-                  variant={workDays.includes(opt.value) ? 'primary' : 'outline'}
-                  onPress={() => toggleWorkDay(opt.value)}
-                  className="min-w-[64px] px-2.5"
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
+            <span className="text-sm text-neutral-700 dark:text-neutral-300">
+              {workDaysLabel || '—'}
+            </span>
             <span className="text-xs text-neutral-500 dark:text-neutral-500">
-              Each table row block covers 2 weeks of the selected days (e.g. Senin–Sabtu = 12 columns,
-              Senin–Jumat = 10 columns). At least one day must stay selected.
+              Follows <strong>Attendance Available On</strong> in{' '}
+              <Link to="/admin/settings" className="underline hover:no-underline">
+                Settings
+              </Link>
+              . Each table row block covers 2 weeks of the selected days (e.g. Senin–Sabtu = 12
+              columns, Senin–Jumat = 10 columns).
             </span>
           </div>
 
