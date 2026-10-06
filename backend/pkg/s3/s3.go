@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,6 +23,7 @@ import (
 )
 
 var Client *s3.Client
+var PresignClient *s3.Client
 var Config *cfg.S3Config
 var readEndpoint string
 
@@ -132,6 +132,27 @@ func InitS3(appConfig *cfg.Config) error {
 	}
 
 	Client = s3.NewFromConfig(cfg, clientOptions...)
+
+	// Presign client: when S3_PUBLIC_HOST is set, presign directly
+	// against it so the signature binds the public host+path from the
+	// start (rewriting a signed URL afterwards breaks SigV4, because
+	// host and path are part of the signature). Presigning performs no
+	// network calls; uploads still go through Client above.
+	PresignClient = Client
+	if strings.TrimSpace(publicHost) != "" {
+		publicEndpoint := strings.TrimSuffix(publicHost, "/")
+		if !strings.HasPrefix(publicEndpoint, "http://") && !strings.HasPrefix(publicEndpoint, "https://") {
+			publicEndpoint = "http://" + publicEndpoint
+		}
+		PresignClient = s3.NewFromConfig(cfg,
+			func(o *s3.Options) {
+				o.BaseEndpoint = aws.String(publicEndpoint)
+			},
+			func(o *s3.Options) {
+				o.UsePathStyle = Config.UsePathStylePublicHost
+			},
+		)
+	}
 
 	// Check if bucket exists
 	ctx := context.Background()
@@ -306,9 +327,8 @@ func ReadFile(ctx context.Context, objectKey string) ([]byte, error) {
 
 // GetSignedURL generates a presigned URL for accessing a file.
 // It works with private buckets (MinIO/R2/S3); the URL expires after expiry.
-// When S3_PUBLIC_HOST is set, the host is rewritten to it so browsers use
-// the public address; the path keeps the bucket prefix according to
-// S3_USE_PATH_STYLE_PUBLIC_HOST and the query signature is preserved.
+// The signature is created against S3_PUBLIC_HOST when set (with
+// S3_USE_PATH_STYLE_PUBLIC_HOST), otherwise against S3_ENDPOINT.
 func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
 	if objectKey == "" {
 		return "", nil
@@ -319,11 +339,15 @@ func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (
 		return SignedURLAsCloudfront(objectKey, expiry)
 	}
 
-	if Client == nil {
+	client := PresignClient
+	if client == nil {
+		client = Client
+	}
+	if client == nil {
 		return "", fmt.Errorf("s3 client not initialized")
 	}
 
-	presigner := s3.NewPresignClient(Client)
+	presigner := s3.NewPresignClient(client)
 	req, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(Config.BucketName),
 		Key:    aws.String(objectKey),
@@ -332,39 +356,7 @@ func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (
 		return "", err
 	}
 
-	return rewriteToPublicHost(req.URL), nil
-}
-
-// rewriteToPublicHost swaps scheme+host to S3_PUBLIC_HOST when configured.
-func rewriteToPublicHost(signedURL string) string {
-	if Config == nil || Config.PublicHost == "" {
-		return signedURL
-	}
-	signed, err := url.Parse(signedURL)
-	if err != nil {
-		return signedURL
-	}
-	pub, err := url.Parse(strings.TrimSuffix(Config.PublicHost, "/"))
-	if err != nil || pub.Host == "" {
-		return signedURL
-	}
-	signed.Scheme = pub.Scheme
-	if signed.Scheme == "" {
-		signed.Scheme = "http"
-	}
-	signed.Host = pub.Host
-	bucketPrefix := "/" + Config.BucketName
-	if Config.UsePathStylePublicHost {
-		if !strings.HasPrefix(signed.Path, bucketPrefix+"/") && signed.Path != bucketPrefix {
-			signed.Path = bucketPrefix + signed.Path
-		}
-	} else {
-		signed.Path = strings.TrimPrefix(signed.Path, bucketPrefix)
-		if signed.Path == "" {
-			signed.Path = "/"
-		}
-	}
-	return signed.String()
+	return req.URL, nil
 }
 
 // SignedURLAsCloudfront generates CloudFront signed URL using AWS SDK library
