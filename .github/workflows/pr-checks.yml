@@ -265,8 +265,10 @@ jobs:
       - name: Collect logs on failure
         if: failure()
         run: |
+          echo "=== Containers ==="
+          docker ps -a || true
           echo "=== Container logs ==="
-          docker logs takota-app --tail 100
+          docker logs takota-app --tail 100 || echo "takota-app container not found"
 
       - name: Cleanup
         if: always()
