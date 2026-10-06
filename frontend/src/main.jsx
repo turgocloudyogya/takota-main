@@ -1,9 +1,10 @@
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { ViewTransition } from 'react'
 import { HeroUIProvider } from '@heroui/system'
 import './index.css'
 import App from './App.jsx'
-import { ThemeProvider } from './lib/theme.jsx'
+import { ThemeProvider, ThemeViewTransition } from './lib/theme.jsx'
 
 // Register the service worker in production builds so the PWA install
 // prompt (beforeinstallprompt) can fire. Skipped in dev to avoid stale
@@ -18,7 +19,9 @@ createRoot(document.getElementById('root')).render(
   <BrowserRouter>
     <HeroUIProvider>
       <ThemeProvider>
-        <App />
+        <ThemeViewTransition>
+          <App />
+        </ThemeViewTransition>
       </ThemeProvider>
     </HeroUIProvider>
   </BrowserRouter>,

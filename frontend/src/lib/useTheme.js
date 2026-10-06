@@ -3,7 +3,7 @@ import { createContext, useContext } from 'react'
 const THEME_STORAGE_KEY = 'takota-theme'
 
 // Browser chrome (address bar) color follows the page theme.
-const THEME_COLORS = { light: '#ffffff', dark: '#0a0a0a' }
+export const THEME_COLORS = { light: '#ffffff', dark: '#0a0a0a' }
 
 export function applyThemeColor(theme) {
   try {
