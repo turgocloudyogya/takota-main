@@ -19,6 +19,7 @@ type DashboardStats struct {
 	TotalAlpha         int64       `json:"total_alpha"`
 	TotalUsers         int64       `json:"total_users"`
 	PendingApprovals   int64       `json:"pending_approvals"`
+	PendingRequesters  []string    `json:"pending_requesters"`
 	AttendanceToday    int64       `json:"attendance_today"`
 	AbsenceToday       int64       `json:"absence_today"`
 	MostFrequentTime   string      `json:"most_frequent_time"`
@@ -62,6 +63,23 @@ func (ctrl *AdminController) GetDashboardStats(c *gin.Context) {
 		Count(&stats.PendingApprovals).Error; err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Failed to get pending count", "DB_ERROR")
 		return
+	}
+
+	// Usernames behind the pending approvals, newest first (for the review panel)
+	stats.PendingRequesters = []string{}
+	var requesters []struct {
+		Username string
+	}
+	if err := ctrl.DB.Model(&models.Attendance{}).
+		Select("users.username").
+		Joins("JOIN users ON users.id = attendance.user_id").
+		Where("attendance.type = ? AND attendance.sign_status IS NULL", "absence").
+		Order("attendance.created_at DESC").
+		Limit(10).
+		Scan(&requesters).Error; err == nil {
+		for _, r := range requesters {
+			stats.PendingRequesters = append(stats.PendingRequesters, r.Username)
+		}
 	}
 
 	// Get today's attendance (app timezone day bounds)
@@ -192,7 +210,7 @@ func (ctrl *AdminController) GetAttendanceTrend(c *gin.Context) {
 	now := utils.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	windowStart := todayStart.AddDate(0, 0, -29)
-	thirtyDaysAgo := now.AddDate(0, 0, -30)
+	thirtyDaysAgo := todayStart.AddDate(0, 0, -30)
 
 	if err := ctrl.DB.Model(&models.Attendance{}).
 		Select("TO_CHAR(created_at, 'YYYY-MM-DD') as date, type, COUNT(*) as count").
@@ -357,7 +375,7 @@ func parseDaysParam(c *gin.Context) int {
 
 // buildActivityDays computes per-day buckets for the given users. When single
 // is true the levels use personal colors (present green, leave yellow,
-// alpha red, empty gray) instead of the aggregate percentage buckets.
+// alpha/unreported gray) instead of the aggregate score buckets.
 func (ctrl *AdminController) buildActivityDays(days int, users []models.User, single bool) []ActivityDay {
 	total := len(users)
 	userIDs := map[string]bool{}
@@ -497,11 +515,8 @@ func (ctrl *AdminController) buildActivityDays(days int, users []models.User, si
 		d.UnreportedPct = pct(d.Unreported, total)
 		if single {
 			d.Level = singleActivityLevel(present > 0, leave > 0, d.Alpha > 0)
-		} else if present == 1 && leave == 0 && rest > 0 {
-			// Lone reporter: only 1 present while the rest unreported.
-			d.Level = 6
 		} else {
-			d.Level = activityLevel(present, d.PresentPct)
+			d.Level = activityLevel(present, leave, total)
 		}
 		out = append(out, d)
 	}
@@ -510,15 +525,13 @@ func (ctrl *AdminController) buildActivityDays(days int, users []models.User, si
 }
 
 // singleActivityLevel maps one user's day to personal colors:
-// green (present), yellow (leave), red (alpha), gray (empty/unreported).
+// green (present), yellow (leave), gray (alpha/unreported — no red in the map).
 func singleActivityLevel(present, leave, alpha bool) int {
 	switch {
 	case present:
 		return 5
 	case leave:
 		return 3
-	case alpha:
-		return 1
 	default:
 		return 0
 	}
@@ -531,24 +544,23 @@ func pct(n, total int) float64 {
 	return float64(n) / float64(total) * 100
 }
 
-// activityLevel maps a day to a heatmap bucket. Truly empty days never reach
-// here (they stay gray). Red means token attendance (below 5% present) or
-// leave-only days; 2 orange (5-49%), 3 yellow (50-79%), 4 light green
-// (80-99%), 5 dark green (100% present). Level 6 (lone reporter) is assigned
-// separately by the caller.
-func activityLevel(present int, presentPct float64) int {
+// activityLevel maps a day to a heatmap bucket from the attendance score:
+// each present user counts 1, each leave counts 0.5. Truly empty days never
+// reach here (they stay gray). Orange below 30, yellow 30-74, light green
+// 75-99, dark green at 100 (everyone present).
+func activityLevel(present, leave, total int) int {
+	if total <= 0 {
+		return 0
+	}
+	score := (float64(present) + 0.5*float64(leave)) / float64(total) * 100
 	switch {
-	case presentPct >= 100:
+	case score >= 100:
 		return 5
-	case presentPct >= 80:
+	case score >= 75:
 		return 4
-	case presentPct >= 50:
+	case score >= 30:
 		return 3
-	case presentPct >= 5:
-		return 2
-	case present > 0:
-		return 1
 	default:
-		return 1
+		return 2
 	}
 }

@@ -1,26 +1,28 @@
 import { Icon } from '@gravity-ui/uikit'
 import { Magnifier, ArrowLeft, ArrowRight, ArrowsRotateLeft } from '@gravity-ui/icons'
-import { Button } from '@heroui/react'
+import { Button, TextField, Input } from '@heroui/react'
 
 export function Toolbar({ search, onSearchChange, onSearchSubmit, onRefresh, actions, placeholder = 'Search name or username…' }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex items-center gap-2">
       <form
         onSubmit={(e) => {
           e.preventDefault()
           onSearchSubmit?.()
         }}
-        className="flex w-full items-center gap-2 rounded-xl border border-transparent bg-neutral-100 px-3.5 py-2.5 transition focus-within:border-primary/30 focus-within:bg-white sm:max-w-xs dark:bg-neutral-800 dark:focus-within:bg-neutral-800"
+        className="min-w-0 flex-1"
       >
-        <Icon data={Magnifier} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
-        <input
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
-        />
+        <TextField fullWidth name="search" value={search} onChange={onSearchChange}>
+          <div className="relative">
+            <Icon data={Magnifier} size={16} className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-neutral dark:text-neutral-400" />
+            <Input
+              placeholder={placeholder}
+              className="bg-neutral-100 pl-10 shadow-none dark:bg-neutral-800"
+            />
+          </div>
+        </TextField>
       </form>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {onRefresh && (
           <Button variant="outline" size="sm" isIconOnly onPress={onRefresh} aria-label="Refresh">
             <Icon data={ArrowsRotateLeft} size={15} />
@@ -73,7 +75,7 @@ export function SegmentedFilter({ options, value, onChange }) {
   const activeIndex = Math.max(0, options.findIndex((opt) => opt.key === value))
 
   return (
-    <div className="inline-flex rounded-2xl bg-neutral-100 p-1 dark:bg-neutral-800">
+    <div className="inline-flex self-start rounded-2xl bg-neutral-100 p-1 dark:bg-neutral-800">
       <div
         className="relative grid"
         style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}

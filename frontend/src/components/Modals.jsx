@@ -12,9 +12,9 @@ export function AppModal({ open, onOpenChange, size = 'md', title, description, 
 
   return (
     <Modal state={state}>
-      <Modal.Backdrop>
-        <Modal.Container size={size} placement="center">
-          <Modal.Dialog aria-label={title || 'Dialog'}>
+      <Modal.Backdrop className="z-[150]">
+        <Modal.Container size={size} placement="center" className="z-[150]">
+          <Modal.Dialog aria-label={title || 'Dialog'} className="z-[150]">
             {(title || description) && (
               <Modal.Header>
                 {title && <Modal.Heading>{title}</Modal.Heading>}

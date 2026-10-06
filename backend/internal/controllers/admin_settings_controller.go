@@ -84,6 +84,7 @@ func (ctrl *AdminSettingsController) GetPublicStatus(c *gin.Context) {
 		"data": gin.H{
 			"is_open":               isOpen,
 			"now":                   now.Format(time.RFC3339),
+			"timezone":              utils.AppLocation().String(),
 			"next_open":             nextOpen.Format(time.RFC3339),
 			"next_open_day":         nextOpen.Weekday().String(),
 			"next_open_time":        nextOpen.Format("15:04"),

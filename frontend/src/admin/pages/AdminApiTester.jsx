@@ -231,7 +231,7 @@ export default function AdminApiTester() {
                 <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
                   Preview after normalization (first 3 rows), compare with the raw JSON below:
                 </p>
-                <div className="overflow-x-auto rounded-xl border border-app-border/15 dark:border-white/10">
+                <div className="overflow-x-auto rounded-xl">
                   <table className="w-full min-w-[480px] text-left text-xs">
                     <thead className="bg-neutral-50 text-neutral dark:bg-neutral-800/60 dark:text-neutral-400">
                       <tr>

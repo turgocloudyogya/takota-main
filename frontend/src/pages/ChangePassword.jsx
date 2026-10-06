@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Key, Eye, EyeSlash, ShieldKeyhole } from '@gravity-ui/icons'
+import { Eye, EyeSlash, ShieldKeyhole } from '@gravity-ui/icons'
+import { TextField, Input, Label } from '@heroui/react'
 import { getProfile } from '../lib/cookies.js'
 
 const MIN_PASSWORD_LENGTH = 6 // Changed from 8 to match backend requirement
@@ -103,65 +104,68 @@ export default function ChangePassword() {
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
-          <Icon data={Key} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
-          <input
-            type={showOldPassword ? 'text' : 'password'}
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            placeholder="Old Password"
-            autoComplete="current-password"
-            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-          <button
-            type="button"
-            onClick={() => setShowOldPassword((v) => !v)}
-            aria-label={showOldPassword ? 'Hide password' : 'Show password'}
-            className="shrink-0 text-neutral dark:text-neutral-400"
-          >
-            <Icon data={showOldPassword ? EyeSlash : Eye} size={16} />
-          </button>
-        </label>
+        <div className="flex items-center gap-2">
+          <TextField fullWidth isRequired name="oldPassword" type={showOldPassword ? 'text' : 'password'} value={oldPassword} onChange={setOldPassword}>
+            <Label className="sr-only">Old password</Label>
+            <div className="relative">
+              <Input
+                placeholder="Old Password"
+                autoComplete="current-password"
+                className="bg-neutral-50 pr-10 shadow-none dark:bg-neutral-800/60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowOldPassword((v) => !v)}
+                aria-label={showOldPassword ? 'Hide password' : 'Show password'}
+                className="absolute top-1/2 right-3 shrink-0 -translate-y-1/2 cursor-pointer text-neutral transition hover:scale-105 active:scale-90 dark:text-neutral-400"
+              >
+                <Icon data={showOldPassword ? EyeSlash : Eye} size={16} />
+              </button>
+            </div>
+          </TextField>
+        </div>
 
-        <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
-          <Icon data={Key} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
-          <input
-            type={showNewPassword ? 'text' : 'password'}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New Password (min. 6 characters)"
-            autoComplete="new-password"
-            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-          <button
-            type="button"
-            onClick={() => setShowNewPassword((v) => !v)}
-            aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-            className="shrink-0 text-neutral dark:text-neutral-400"
-          >
-            <Icon data={showNewPassword ? EyeSlash : Eye} size={16} />
-          </button>
-        </label>
+        <div className="flex items-center gap-2">
+          <TextField fullWidth isRequired name="newPassword" type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={setNewPassword}>
+            <Label className="sr-only">New password</Label>
+            <div className="relative">
+              <Input
+                placeholder="New Password (min. 6 characters)"
+                autoComplete="new-password"
+                className="bg-neutral-50 pr-10 shadow-none dark:bg-neutral-800/60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((v) => !v)}
+                aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                className="absolute top-1/2 right-3 shrink-0 -translate-y-1/2 cursor-pointer text-neutral transition hover:scale-105 active:scale-90 dark:text-neutral-400"
+              >
+                <Icon data={showNewPassword ? EyeSlash : Eye} size={16} />
+              </button>
+            </div>
+          </TextField>
+        </div>
 
-        <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
-          <Icon data={Key} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
-          <input
-            type={showConfirmPassword ? 'text' : 'password'}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirm New Password"
-            autoComplete="new-password"
-            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword((v) => !v)}
-            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-            className="shrink-0 text-neutral dark:text-neutral-400"
-          >
-            <Icon data={showConfirmPassword ? EyeSlash : Eye} size={16} />
-          </button>
-        </label>
+        <div className="flex items-center gap-2">
+          <TextField fullWidth isRequired name="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} value={confirmPassword} onChange={setConfirmPassword}>
+            <Label className="sr-only">Confirm new password</Label>
+            <div className="relative">
+              <Input
+                placeholder="Confirm New Password"
+                autoComplete="new-password"
+                className="bg-neutral-50 pr-10 shadow-none dark:bg-neutral-800/60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                className="absolute top-1/2 right-3 shrink-0 -translate-y-1/2 cursor-pointer text-neutral transition hover:scale-105 active:scale-90 dark:text-neutral-400"
+              >
+                <Icon data={showConfirmPassword ? EyeSlash : Eye} size={16} />
+              </button>
+            </div>
+          </TextField>
+        </div>
 
         <button
           type="submit"

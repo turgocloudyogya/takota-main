@@ -18,6 +18,7 @@ import AdminAbsence from './admin/pages/AdminAbsence.jsx'
 import AdminPhotos from './admin/pages/AdminPhotos.jsx'
 import AdminReports from './admin/pages/AdminReports.jsx'
 import AdminSettings from './admin/pages/AdminSettings.jsx'
+import AdminSecurity from './admin/pages/AdminSecurity.jsx'
 
 // Page title map: pathname → browser tab title
 const PAGE_TITLES = {
@@ -35,6 +36,7 @@ const PAGE_TITLES = {
   '/admin/photos': 'Photo Gallery • Takota Admin',
   '/admin/reports': 'Reports & Export • Takota Admin',
   '/admin/settings': 'Settings • Takota Admin',
+  '/admin/security': 'Security • Takota Admin',
 }
 
 // Validates the JWT through GET /api/all/info on every route change.
@@ -135,6 +137,7 @@ export default function App() {
           <Route path="photos" element={<AdminPhotos />} />
           <Route path="reports" element={<AdminReports />} />
           <Route path="settings" element={<AdminSettings />} />
+          <Route path="security" element={<AdminSecurity />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

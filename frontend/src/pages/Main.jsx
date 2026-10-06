@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { ArrowRightFromSquare, Paperclip } from '@gravity-ui/icons'
-import { getUserHome, getUserActivity, logout, deleteAbsence } from '../lib/api.js'
+import { getUserHome, getUserActivity, logout, deleteAbsence, getSettings } from '../lib/api.js'
 import { isPageTipDone } from '../lib/userGuide.js'
 import AbsenceCard from '../components/AbsenceCard.jsx'
 import ActivityHeatmap from '../admin/components/ActivityHeatmap.jsx'
 import AttendanceSheet from '../components/AttendanceSheet.jsx'
 import AttendanceDetailDrawer from '../components/AttendanceDetailDrawer.jsx'
+import SafeImage from '../components/SafeImage.jsx'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
 import NotificationBanner from '../components/NotificationBanner.jsx'
@@ -120,6 +121,7 @@ export default function Main() {
   const [deletingAbsence, setDeletingAbsence] = useState(false)
   const [detailItem, setDetailItem] = useState(null)
   const [activity, setActivity] = useState(null)
+  const [appTimezone, setAppTimezone] = useState(null)
 
   function locationLabel(item) {
     if (item?.displayAddress) return item.displayAddress
@@ -127,21 +129,22 @@ export default function Main() {
     return 'Location not available'
   }
 
-  // Server clock runs in TIMEZONE_APP (Asia/Jakarta) — always render
-  // check-in stamps in WIB so the label matches the attendance window.
+  // Server clock runs in the app timezone from /settings/status — always
+  // render check-in stamps in that zone so the label matches the window.
   function formatCheckinHeader(timestamp) {
     if (!timestamp) return 'Checked in'
+    const zone = appTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone
     const d = new Date(timestamp)
     const time = d
-      .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
+      .toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: zone })
       .replace(':', '.')
     const date = d.toLocaleDateString('id-ID', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
-      timeZone: 'Asia/Jakarta',
+      timeZone: zone,
     })
-    return `Checked in at ${time} WIB on ${date}`
+    return `Checked in at ${time} on ${date}`
   }
 
   useEffect(() => {
@@ -243,8 +246,12 @@ export default function Main() {
           isInitialLoad = false
           setLoading(false)
           try {
-            const activityRes = await getUserActivity()
+            const [activityRes, settingsRes] = await Promise.all([
+              getUserActivity(),
+              getSettings().catch(() => null),
+            ])
             setActivity(activityRes?.data || activityRes || [])
+            if (settingsRes?.data?.timezone) setAppTimezone(settingsRes.data.timezone)
           } catch {
             // Non-fatal: activity heatmap just stays empty.
           }
@@ -355,7 +362,7 @@ export default function Main() {
       <header data-guide="greeting" className="flex items-start justify-between gap-4 py-4 pt-8">
         <div>
           <h1 className="text-xl font-bold leading-tight text-neutral-900 dark:text-neutral-100">
-            {greeting}, {userName} <span aria-hidden>👋</span>
+            {greeting}, {userName}
           </h1>
           <small className="mt-1 block text-xs text-neutral dark:text-neutral-400">{formatNow(now)}</small>
         </div>
@@ -386,13 +393,16 @@ export default function Main() {
         {todayStatus ? (
           <div className="flex gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
             {todayStatus.photoUrl ? (
-              <img
+              <SafeImage
                 src={todayStatus.photoUrl}
                 alt="Today's attendance"
-                className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                eager
+                className="w-20 h-20 shrink-0 rounded-lg"
               />
             ) : (
-              <div className="w-20 h-20 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex-shrink-0" />
+              <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg bg-neutral-100 p-1 text-center dark:bg-neutral-800">
+                <p className="text-[11px] font-medium text-neutral-400">No photo</p>
+              </div>
             )}
             <div className="flex-1 flex flex-col justify-center gap-1">
               <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
@@ -408,7 +418,7 @@ export default function Main() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">No attendance status yet</p>
           </div>
         )}

@@ -5,6 +5,7 @@ import { Picture } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import PageHeader from '../components/PageHeader.jsx'
 import PhotoPreviewModal from '../../components/PhotoPreviewModal.jsx'
+import SafeImage from '../../components/SafeImage.jsx'
 
 const FETCH_LIMIT = 50
 
@@ -125,10 +126,9 @@ export default function AdminPhotos() {
                 onClick={() => setActivePhoto(photo)}
                 className="group relative aspect-square overflow-hidden bg-neutral-100 dark:bg-neutral-800"
               >
-                <img 
-                  src={photo.url} 
-                  alt={`Photo of ${photo.nickname}`} 
-                  className="h-full w-full object-cover" 
+                <SafeImage
+                  src={photo.url}
+                  alt={`Photo of ${photo.nickname}`}
                 />
                 <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/0 to-transparent p-2 opacity-0 transition duration-150 group-hover:opacity-100">
                   <p className="truncate text-[11px] font-medium text-white">

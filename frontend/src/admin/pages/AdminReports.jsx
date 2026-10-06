@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
-import { Button, Card, Input, Label, ListBox, Select, TextField, DatePicker, DateField } from '@heroui/react'
+import { Button, Input, Label, ListBox, Select, TextField, DatePicker, DateField } from '@heroui/react'
 import { Calendar } from '@heroui/react'
 import { parseDate as parseCalDate } from '@internationalized/date'
 import { Icon } from '@gravity-ui/uikit'
@@ -18,6 +18,7 @@ import {
 import { downloadBlob } from '../lib/download.js'
 import { downloadAttendanceReportPdf } from '../lib/attendanceReportHtml.js'
 import PageHeader from '../components/PageHeader.jsx'
+import { SegmentedFilter } from '../components/ListChrome.jsx'
 
 // Backend expects an English month name (e.g. "august") in the ?month query
 // and a numeric ?year, defaulting to the current month/year.
@@ -176,26 +177,18 @@ export default function AdminReports() {
       {/* Method switcher */}
       <div data-guide="reports-export" className="flex flex-col gap-1.5">
         <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Export method</span>
-        <div className="flex gap-2">
-          <Button
-            variant={method === 'csv' ? 'primary' : 'outline'}
-            onPress={() => setMethod('csv')}
-            className="min-w-[96px]"
-          >
-            CSV
-          </Button>
-          <Button
-            variant={method === 'pdf' ? 'primary' : 'outline'}
-            onPress={() => setMethod('pdf')}
-            className="min-w-[96px]"
-          >
-            PDF
-          </Button>
-        </div>
+        <SegmentedFilter
+          options={[
+            { key: 'csv', label: 'Export Specific' },
+            { key: 'pdf', label: 'Export as PDF' },
+          ]}
+          value={method}
+          onChange={setMethod}
+        />
       </div>
 
       {method === 'csv' ? (
-        <Card className="flex flex-col gap-4 p-4 shadow-none dark:border-neutral-800">
+        <div className="flex flex-col gap-4 rounded-xl bg-neutral-50 p-4 dark:bg-neutral-900">
           <div>
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Download Monthly Report</p>
             <p className="text-sm text-neutral dark:text-neutral-400">
@@ -212,7 +205,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Month</Label>
-              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="rounded-xl bg-neutral-100 shadow-none dark:bg-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -234,7 +227,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Year</Label>
-              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="rounded-xl bg-neutral-100 shadow-none dark:bg-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -256,7 +249,7 @@ export default function AdminReports() {
               fullWidth
             >
               <Label>Language</Label>
-              <Select.Trigger className="shadow-none border border-neutral-100 dark:border-neutral-800">
+              <Select.Trigger className="rounded-xl bg-neutral-100 shadow-none dark:bg-neutral-800">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -282,9 +275,9 @@ export default function AdminReports() {
             <Icon data={FileArrowDown} size={15} />
             {buildingCsv ? 'Building report…' : `Download ${formatLabel} ${monthLabel} ${year}`}
           </Button>
-        </Card>
+        </div>
       ) : (
-        <Card className="flex flex-col gap-4 p-4 shadow-none dark:border-neutral-800">
+        <div className="flex flex-col gap-4 rounded-xl bg-neutral-50 p-4 dark:bg-neutral-900">
           <div>
             <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
               Build PDF Attendance Recap
@@ -301,7 +294,7 @@ export default function AdminReports() {
               maxValue={endDate ? parseCalDate(endDate) : undefined}
             >
               <Label>Recap start date</Label>
-              <DateField.Group fullWidth className="shadow-none border border-neutral-100 dark:border-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
+              <DateField.Group fullWidth className="rounded-xl bg-neutral-100 shadow-none dark:bg-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
                 <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
                 <DateField.Suffix>
                   <DatePicker.Trigger>
@@ -342,7 +335,7 @@ export default function AdminReports() {
               minValue={startDate ? parseCalDate(startDate) : undefined}
             >
               <Label>Recap end date</Label>
-              <DateField.Group fullWidth className="shadow-none border border-neutral-100 dark:border-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
+              <DateField.Group fullWidth className="rounded-xl bg-neutral-100 shadow-none dark:bg-neutral-800" style={{ borderRadius: 'var(--field-radius)' }}>
                 <DateField.Input>{(segment) => <DateField.Segment segment={segment} />}</DateField.Input>
                 <DateField.Suffix>
                   <DatePicker.Trigger>
@@ -379,12 +372,12 @@ export default function AdminReports() {
 
             <TextField value={duName} onChange={setDuName}>
               <Label>DU/DI name (optional)</Label>
-              <Input placeholder="e.g. PT Sinar Abadi" className="shadow-none border border-neutral-100 dark:border-neutral-800" />
+              <Input placeholder="e.g. PT Sinar Abadi" className="rounded-xl bg-neutral-100 shadow-none dark:bg-neutral-800" />
             </TextField>
 
             <TextField value={duAddress} onChange={setDuAddress}>
               <Label>DU/DI address (optional)</Label>
-              <Input placeholder="e.g. Jl. Industri No. 12" className="shadow-none border border-neutral-100 dark:border-neutral-800" />
+              <Input placeholder="e.g. Jl. Industri No. 12" className="rounded-xl bg-neutral-100 shadow-none dark:bg-neutral-800" />
             </TextField>
           </div>
 
@@ -429,7 +422,7 @@ export default function AdminReports() {
             <Icon data={FileArrowDown} size={15} />
             {buildingPdf ? 'Building PDF…' : 'Build & Download PDF'}
           </Button>
-        </Card>
+        </div>
       )}
     </div>
   )

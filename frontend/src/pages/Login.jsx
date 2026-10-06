@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { At, Key, Eye, EyeSlash, Shield, Fingerprint } from '@gravity-ui/icons'
+import { Eye, EyeSlash, Shield, Fingerprint } from '@gravity-ui/icons'
+import { TextField, Input, Label } from '@heroui/react'
 
 // Import API and session utilities from admin
 import { clearLegacyTokenStorage } from '../lib/cookies.js'
@@ -153,17 +154,16 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
-          <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
-            <Icon data={Key} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value.slice(0, 9))}
-              placeholder="000000 or XXXX-XXXX"
-              autoComplete="one-time-code"
-              className="w-full bg-transparent text-center font-mono text-sm tracking-widest text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
-            />
-          </label>
+          <div className="flex items-center gap-2">
+            <TextField fullWidth name="code" value={code} onChange={(v) => setCode(v.slice(0, 9))}>
+              <Label className="sr-only">Verification code</Label>
+              <Input
+                placeholder="000000 or XXXX-XXXX"
+                autoComplete="one-time-code"
+                className="bg-neutral-50 text-center font-mono tracking-widest shadow-none dark:bg-neutral-800/60"
+              />
+            </TextField>
+          </div>
 
           <button
             type="submit"
@@ -211,39 +211,37 @@ export default function Login() {
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
-          <Icon data={At} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
-          <input
-            type="text"
-            required
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username"
-            autoComplete="username"
-            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-        </label>
+        <div className="flex items-center gap-2">
+          <TextField fullWidth isRequired name="username" value={username} onChange={setUsername}>
+            <Label className="sr-only">Username</Label>
+            <Input
+              placeholder="Username"
+              autoComplete="username"
+              className="bg-neutral-50 shadow-none dark:bg-neutral-800/60"
+            />
+          </TextField>
+        </div>
 
-        <label className="flex items-center gap-2 rounded-xl bg-neutral-50 px-3.5 py-3 dark:bg-neutral-800/60">
-          <Icon data={Key} size={16} className="shrink-0 text-neutral dark:text-neutral-400" />
-          <input
-            type={showPassword ? 'text' : 'password'}
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            autoComplete="current-password"
-            className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="shrink-0 text-neutral dark:text-neutral-400"
-          >
-            <Icon data={showPassword ? EyeSlash : Eye} size={16} />
-          </button>
-        </label>
+        <div className="flex items-center gap-2">
+          <TextField fullWidth isRequired name="password" type={showPassword ? 'text' : 'password'} value={password} onChange={setPassword}>
+            <Label className="sr-only">Password</Label>
+            <div className="relative">
+              <Input
+                placeholder="Password"
+                autoComplete="current-password"
+                className="bg-neutral-50 pr-10 shadow-none dark:bg-neutral-800/60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute top-1/2 right-3 shrink-0 -translate-y-1/2 cursor-pointer text-neutral transition hover:scale-105 active:scale-90 dark:text-neutral-400"
+              >
+                <Icon data={showPassword ? EyeSlash : Eye} size={16} />
+              </button>
+            </div>
+          </TextField>
+        </div>
 
 
         <button

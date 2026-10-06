@@ -10,7 +10,7 @@ export function TextInput({ label, className = '', ...inputProps }) {
     <label className={`flex flex-col gap-1.5 ${className}`}>
       {label && <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">{label}</span>}
       <input
-        className="w-full rounded-xl border border-transparent bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral focus:border-primary/40 dark:bg-neutral-800/60 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+        className="w-full rounded-xl border border-transparent bg-neutral-100 px-3.5 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral focus:border-primary/40 dark:bg-neutral-800/60 dark:text-neutral-100 dark:placeholder:text-neutral-500"
         {...inputProps}
       />
     </label>
@@ -22,7 +22,7 @@ export function PasswordInput({ label, className = '', ...inputProps }) {
   return (
     <label className={`flex flex-col gap-1.5 ${className}`}>
       {label && <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">{label}</span>}
-      <span className="flex items-center gap-2 rounded-xl border border-transparent bg-neutral-50 px-3.5 py-2.5 focus-within:border-primary/40 dark:bg-neutral-800/60">
+      <span className="flex items-center gap-2 rounded-xl border border-transparent bg-neutral-100 px-3.5 py-2.5 focus-within:border-primary/40 dark:bg-neutral-800/60">
         <input
           type={show ? 'text' : 'password'}
           className="w-full bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral dark:text-neutral-100 dark:placeholder:text-neutral-500"
@@ -46,7 +46,7 @@ export function SelectInput({ label, className = '', children, ...selectProps })
     <label className={`flex flex-col gap-1.5 ${className}`}>
       {label && <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">{label}</span>}
       <select
-        className="w-full rounded-xl border border-transparent bg-neutral-50 px-3.5 py-2.5 text-sm text-neutral-900 outline-none focus:border-primary/40 dark:bg-neutral-800/60 dark:text-neutral-100"
+        className="w-full rounded-xl border border-transparent bg-neutral-100 px-3.5 py-2.5 text-sm text-neutral-900 outline-none focus:border-primary/40 dark:bg-neutral-800/60 dark:text-neutral-100"
         {...selectProps}
       >
         {children}

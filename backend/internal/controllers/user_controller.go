@@ -103,11 +103,11 @@ func (ctrl *UserController) Home(c *gin.Context) {
 		Title: utils.GetGreetingTitle(user.Nickname),
 	}
 
-	// Get today's attendance
+	// Get today's attendance (app-timezone day bounds, not UTC midnight)
 	var todayAttendance *TodayAttendance
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	dayStart, dayEnd := utils.TodayRange()
 	var attendance models.Attendance
-	err := ctrl.DB.Where("user_id = ? AND type = ? AND created_at >= ?", uid, "attendance", today).
+	err := ctrl.DB.Where("user_id = ? AND type = ? AND created_at >= ? AND created_at < ?", uid, "attendance", dayStart.UTC(), dayEnd.UTC()).
 		First(&attendance).Error
 	if err == nil {
 		todayAttendance = &TodayAttendance{
@@ -225,10 +225,10 @@ func (ctrl *UserController) Attendance(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	uid, _ := uuid.Parse(userID.(string))
 
-	// VALIDATION: Check if user already has attendance today
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	// VALIDATION: Check if user already has attendance today (app timezone)
+	dayStart, dayEnd := utils.TodayRange()
 	var existingAttendance models.Attendance
-	err := ctrl.DB.Where("user_id = ? AND type = ? AND DATE(created_at) = DATE(?)", uid, "attendance", today).
+	err := ctrl.DB.Where("user_id = ? AND type = ? AND created_at >= ? AND created_at < ?", uid, "attendance", dayStart.UTC(), dayEnd.UTC()).
 		First(&existingAttendance).Error
 	if err == nil {
 		// User has already submitted attendance today
@@ -323,10 +323,10 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	uid, _ := uuid.Parse(userID.(string))
 
-	// VALIDATION 1: Check if user already has normal attendance today
-	today := time.Now().UTC().Truncate(24 * time.Hour)
+	// VALIDATION 1: Check if user already has normal attendance today (app timezone)
+	dayStart, dayEnd := utils.TodayRange()
 	var attendanceToday models.Attendance
-	err := ctrl.DB.Where("user_id = ? AND type = ? AND DATE(created_at) = DATE(?)", uid, "attendance", today).
+	err := ctrl.DB.Where("user_id = ? AND type = ? AND created_at >= ? AND created_at < ?", uid, "attendance", dayStart.UTC(), dayEnd.UTC()).
 		First(&attendanceToday).Error
 	if err == nil {
 		// User already has normal attendance today, cannot submit absence
@@ -397,16 +397,17 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 	// request is submitted); the user only picks the end date. An explicit
 	// start date is still accepted for backward compatibility.
 	if req.AbsenceEndDate != "" {
-		endDate, err := time.Parse("2006-01-02", req.AbsenceEndDate)
+		endDate, err := utils.ParseDateInAppLocation(req.AbsenceEndDate)
 		if err != nil {
 			utils.RespondError(c, http.StatusBadRequest, "Invalid end date format, use YYYY-MM-DD", "INVALID_DATE_FORMAT")
 			return
 		}
 
-		today := time.Now().UTC().Truncate(24 * time.Hour)
+		dayStart, _ := utils.TodayRange()
+		today := dayStart
 		startDate := today
 		if req.AbsenceStartDate != "" {
-			startDate, err = time.Parse("2006-01-02", req.AbsenceStartDate)
+			startDate, err = utils.ParseDateInAppLocation(req.AbsenceStartDate)
 			if err != nil {
 				utils.RespondError(c, http.StatusBadRequest, "Invalid start date format, use YYYY-MM-DD", "INVALID_DATE_FORMAT")
 				return

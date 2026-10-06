@@ -152,11 +152,16 @@ export default function Absence() {
     if (closeAt && closeAt > now) {
       setTimeUntilClose(formatDuration(closeAt - now))
     } else {
+      // Server-derived fallback only: same calendar day as server now.
       const closeStr = settings.attendance_close_time || settings.close_time || '21:00:00'
       const [closeHour, closeMinute] = closeStr.split(':')
-      const closeTime = new Date()
+      const closeTime = new Date(now)
       closeTime.setHours(parseInt(closeHour), parseInt(closeMinute), 0)
       const diff = closeTime - now
+      if (diff <= 0) {
+        setTimeUntilClose(null)
+        return
+      }
       const hours = Math.floor(diff / 3600000)
       const minutes = Math.floor((diff % 3600000) / 60000)
       const seconds = Math.floor((diff % 60000) / 1000)
@@ -164,8 +169,8 @@ export default function Absence() {
     }
   }
 
-  // Evaluated live every tick from the current time, so the page flips to
-  // open automatically the moment the opening time passes (no reload needed).
+  // Evaluated live every tick from server time. `now` must always be
+  // serverNow(delta); never pass device-local new Date().
   function absenceIsClosed(settings, now) {
     const openDays = (settings.open_days || []).map((d) => String(d).toLowerCase())
     const currentDay = now.toLocaleString('en-US', { weekday: 'long' }).toLowerCase()
@@ -252,16 +257,17 @@ export default function Absence() {
         toast.error('Please select an end date for multi-day absence.')
         return
       }
-      const todayStart = new Date()
-      todayStart.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(todayStart)
+      // Validate against server time so device timezone never shifts the window.
+      const serverToday = serverNow(deltaRef.current)
+      serverToday.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(serverToday)
       tomorrow.setDate(tomorrow.getDate() + 1)
       const end = new Date(`${absenceEndDate}T00:00:00`)
       if (end < tomorrow) {
         toast.error('End date must be at least tomorrow.')
         return
       }
-      const maxDate = new Date(todayStart)
+      const maxDate = new Date(serverToday)
       maxDate.setDate(maxDate.getDate() + 90)
       if (end > maxDate) {
         toast.error('Absence can be requested up to 3 months in advance.')

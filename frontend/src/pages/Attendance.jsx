@@ -235,11 +235,16 @@ export default function Attendance() {
     if (closeAt && closeAt > now) {
       setTimeUntilClose(formatDuration(closeAt - now))
     } else {
+      // Server-derived fallback only: same calendar day as server now, never device-local midnight.
       const closeStr = settings.attendance_close_time || settings.close_time || '21:00:00'
       const [closeHour, closeMinute] = closeStr.split(':')
-      const closeTime = new Date()
+      const closeTime = new Date(now)
       closeTime.setHours(parseInt(closeHour), parseInt(closeMinute), 0)
       const diff = closeTime - now
+      if (diff <= 0) {
+        setTimeUntilClose(null)
+        return
+      }
       const hours = Math.floor(diff / 3600000)
       const minutes = Math.floor((diff % 3600000) / 60000)
       const seconds = Math.floor((diff % 60000) / 1000)
@@ -247,8 +252,9 @@ export default function Attendance() {
     }
   }
 
-  // Evaluated live every tick from the current time, so the page flips to
+  // Evaluated live every tick from server time, so the page flips to
   // open automatically the moment the opening time passes (no reload needed).
+  // `now` must always be serverNow(delta); never pass device-local new Date().
   // The backend `is_open` flag is only a stale snapshot, so it is ignored.
   function attendanceIsClosed(settings, now) {
     const openDays = (settings.open_days || []).map((d) => String(d).toLowerCase())
