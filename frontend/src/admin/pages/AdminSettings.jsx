@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Clock, Check, Shield } from '@gravity-ui/icons'
+import { Check } from '@gravity-ui/icons'
 import { Checkbox, Label, TimeField } from '@heroui/react'
 import { parseTime } from '@internationalized/date'
-import SecuritySettings from '../../components/SecuritySettings.jsx'
+import { PanelSkeleton } from '../../components/Skeletons.jsx'
 
 const DAYS_OF_WEEK = [
   { key: 'monday', label: 'Monday' },
@@ -154,8 +154,16 @@ export default function AdminSettings() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">Loading settings...</p>
+      <div className="space-y-6" aria-busy="true" aria-label="Loading settings">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+            Settings
+          </h1>
+          <p className="mt-1 max-w-2xl text-xs text-neutral dark:text-neutral-400">
+            Configure attendance time window and available days
+          </p>
+        </div>
+        <PanelSkeleton className="h-64" />
       </div>
     )
   }
@@ -163,16 +171,25 @@ export default function AdminSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-          <Icon data={Clock} size={28} />
+        <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
           Settings
         </h1>
-        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+        <p className="mt-1 max-w-2xl text-xs text-neutral dark:text-neutral-400">
           Configure attendance time window and available days
         </p>
       </div>
 
-      <div className="space-y-6 rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="rounded-lg bg-red-500/10 p-4 dark:bg-red-500/10">
+        <p className="text-xs font-semibold text-red-700 dark:text-red-400">
+          Danger zone — these settings apply to the whole application
+        </p>
+        <p className="mt-1 text-xs text-red-600/90 dark:text-red-400/80">
+          Changing the time window or open days immediately affects every user: open/closed
+          gates, countdowns, reminders, and reports all follow these values.
+        </p>
+      </div>
+
+      <div className="space-y-6 rounded-lg bg-neutral-50 p-6 dark:bg-neutral-900">
         {/* Time Settings */}
         <div className="space-y-4">
           <TimeSetting
@@ -231,18 +248,6 @@ export default function AdminSettings() {
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </div>
-
-      {/* Self security - separate section, operates on this admin only */}
-      <div>
-        <h2 className="flex items-center gap-2 text-lg font-bold text-neutral-900 dark:text-neutral-100">
-          <Icon data={Shield} size={22} />
-          My Security
-        </h2>
-        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Two-factor authentication for your own admin account. It cannot be applied to other admins.
-        </p>
-      </div>
-      <SecuritySettings apiBase="/api/admin" />
     </div>
   )
 }

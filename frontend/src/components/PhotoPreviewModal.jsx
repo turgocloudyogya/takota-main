@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Icon } from '@gravity-ui/uikit'
 import { Xmark, ArrowDownToLine } from '@gravity-ui/icons'
 import { downloadFile } from '../lib/download.js'
+import SafeImage from './SafeImage.jsx'
 
 // Preview popup for a single gallery photo. Reuses the same
 // bg-black/40 + backdrop-blur-sm overlay treatment as AttendanceSheet,
@@ -39,7 +40,7 @@ export default function PhotoPreviewModal({ photo, onClose }) {
           >
             <div className="relative">
               <div className="overflow-hidden rounded-xl bg-white shadow-xl dark:bg-neutral-900">
-                <img src={photo.url} alt="" className="max-h-[50dvh] w-full object-contain" />
+                <SafeImage src={photo.url} alt="" className="max-h-[50dvh] w-full" imgClassName="object-contain" />
               </div>
               <button
                 type="button"

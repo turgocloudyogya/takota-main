@@ -57,6 +57,7 @@ type S3Config struct {
 	BucketName            string
 	UseSSL                bool
 	UsePathStyleEndpoint  bool
+	UsePathStylePublicHost bool
 	Region                string
 	PublicHost            string
 	UseCloudFront         bool
@@ -136,6 +137,7 @@ func LoadConfig() (*Config, error) {
 			BucketName:            getEnv("S3_BUCKET_NAME", "takota-bucket"),
 			UseSSL:                getEnvAsBool("S3_USE_SSL", true),
 			UsePathStyleEndpoint:  getEnvAsBool("S3_USE_PATH_STYLE_ENDPOINT", false),
+			UsePathStylePublicHost: getEnvAsBool("S3_USE_PATH_STYLE_PUBLIC_HOST", true),
 			Region:                getEnv("S3_REGION", "us-east-1"),
 			PublicHost:            getEnv("S3_PUBLIC_HOST", ""),
 			UseCloudFront:         getEnvAsBool("S3_USE_CLOUDFRONT", false),

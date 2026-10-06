@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
+import SafeImage from './SafeImage.jsx'
 
 function formatFull(timestamp) {
   if (!timestamp) return '—'
@@ -55,10 +56,10 @@ export default function AttendanceDetailDrawer({ open, onOpenChange, item }) {
           </Drawer.Title>
 
           {item?.photoUrl && (
-            <img
+            <SafeImage
               src={item.photoUrl}
               alt="Attendance"
-              className="w-full rounded-xl object-cover"
+              className="w-full rounded-xl"
             />
           )}
 

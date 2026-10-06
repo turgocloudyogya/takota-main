@@ -5,6 +5,7 @@ import BackButton from '../components/BackButton.jsx'
 import PageGuideOverlay from '../components/PageGuideOverlay.jsx'
 import PhotoPreviewModal from '../components/PhotoPreviewModal.jsx'
 import PhotoGalleryEmptyState from '../components/PhotoGalleryEmptyState.jsx'
+import SafeImage from '../components/SafeImage.jsx'
 import { isPageTipDone } from '../lib/userGuide.js'
 
 const PHOTOS_STEPS = [
@@ -99,7 +100,6 @@ export default function Photos() {
     <main className="mx-auto min-h-dvh w-full max-w-md">
       <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
         <BackButton label="Photos" />
-        <span className="h-8 w-8 shrink-0" />
       </header>
 
       <div className="px-2">
@@ -119,7 +119,7 @@ export default function Photos() {
                   onClick={() => setActivePhoto(photo)}
                   className="group relative cursor-pointer aspect-square overflow-hidden bg-neutral-100 dark:bg-neutral-800"
                 >
-                  <img src={photo.url} alt="" className="h-full w-full object-cover" />
+                  <SafeImage src={photo.url} alt="" className="h-full w-full" />
                   <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/70 via-black/0 to-transparent p-2 opacity-0 transition duration-150 group-hover:opacity-100">
                     <p className="truncate text-[11px] font-medium text-white">
                       {photo.date ? (() => {

@@ -1,17 +1,42 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Persons, Check, FileCheck, TriangleExclamation, ArrowRightFromLine } from '@gravity-ui/icons'
-import { ResponsiveLine } from '@nivo/line'
+import { Persons, Check, FileCheck, TriangleExclamation, Clock } from '@gravity-ui/icons'
+import { ResponsiveBar } from '@nivo/bar'
 import { Label, ListBox, Select } from '@heroui/react'
+import { useTheme } from '../../lib/useTheme.js'
 import ActivityHeatmap from '../components/ActivityHeatmap.jsx'
+import { MetricSkeleton, PanelSkeleton } from '../../components/Skeletons.jsx'
 import { listUsers } from '../lib/api.js'
 import { unwrapList, normalizeUser } from '../lib/normalize.js'
+
+function Metric({ label, value, sub, icon }) {
+  return (
+    <div className="rounded-xl bg-neutral-50 p-4 dark:bg-neutral-900">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{label}</p>
+          <p className="mt-1.5 truncate text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-100">
+            {value}
+          </p>
+          {sub && (
+            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{sub}</p>
+          )}
+        </div>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+          <Icon data={icon} size={18} />
+        </span>
+      </div>
+    </div>
+  )
+}
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [trend, setTrend] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [activity, setActivity] = useState(null)
   const [activityLoading, setActivityLoading] = useState(false)
   const [users, setUsers] = useState([])
@@ -51,8 +76,8 @@ export default function AdminDashboard() {
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true)
+      setLoadError(null)
 
-      // Load stats
       const statsResponse = await fetch('/api/admin/dashboard/stats', {
         credentials: 'include',
         headers: {
@@ -64,7 +89,6 @@ export default function AdminDashboard() {
       const statsData = await statsResponse.json()
       setStats(statsData.data)
 
-      // Load trend
       const trendResponse = await fetch('/api/admin/dashboard/trend', {
         credentials: 'include',
         headers: {
@@ -76,6 +100,7 @@ export default function AdminDashboard() {
       const trendData = await trendResponse.json()
       setTrend(trendData.data)
     } catch (err) {
+      setLoadError(err.message || 'Failed to load dashboard data')
       toast.error('Failed to load dashboard data')
       console.error(err)
     } finally {
@@ -98,284 +123,251 @@ export default function AdminDashboard() {
     init()
   }, [activityUser, loadActivity])
 
+  // Small screens get fewer bars so they stay readable: 30 days on
+  // desktop, the last 15 on mobile.
+  const [isDesktopChart, setIsDesktopChart] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(min-width: 640px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia?.('(min-width: 640px)')
+    if (!mq) return
+    const onChange = (e) => setIsDesktopChart(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  // Nivo draws on canvas/SVG outside Tailwind's dark: variant, so its text
+  // and tooltip colors follow the app theme explicitly.
+  const { theme } = useTheme()
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">Loading dashboard...</p>
+      <div className="flex flex-col gap-5" aria-busy="true" aria-label="Loading dashboard">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl dark:text-neutral-100">Dashboard</h1>
+          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+            What needs attention today, then the numbers behind it
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricSkeleton label="Today's check-ins" />
+          <MetricSkeleton label="On leave today" />
+          <MetricSkeleton label="Peak check-in time" />
+          <MetricSkeleton label="Registered users" />
+        </div>
+        <PanelSkeleton className="h-64" />
+        <PanelSkeleton className="h-40" />
       </div>
     )
   }
 
   if (!stats) {
     return (
-      <div className="rounded-lg bg-red-50 p-4 dark:bg-red-500/10">
-        <p className="text-sm text-red-900 dark:text-red-200">Failed to load dashboard data</p>
+      <div className="rounded-xl bg-neutral-50 p-6 text-center dark:bg-neutral-900">
+        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          Dashboard unavailable
+        </p>
+        <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500 dark:text-neutral-400">
+          {loadError || 'The server did not return statistics.'} Check the connection and try again.
+        </p>
+        <button
+          type="button"
+          onClick={loadDashboardData}
+          className="mt-4 cursor-pointer rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition active:scale-[0.98]"
+        >
+          Retry
+        </button>
       </div>
     )
   }
 
+  const attendanceRate = stats.attendance_rate ? `${stats.attendance_rate.toFixed(1)}% of users reported today` : 'No reports yet today'
+  const avgAttendance = stats.average_attendance ? `${stats.average_attendance.toFixed(1)} check-ins per user overall` : null
+
+  // Only days with at least one check-in or one leave get a bar.
+  const activeDays = (trend || []).filter(
+    (day) => (Number(day.attendance) || 0) >= 1 || (Number(day.absence) || 0) >= 1,
+  )
+  const visibleDays = isDesktopChart ? activeDays : activeDays.slice(-15)
+
+  const chartTheme = {
+    axis: {
+      ticks: { text: { fill: theme === 'dark' ? '#e5e5e5' : '#333333', fontSize: 11 } },
+    },
+    legends: {
+      text: { fill: theme === 'dark' ? '#e5e5e5' : '#333333', fontSize: 12 },
+    },
+    tooltip: {
+      container: {
+        fontSize: 12,
+        background: theme === 'dark' ? '#171717' : '#ffffff',
+        color: theme === 'dark' ? '#f5f5f5' : '#171717',
+        borderRadius: 8,
+      },
+    },
+  }
+
+  function absenceRequestText() {
+    const names = Array.isArray(stats.pending_requesters) ? stats.pending_requesters : []
+    const total = stats.pending_approvals || 0
+    if (total <= 0) return null
+    if (names.length === 0) {
+      return `${total} absence request${total === 1 ? '' : 's'} awaiting review`
+    }
+    if (total === 1) return `${names[0]} has requested absence`
+    if (total === 2 && names.length >= 2) return `${names[0]} and ${names[1]} have requested absence`
+    const others = total - 2
+    return `${names[0]}, ${names[1]} and ${others} other${others === 1 ? '' : 's'} have requested absence`
+  }
+
+  const requestText = absenceRequestText()
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
-        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Overview of attendance and absence records
+        <h1 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl dark:text-neutral-100">Dashboard</h1>
+        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          What needs attention today, then the numbers behind it
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div data-guide="stat-cards" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Total Users */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
+      {/* Primary: pending Leave & Sick requests. Hidden when there is nothing to review. */}
+      {requestText && (
+      <section aria-label="Absence requests awaiting review" className="rounded-xl bg-amber-50 p-4 sm:p-5 dark:bg-amber-500/10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white">
+              <Icon data={TriangleExclamation} size={20} />
+            </span>
             <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Total Users</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.total_users}
+              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
+                {requestText}
+              </h2>
+              <p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">
+                {stats.attendance_today} checked in today · {stats.absence_today} on leave today · {stats.total_alpha} unreported
               </p>
-            </div>
-            <Icon data={Persons} size={24} className="text-blue-600 dark:text-blue-400" />
-          </div>
-        </div>
-
-        {/* Today's Attendance */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Today's Check-ins</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.attendance_today}
-              </p>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                {stats.attendance_rate ? stats.attendance_rate.toFixed(1) : 0}% attendance rate
-              </p>
-            </div>
-            <Icon data={Check} size={24} className="text-green-600 dark:text-green-400" />
-          </div>
-        </div>
-
-        {/* Today's Absence */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Today's Absence</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.absence_today}
-              </p>
-            </div>
-            <Icon data={FileCheck} size={24} className="text-orange-600 dark:text-orange-400" />
-          </div>
-        </div>
-
-        {/* Pending Approvals */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Pending Approvals</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.pending_approvals}
-              </p>
-            </div>
-            <Icon data={TriangleExclamation} size={24} className="text-yellow-600 dark:text-yellow-400" />
-          </div>
-        </div>
-
-        {/* Total Attendance */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Total Check-ins</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.total_attendance}
-              </p>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                Avg: {stats.average_attendance ? stats.average_attendance.toFixed(1) : 0} per user
-              </p>
-            </div>
-            <Icon data={ArrowRightFromLine} size={24} className="text-purple-600 dark:text-purple-400" />
-          </div>
-        </div>
-
-        {/* Most Frequent Time */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Peak Check-in Time</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.most_frequent_time}
-              </p>
-            </div>
-            <Icon data={ArrowRightFromLine} size={24} className="text-indigo-600 dark:text-indigo-400" />
-          </div>
-        </div>
-
-        {/* Weekly Average Check-ins */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Daily Average Check-ins (7d)</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.weekly_avg_checkins ? stats.weekly_avg_checkins.toFixed(1) : 0}
-              </p>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                Average check-ins per day, last 7 days
-              </p>
-            </div>
-            <Icon data={Check} size={24} className="text-teal-600 dark:text-teal-400" />
-          </div>
-        </div>
-
-        {/* Weekly Average Absences */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Daily Average Absences (7d)</p>
-              <p className="mt-2 text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {stats.weekly_avg_absences ? stats.weekly_avg_absences.toFixed(1) : 0}
-              </p>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                Average absence requests per day, last 7 days
-              </p>
-            </div>
-            <Icon data={FileCheck} size={24} className="text-rose-600 dark:text-rose-400" />
-          </div>
-        </div>
-
-        {/* Overall Statistics */}
-        <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Overall Statistics</p>
-          <div className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between gap-2">
-              <span className="text-neutral-600 dark:text-neutral-400">Total Absence Requests:</span>
-              <span className="font-bold text-neutral-900 dark:text-neutral-100">{stats.total_absence}</span>
-            </div>
-            <div className="flex justify-between gap-2">
-              <span className="text-neutral-600 dark:text-neutral-400">Total Alpha:</span>
-              <span className="font-bold text-neutral-900 dark:text-neutral-100">{stats.total_alpha}</span>
             </div>
           </div>
+          <Link
+            to="/admin/absence"
+            className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.98] dark:border-neutral-600 dark:bg-black dark:text-white dark:hover:bg-neutral-900"
+          >
+            Review in Leave & Sick
+          </Link>
         </div>
-      </div>
+      </section>
+      )}
 
-      {/* Trend Chart Data */}
-      {trend && trend.length > 0 && (
-        <div data-guide="charts" className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">30-Day Trend</h3>
-          <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+      {/* Secondary: today at a glance */}
+      <section aria-label="Today at a glance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric
+          label="Today's check-ins"
+          value={stats.attendance_today}
+          sub={attendanceRate}
+          icon={Check}
+        />
+        <Metric
+          label="On leave today"
+          value={stats.absence_today}
+          sub="Approved and pending covering today"
+          icon={FileCheck}
+        />
+        <Metric
+          label="Peak check-in time"
+          value={stats.most_frequent_time || '—'}
+          sub="Most frequent submission hour"
+          icon={Clock}
+        />
+        <Metric
+          label="Registered users"
+          value={stats.total_users}
+          sub={avgAttendance}
+          icon={Persons}
+        />
+      </section>
+
+      {/* Tertiary: totals */}
+      <section aria-label="Totals" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Metric label="Total check-ins" value={stats.total_attendance} icon={Check} />
+        <Metric label="Total absence requests" value={stats.total_absence} icon={FileCheck} />
+        <Metric
+          label="Daily average, last 7 days"
+          value={stats.weekly_avg_checkins ? stats.weekly_avg_checkins.toFixed(1) : '0'}
+          sub={`${stats.weekly_avg_absences ? stats.weekly_avg_absences.toFixed(1) : '0'} absences per day in the same period`}
+          icon={Clock}
+        />
+      </section>
+
+      {/* Bars answer one question: on which active days did people report? */}
+      {visibleDays.length > 0 ? (
+        <section aria-label="Check-ins and absences on active days" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+          <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Check-ins vs absences on active days ({visibleDays.length} days)</h2>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
             {(() => {
-              const checkins = trend.reduce((sum, day) => sum + (Number(day.attendance) || 0), 0)
-              const absences = trend.reduce((sum, day) => sum + (Number(day.absence) || 0), 0)
-              const days = trend.length || 1
-              return `${checkins} check-ins total · ${absences} absences total · avg ${(checkins / days).toFixed(1)} check-ins/day over ${trend.length} days`
+              const checkins = visibleDays.reduce((sum, day) => sum + (Number(day.attendance) || 0), 0)
+              const absences = visibleDays.reduce((sum, day) => sum + (Number(day.absence) || 0), 0)
+              const days = visibleDays.length || 1
+              return `${checkins} check-ins total · ${absences} absences total · avg ${(checkins / days).toFixed(1)} check-ins per active day`
             })()}
           </p>
-          <div className="mt-4 h-72">
-            <ResponsiveLine
-              data={[
-                {
-                  id: 'Check-ins',
-                  data: trend.map((day) => ({ x: day.date, y: Number(day.attendance) || 0 })),
-                },
-                {
-                  id: 'Absences',
-                  data: trend.map((day) => ({ x: day.date, y: Number(day.absence) || 0 })),
-                },
-              ]}
-              margin={{ top: 16, right: 24, bottom: 48, left: 44 }}
-              xScale={{ type: 'point' }}
-              yScale={{ type: 'linear', min: 0, max: 'auto', stacked: false }}
-              curve="monotoneX"
-              axisBottom={{
-                tickSize: 0,
-                tickPadding: 10,
-                tickRotation: -25,
-                legend: 'Date',
-                legendOffset: 40,
-                legendPosition: 'middle',
-              }}
-              axisLeft={{
-                tickSize: 0,
-                tickPadding: 8,
-                legend: 'Records',
-                legendOffset: -36,
-                legendPosition: 'middle',
-              }}
-              colors={['#16a34a', '#f97316']}
-              pointSize={8}
-              pointBorderWidth={2}
-              pointBorderColor={{ from: 'serieColor' }}
-              pointLabelYOffset={-12}
-              useMesh
-              enableSlices="x"
+          <div className="bar-rise mt-4 h-64 sm:h-72">
+            <ResponsiveBar
+              animate={false}
+              data={visibleDays.map((day) => ({
+                date: day.date,
+                attendance: Number(day.attendance) || 0,
+                absence: Number(day.absence) || 0,
+              }))}
+              keys={['absence', 'attendance']}
+              indexBy="date"
+              colors={['#8e2bd9', '#3d6ce3']}
+              labelSkipWidth={12}
+              labelSkipHeight={12}
               legends={[
                 {
-                  anchor: 'top-left',
-                  direction: 'row',
-                  translateY: -16,
-                  itemWidth: 110,
-                  itemHeight: 20,
-                  symbolSize: 12,
-                  symbolShape: 'circle',
+                  dataFrom: 'keys',
+                  anchor: 'bottom-right',
+                  direction: 'column',
+                  translateX: 120,
+                  itemsSpacing: 3,
+                  itemWidth: 100,
+                  itemHeight: 16,
                 },
               ]}
-              theme={{
-                axis: {
-                  ticks: { text: { fill: '#888888', fontSize: 11 } },
-                  legend: { text: { fill: '#888888', fontSize: 12 } },
-                },
-                grid: { line: { strokeDasharray: '3 3', stroke: '#e5e5e5' } },
-                legends: { text: { fill: '#888888', fontSize: 12 } },
-                tooltip: {
-                  container: {
-                    fontSize: 12,
-                    background: '#111827',
-                    color: '#f9fafb',
-                    borderRadius: 8,
-                  },
-                },
-              }}
+              axisBottom={{ tickValues: [] }}
+              axisLeft={null}
+              margin={{ top: 16, right: 130, bottom: 0, left: 0 }}
+              enableGridY={false}
+              theme={chartTheme}
             />
           </div>
-          <div className="mt-4 max-h-96 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-neutral-200 dark:border-neutral-700">
-                <tr>
-                  <th className="px-2 py-2 text-left text-neutral-600 dark:text-neutral-400">Date</th>
-                  <th className="px-2 py-2 text-right text-neutral-600 dark:text-neutral-400">Check-ins</th>
-                  <th className="px-2 py-2 text-right text-neutral-600 dark:text-neutral-400">Absences</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-                {trend.map((day, idx) => (
-                  <tr key={idx}>
-                    <td className="px-2 py-2 text-neutral-900 dark:text-neutral-100">{day.date}</td>
-                    <td className="px-2 py-2 text-right text-green-600 dark:text-green-400">{day.attendance}</td>
-                    <td className="px-2 py-2 text-right text-orange-600 dark:text-orange-400">{day.absence}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </section>
+      ) : (
+        <section aria-label="Check-ins and absences on active days" className="rounded-xl bg-neutral-50 p-6 text-center dark:bg-neutral-900">
+          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No active days yet</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500 dark:text-neutral-400">
+            Bars appear here once at least one check-in or leave is recorded on a day.
+          </p>
+        </section>
       )}
 
       {/* Activity Heatmap */}
-      <div data-guide="activity-heatmap" className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+      <section aria-label="Activity" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">Activity</h3>
-            <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
+            <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Activity</h2>
+            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
               Daily attendance activity, last 5 months
             </p>
           </div>
-          <div className="w-56">
+          <div className="w-full sm:w-56">
             <Select
               selectedKey={activityUser}
               onSelectionChange={(key) => setActivityUser(String(key))}
               fullWidth
             >
               <Label>User</Label>
-              <Select.Trigger className="bg-neutral-100 dark:bg-neutral-900 shadow-none">
+              <Select.Trigger className="bg-neutral-100 shadow-none dark:bg-neutral-900">
                 <Select.Value />
                 <Select.Indicator />
               </Select.Trigger>
@@ -398,12 +390,12 @@ export default function AdminDashboard() {
         </div>
         <div className="mt-4">
           {activityLoading ? (
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">Loading activity…</p>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Loading activity…</p>
           ) : (
             <ActivityHeatmap days={activity} />
           )}
         </div>
-      </div>
+      </section>
     </div>
   )
 }

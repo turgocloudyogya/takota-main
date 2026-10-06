@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -70,10 +71,16 @@ func InitS3(appConfig *cfg.Config) error {
 			readEndpoint = fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{{file}}", bucket, region)
 		}
 	} else {
-		// Non-AWS (R2, Minio, etc.) - bucket MUST be in path for path-style endpoints
+		// Non-AWS (R2, MinIO, rustfs) - path style follows its own flag so a
+		// virtual-hosted public host (CDN, path-style false) keeps working
+		// while the SDK endpoint stays path-style true.
+		publicHostTrimmed := strings.TrimSuffix(publicHost, "/")
 		if publicHost != "" {
-			// Custom public host with bucket in path
-			readEndpoint = fmt.Sprintf("%s/%s/{{file}}", publicHost, bucket)
+			if Config.UsePathStylePublicHost {
+				readEndpoint = fmt.Sprintf("%s/%s/{{file}}", publicHostTrimmed, bucket)
+			} else {
+				readEndpoint = fmt.Sprintf("%s/{{file}}", publicHostTrimmed)
+			}
 		} else {
 			// Default endpoint with bucket in path
 			readEndpoint = fmt.Sprintf("%s/%s/{{file}}", endpoint, bucket)
@@ -299,6 +306,9 @@ func ReadFile(ctx context.Context, objectKey string) ([]byte, error) {
 
 // GetSignedURL generates a presigned URL for accessing a file.
 // It works with private buckets (MinIO/R2/S3); the URL expires after expiry.
+// When S3_PUBLIC_HOST is set, the host is rewritten to it so browsers use
+// the public address; the path keeps the bucket prefix according to
+// S3_USE_PATH_STYLE_PUBLIC_HOST and the query signature is preserved.
 func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
 	if objectKey == "" {
 		return "", nil
@@ -322,7 +332,39 @@ func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (
 		return "", err
 	}
 
-	return req.URL, nil
+	return rewriteToPublicHost(req.URL), nil
+}
+
+// rewriteToPublicHost swaps scheme+host to S3_PUBLIC_HOST when configured.
+func rewriteToPublicHost(signedURL string) string {
+	if Config == nil || Config.PublicHost == "" {
+		return signedURL
+	}
+	signed, err := url.Parse(signedURL)
+	if err != nil {
+		return signedURL
+	}
+	pub, err := url.Parse(strings.TrimSuffix(Config.PublicHost, "/"))
+	if err != nil || pub.Host == "" {
+		return signedURL
+	}
+	signed.Scheme = pub.Scheme
+	if signed.Scheme == "" {
+		signed.Scheme = "http"
+	}
+	signed.Host = pub.Host
+	bucketPrefix := "/" + Config.BucketName
+	if Config.UsePathStylePublicHost {
+		if !strings.HasPrefix(signed.Path, bucketPrefix+"/") && signed.Path != bucketPrefix {
+			signed.Path = bucketPrefix + signed.Path
+		}
+	} else {
+		signed.Path = strings.TrimPrefix(signed.Path, bucketPrefix)
+		if signed.Path == "" {
+			signed.Path = "/"
+		}
+	}
+	return signed.String()
 }
 
 // SignedURLAsCloudfront generates CloudFront signed URL using AWS SDK library

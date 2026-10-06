@@ -92,7 +92,9 @@ body {
    CSS, so this always wins over @heroui/styles' own `@layer theme` values).
    Any HeroUI component's derived hover/soft shades recompute automatically
    from these via color-mix(), so this is the only place to touch. */
-:root {
+:root,
+.light,
+.dark {
   --accent: var(--color-primary);
   --accent-foreground: var(--white);
   --success: var(--color-success);
@@ -139,6 +141,64 @@ body {
   .presence-pulse {
     animation: none !important;
   }
+}
+
+/* Nivo bars: entrance grows bottom-to-top (nivo's own mount animation
+   runs left-to-right, so it is disabled on the chart and replaced here).
+   transform-box keeps the origin at each bar's own base. */
+@keyframes bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.bar-rise svg rect {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: bar-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-rise svg rect {
+    animation: none !important;
+  }
+}
+
+/* Theme switch: React <ViewTransition update="theme-wipe"> (see
+   ThemeViewTransition in src/lib/theme.jsx) snapshots the themed subtree;
+   the incoming snapshot wipes in diagonally top-left to bottom-right (1s,
+   slow-fast-slow). Class selectors per React docs, no `name` prop. */
+::view-transition-old(.theme-wipe) {
+  animation: none;
+  z-index: 1;
+}
+::view-transition-new(.theme-wipe) {
+  animation: vt-slash 1s ease-in-out both;
+  z-index: 2;
+}
+@keyframes vt-slash {
+  from {
+    clip-path: circle(0px at var(--tx, 50vw) var(--ty, 24px));
+  }
+  to {
+    clip-path: circle(var(--tr, 150vmax) at var(--tx, 50vw) var(--ty, 24px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.theme-wipe),
+  ::view-transition-old(.theme-wipe),
+  ::view-transition-new(.theme-wipe) {
+    animation: none;
+  }
+}
+
+.vt-lock,
+.vt-lock *,
+.vt-lock *::before,
+.vt-lock *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
 }
 
 /* Custom sizes for absence badge (h-13 = 3.25rem, w-15 = 3.75rem) */

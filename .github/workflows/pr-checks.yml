@@ -77,35 +77,32 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      minio:
-        image: minio/minio:latest
+      rustfs:
+        image: rustfs/rustfs:latest
         env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
+          RUSTFS_ACCESS_KEY: minioadmin
+          RUSTFS_SECRET_KEY: minioadmin
+          RUSTFS_ADDRESS: :9000
         ports:
           - 9000:9000
-#        options: >-
-#          --health-cmd "wget -q -O- http://localhost:9000/minio/health/live || exit 1"
-#          --health-interval 10s
-#          --health-timeout 5s
-#          --health-retries 5
-        command: server /data
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Wait for MinIO to be ready
+      - name: Wait for RustFS to be ready
         run: |
-          echo "Waiting for MinIO to be ready..."
+          echo "Waiting for RustFS to be ready..."
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:9000/minio/health/live >/dev/null 2>&1; then
-              echo "MinIO is healthy"
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/ 2>/dev/null || echo "000")
+            if [ "$CODE" != "000" ]; then
+              echo "RustFS is responding (HTTP $CODE)"
               break
             fi
             echo "Attempt $i/30 - waiting 2s..."
             sleep 2
           done
-          curl -sf http://localhost:9000/minio/health/live || (echo "MinIO failed to become healthy" && exit 1)
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/ 2>/dev/null || echo "000")
+          [ "$CODE" != "000" ] || (echo "RustFS failed to become ready" && exit 1)
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -139,6 +136,7 @@ jobs:
             -e S3_BUCKET_NAME=takota-bucket \
             -e S3_USE_SSL=false \
             -e S3_USE_PATH_STYLE_ENDPOINT=true \
+            -e S3_USE_PATH_STYLE_PUBLIC_HOST=true \
             -e S3_REGION=us-east-1 \
             -e JWT_SECRET=ci-test-secret-key \
             -e TIMEZONE_APP=Asia/Jakarta \
@@ -267,8 +265,10 @@ jobs:
       - name: Collect logs on failure
         if: failure()
         run: |
+          echo "=== Containers ==="
+          docker ps -a || true
           echo "=== Container logs ==="
-          docker logs takota-app --tail 100
+          docker logs takota-app --tail 100 || echo "takota-app container not found"
 
       - name: Cleanup
         if: always()

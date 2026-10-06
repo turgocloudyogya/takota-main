@@ -1,21 +1,19 @@
 // GitHub-style activity heatmap for attendance.
 //
-// Each column is a week (Mon-Sun rows). Color buckets:
-// 0 gray (empty/closed), 1 red (below 5% present, or leave only),
-// 2 orange (5-49%), 3 yellow (50-79%), 4 light green (80-99%),
-// 5 dark green (100% present), 6 dark orange (lone reporter).
+// Each column is a week (Mon-Sun rows). Score per day: present counts 1,
+// leave counts 0.5. Color buckets: 0 gray (no reports that day),
+// 2 orange (score below 30), 3 yellow (30-74), 4 light green (75-99),
+// 5 dark green (100, everyone present).
 // Hovering a cell shows present/leave/unreported/alpha percentages.
 
 import { useMemo, useState } from 'react'
 
 const LEVEL_CLASSES = {
   0: 'bg-neutral-200 dark:bg-neutral-700',
-  1: 'bg-red-500',
   2: 'bg-orange-500',
   3: 'bg-yellow-400',
   4: 'bg-green-400',
   5: 'bg-green-700',
-  6: 'bg-orange-700',
 }
 
 // Pale filler for padding cells and upcoming (future) days.
@@ -135,7 +133,7 @@ export default function ActivityHeatmap({ days, showDetails = true }) {
         )}
         <div className="flex shrink-0 items-center gap-1 text-xs text-neutral-600 dark:text-neutral-400">
           <span>Less</span>
-          {[0, 1, 2, 3, 6, 4, 5].map((l) => (
+          {[0, 2, 3, 4, 5].map((l) => (
             <span key={l} className={`h-3 w-3 rounded-[3px] ${LEVEL_CLASSES[l]}`} />
           ))}
           <span>More</span>

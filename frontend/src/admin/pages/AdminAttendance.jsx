@@ -10,6 +10,7 @@ import { Toolbar, PagerFooter } from '../components/ListChrome.jsx'
 import { ConfirmDialog } from '../../components/Modals.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
 import PageHeader from '../components/PageHeader.jsx'
+import { RowSkeleton } from '../../components/Skeletons.jsx'
 import PhotoPreviewModal from '../../components/PhotoPreviewModal.jsx'
 
 const LIMIT = 15
@@ -195,9 +196,7 @@ export default function AdminAttendance() {
 
       <div data-guide="attendance-table" className="flex flex-col gap-3">
         {loading ? (
-          <p className="py-8 text-center text-sm text-neutral dark:text-neutral-400">
-            Loading data…
-          </p>
+          <RowSkeleton rows={5} className="h-36" />
         ) : items.length === 0 ? (
           <div className="py-8">
             <EmptyState label="No attendance data yet" />
@@ -211,7 +210,7 @@ export default function AdminAttendance() {
             return (
               <div
                 key={row.id}
-                className="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 sm:flex-row dark:border-neutral-700 dark:bg-neutral-900"
+                className="flex flex-col gap-3 rounded-lg bg-neutral-50 p-4 sm:flex-row dark:bg-neutral-900"
               >
                 {mapSrc ? (
                   <iframe

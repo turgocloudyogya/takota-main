@@ -13,6 +13,7 @@ import { OptionChip, SignChip } from '../components/StatusChip.jsx'
 import { ConfirmDialog } from '../../components/Modals.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
 import PageHeader from '../components/PageHeader.jsx'
+import { RowSkeleton } from '../../components/Skeletons.jsx'
 
 const LIMIT = 15
 
@@ -332,9 +333,7 @@ export default function AdminAbsence() {
 
       <div data-guide="absence-table" className="flex flex-col gap-3">
         {loading ? (
-          <p className="py-8 text-center text-sm text-neutral dark:text-neutral-400">
-            Loading data…
-          </p>
+          <RowSkeleton rows={4} />
         ) : items.length === 0 ? (
           <div className="py-8">
             <EmptyState label="No leave submissions yet" />
@@ -345,7 +344,7 @@ export default function AdminAbsence() {
             return (
               <div
                 key={row.id}
-                className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900"
+                className="rounded-lg bg-neutral-50 p-4 dark:bg-neutral-900"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

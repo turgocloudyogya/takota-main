@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
 import { Shield, ShieldCheck, Key, Copy, TrashBin, Check, Plus, Fingerprint, FileArrowDown } from '@gravity-ui/icons'
-import { Checkbox } from '@heroui/react'
+import { Checkbox, TextField, Input, Label } from '@heroui/react'
+import { PanelSkeleton } from './Skeletons.jsx'
 import { jsPDF } from 'jspdf'
 import { ConfirmDialog } from './Modals.jsx'
 import { createPasskey, webauthnSupported } from '../lib/webauthn.js'
@@ -106,7 +107,7 @@ function BackupCodesDisplay({ codes, generatedAt, onDone }) {
         (e.g. when you lose your phone). They will <strong>never be shown again</strong>.
         Generated: {generatedLabel}
       </p>
-      <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-white p-3 font-mono text-sm dark:bg-neutral-900">
+      <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-neutral-100 p-3 font-mono text-sm dark:bg-neutral-800">
         {codes.map((code) => (
           <span key={code} className="select-all text-neutral-900 dark:text-neutral-100">{code}</span>
         ))}
@@ -344,8 +345,9 @@ export default function SecuritySettings({ apiBase }) {
 
   if (loading && !status) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">Loading security settings...</p>
+      <div className="space-y-4" aria-busy="true" aria-label="Loading security settings">
+        <PanelSkeleton />
+        <PanelSkeleton />
       </div>
     )
   }
@@ -371,7 +373,7 @@ export default function SecuritySettings({ apiBase }) {
       )}
 
       {/* Authenticator app */}
-      <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="rounded-lg bg-neutral-50 p-4 dark:bg-neutral-900">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${status?.totp ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
@@ -406,7 +408,7 @@ export default function SecuritySettings({ apiBase }) {
         {setup && (
           <div className="mt-4 space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-700">
             <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">1. Scan this QR code with your authenticator app</p>
-            <div className="flex justify-center rounded-lg bg-white p-3">
+            <div className="flex justify-center rounded-lg bg-neutral-100 p-3 dark:bg-neutral-800">
               <img src={setup.qr} alt="2FA QR code" className="h-48 w-48" />
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-neutral-100 p-2 dark:bg-neutral-800">
@@ -416,15 +418,15 @@ export default function SecuritySettings({ apiBase }) {
               </button>
             </div>
             <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">2. Enter the 6-digit code to confirm</p>
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="000000"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              maxLength={6}
-              className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-center font-mono text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
-            />
+            <TextField fullWidth name="code" value={code} onChange={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}>
+              <Label className="sr-only">6-digit code</Label>
+              <Input
+                placeholder="000000"
+                inputMode="numeric"
+                maxLength={6}
+                className="bg-neutral-100 text-center font-mono shadow-none dark:bg-neutral-900"
+              />
+            </TextField>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -450,13 +452,13 @@ export default function SecuritySettings({ apiBase }) {
         {disableMode && status?.totp && (
           <div className="mt-4 space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-700">
             <p className="text-xs text-neutral-600 dark:text-neutral-400">Confirm with your 6-digit code or an unused backup code:</p>
-            <input
-              type="text"
-              placeholder="6-digit code or XXXX-XXXX"
-              value={code}
-              onChange={(e) => setCode(e.target.value.slice(0, 9))}
-              className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-center font-mono text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
-            />
+            <TextField fullWidth name="code" value={code} onChange={(v) => setCode(v.slice(0, 9))}>
+              <Label className="sr-only">Confirmation code</Label>
+              <Input
+                placeholder="6-digit code or XXXX-XXXX"
+                className="bg-neutral-100 text-center font-mono shadow-none dark:bg-neutral-900"
+              />
+            </TextField>
             <button
               type="button"
               onClick={disableTotp}
@@ -483,13 +485,13 @@ export default function SecuritySettings({ apiBase }) {
                 <p className="text-xs text-neutral-600 dark:text-neutral-400">
                   Old codes stop working. Confirm with your 6-digit code or an unused backup code:
                 </p>
-                <input
-                  type="text"
-                  placeholder="6-digit code or XXXX-XXXX"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.slice(0, 9))}
-                  className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-center font-mono text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
-                />
+                <TextField fullWidth name="code" value={code} onChange={(v) => setCode(v.slice(0, 9))}>
+                  <Label className="sr-only">Confirmation code</Label>
+                  <Input
+                    placeholder="6-digit code or XXXX-XXXX"
+                    className="bg-neutral-100 text-center font-mono shadow-none dark:bg-neutral-900"
+                  />
+                </TextField>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -514,7 +516,7 @@ export default function SecuritySettings({ apiBase }) {
       </div>
 
       {/* Passkey */}
-      <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="rounded-lg bg-neutral-50 p-4 dark:bg-neutral-900">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${status?.passkey ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
@@ -539,13 +541,13 @@ export default function SecuritySettings({ apiBase }) {
         </div>
 
         <div className="mt-3 flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Passkey name (e.g. My phone)"
-            value={passkeyName}
-            onChange={(e) => setPasskeyName(e.target.value.slice(0, 100))}
-            className="w-full rounded-lg bg-neutral-100 px-3.5 py-2.5 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:bg-neutral-900 dark:text-neutral-100"
-          />
+          <TextField fullWidth name="passkeyName" value={passkeyName} onChange={(v) => setPasskeyName(v.slice(0, 100))}>
+            <Label className="sr-only">Passkey name</Label>
+            <Input
+              placeholder="Passkey name (e.g. My phone)"
+              className="bg-neutral-100 shadow-none dark:bg-neutral-900"
+            />
+          </TextField>
         </div>
 
         {passkeys.length > 0 && (

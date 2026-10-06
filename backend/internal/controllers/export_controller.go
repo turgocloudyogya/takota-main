@@ -93,7 +93,8 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 		}
 	}
 
-	startDate := time.Date(yearNum, time.Month(monthNum), 1, 0, 0, 0, 0, time.UTC)
+	loc := utils.AppLocation()
+	startDate := time.Date(yearNum, time.Month(monthNum), 1, 0, 0, 0, 0, loc)
 	endDate := startDate.AddDate(0, 1, 0)
 
 	// Fetch records: attendances submitted in the month, plus absences
@@ -109,7 +110,6 @@ func (ctrl *AdminController) ExportAttendance(c *gin.Context) {
 
 	// Prepare export rows (time/date shown in the configured app timezone).
 	// Multi-day absences expand to one row per covered day inside the month.
-	loc := utils.AppLocation()
 	timeGMT := utils.GMTOffset()
 	monthStartKey := startDate.Format("2006-01-02")
 	monthEndKey := monthEndExclusive.AddDate(0, 0, -1).Format("2006-01-02")

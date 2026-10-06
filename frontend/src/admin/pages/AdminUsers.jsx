@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@heroui/react'
 import { Icon } from '@gravity-ui/uikit'
-import { PersonPlus, Pencil, TrashBin, Persons, Layers, Person, ShieldKeyhole } from '@gravity-ui/icons'
+import { PersonPlus, Pencil, TrashBin, Persons } from '@gravity-ui/icons'
 import * as api from '../lib/api.js'
 import { unwrapList, normalizeUser } from '../lib/normalize.js'
 import { Toolbar, PagerFooter, SegmentedFilter } from '../components/ListChrome.jsx'
@@ -11,6 +11,7 @@ import { ConfirmDialog } from '../../components/Modals.jsx'
 import UserFormModal from '../components/UserFormModal.jsx'
 import EmptyState from '../../components/EmptyState.jsx'
 import PageHeader from '../components/PageHeader.jsx'
+import { RowSkeleton } from '../../components/Skeletons.jsx'
 
 const LIMIT = 15
 
@@ -202,9 +203,9 @@ export default function AdminUsers() {
         value={typeFilter}
         onChange={setTypeFilter}
         options={[
-          { key: 'all', label: 'All', count: typeCounts.all, icon: Layers, tone: 'neutral' },
-          { key: 'user', label: 'Students', count: typeCounts.user, icon: Person, tone: 'neutral' },
-          { key: 'admin', label: 'Admin', count: typeCounts.admin, icon: ShieldKeyhole, tone: 'accent' },
+          { key: 'all', label: 'All', count: typeCounts.all, tone: 'neutral' },
+          { key: 'user', label: 'Students', count: typeCounts.user, tone: 'neutral' },
+          { key: 'admin', label: 'Admin', count: typeCounts.admin, tone: 'accent' },
         ]}
       />
 
@@ -217,16 +218,14 @@ export default function AdminUsers() {
         actions={
           <Button data-guide="add-user-btn" variant="primary" size="sm" onPress={openCreate}>
             <Icon data={PersonPlus} size={15} />
-            Add {typeFilter === 'admin' ? 'Admin' : typeFilter === 'user' ? 'Student' : 'User'}
+            <span className="hidden sm:inline">Add {typeFilter === 'admin' ? 'Admin' : typeFilter === 'user' ? 'Student' : 'User'}</span>
           </Button>
         }
       />
 
       <div className="flex flex-col gap-3">
         {loading ? (
-          <p className="py-8 text-center text-sm text-neutral dark:text-neutral-400">
-            Loading data…
-          </p>
+          <RowSkeleton rows={5} />
         ) : filteredItems.length === 0 ? (
           <div className="py-8">
             <EmptyState
@@ -241,7 +240,7 @@ export default function AdminUsers() {
           filteredItems.map((user) => (
             <div
               key={user.id}
-              className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900"
+              className="flex items-center gap-3 rounded-lg bg-neutral-50 p-4 dark:bg-neutral-900"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
                 {(user.nickname || user.username || '?')[0].toUpperCase()}

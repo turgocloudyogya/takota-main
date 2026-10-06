@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/carakan/takota/internal/models"
+	"github.com/carakan/takota/internal/utils"
 	"github.com/google/uuid"
 )
 
@@ -218,8 +219,8 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 		// Approved multi-day absences cover every day of their period, not
 		// just the submission day.
 		if rec.Type == "absence" && isMultiDayAbsence(rec.AbsenceStartDate, rec.AbsenceEndDate) {
-			startDay := rec.AbsenceStartDate.Format("2006-01-02")
-			endDay := rec.AbsenceEndDate.Format("2006-01-02")
+			startDay := rec.AbsenceStartDate.In(utils.AppLocation()).Format("2006-01-02")
+			endDay := rec.AbsenceEndDate.In(utils.AppLocation()).Format("2006-01-02")
 			for _, d := range daysBetween(startDay, endDay) {
 				if d < p.StartStr || d > p.EndStr {
 					continue
@@ -228,11 +229,11 @@ func (ctrl *AdminController) buildAttendanceDoc(p *buildExportParams) (*models.P
 			}
 			continue
 		}
-		dateKey := rec.CreatedAt.Format("2006-01-02")
+		dateKey := rec.CreatedAt.In(utils.AppLocation()).Format("2006-01-02")
 		markDay(rec.UserID, dateKey, rec)
 	}
 
-	todayStr := time.Now().UTC().Format("2006-01-02")
+	todayStr := utils.Now().In(utils.AppLocation()).Format("2006-01-02")
 
 	markFor := func(studentID uuid.UUID, d time.Time) string {
 		dateStr := d.Format("2006-01-02")

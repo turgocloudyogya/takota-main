@@ -51,7 +51,10 @@ func AttendanceTimeMiddleware(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// getNextAttendanceOpen calculates when attendance will next be open
+// getNextAttendanceOpen calculates when attendance will next be open.
+// It mirrors Settings.NextOpen: a candidate equal to checkTime counts as
+// next (uses !Before, not After), and the scan is capped so a degenerate
+// window can never spin forever.
 func getNextAttendanceOpen(now time.Time, settings models.Settings) time.Time {
 	validDays := make(map[string]bool)
 	for _, day := range settings.OpenDays {
@@ -60,7 +63,7 @@ func getNextAttendanceOpen(now time.Time, settings models.Settings) time.Time {
 
 	checkTime := now
 
-	for {
+	for i := 0; i < 8; i++ {
 		dayName := strings.ToLower(checkTime.Weekday().String())
 
 		if validDays[dayName] {
@@ -72,7 +75,7 @@ func getNextAttendanceOpen(now time.Time, settings models.Settings) time.Time {
 			nextOpen := time.Date(checkTime.Year(), checkTime.Month(), checkTime.Day(),
 				openHour, openMin, 0, 0, checkTime.Location())
 
-			if nextOpen.After(checkTime) {
+			if !nextOpen.Before(checkTime) {
 				return nextOpen
 			}
 		}
@@ -82,4 +85,6 @@ func getNextAttendanceOpen(now time.Time, settings models.Settings) time.Time {
 		checkTime = time.Date(checkTime.Year(), checkTime.Month(), checkTime.Day(),
 			0, 0, 0, 0, checkTime.Location())
 	}
+
+	return now
 }

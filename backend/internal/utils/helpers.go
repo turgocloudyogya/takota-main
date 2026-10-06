@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"log"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,6 +20,7 @@ func appLocation() *time.Location {
 		if loc, err := time.LoadLocation(config.GlobalConfig.App.Timezone); err == nil {
 			return loc
 		}
+		log.Printf("invalid TIMEZONE_APP value, falling back to UTC")
 	}
 	return time.UTC
 }
