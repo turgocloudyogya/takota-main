@@ -237,7 +237,7 @@ export default function AdminLayout() {
   const initial = session.username?.[0]?.toUpperCase() || 'A'
 
   return (
-    <div className="min-h-screen w-full bg-neutral-50/50 dark:bg-neutral-950">
+    <div className="min-h-screen w-full bg-white dark:bg-neutral-950">
       {/* Desktop sidebar. z-40 makes sure it (and anything inside it, like
           the collapsed-state tooltips) always paints above the main
           content, regardless of DOM order. */}

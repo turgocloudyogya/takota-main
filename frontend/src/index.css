@@ -92,7 +92,9 @@ body {
    CSS, so this always wins over @heroui/styles' own `@layer theme` values).
    Any HeroUI component's derived hover/soft shades recompute automatically
    from these via color-mix(), so this is the only place to touch. */
-:root {
+:root,
+.light,
+.dark {
   --accent: var(--color-primary);
   --accent-foreground: var(--white);
   --success: var(--color-success);
