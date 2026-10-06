@@ -60,7 +60,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # ---------- Test: spin up Postgres + MinIO, run the image ----------
+      # ---------- Test: spin up Postgres + RustFS, run the image ----------
       - name: Start Postgres
         run: |
           docker run -d --name postgres \
@@ -74,13 +74,14 @@ jobs:
             sleep 2
           done
 
-      - name: Start MinIO
+      - name: Start RustFS
         run: |
-          docker run -d --name minio \
-            -e MINIO_ROOT_USER=minioadmin \
-            -e MINIO_ROOT_PASSWORD=minioadmin \
+          docker run -d --name rustfs \
+            -e RUSTFS_ACCESS_KEY=minioadmin \
+            -e RUSTFS_SECRET_KEY=minioadmin \
+            -e RUSTFS_ADDRESS=:9000 \
             -p 9000:9000 \
-            minio/minio:latest server /data
+            rustfs/rustfs:latest
 
       - name: Run application image
         run: |
@@ -100,6 +101,7 @@ jobs:
             -e S3_BUCKET_NAME=takota-bucket \
             -e S3_USE_SSL=false \
             -e S3_USE_PATH_STYLE_ENDPOINT=true \
+            -e S3_USE_PATH_STYLE_PUBLIC_HOST=true \
             -e S3_REGION=us-east-1 \
             -e JWT_SECRET=test-secret-change-me \
             ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
@@ -141,4 +143,4 @@ jobs:
 
       - name: Clean up test containers
         if: always()
-        run: docker rm -f takota-app postgres minio || true
+        run: docker rm -f takota-app postgres rustfs || true
