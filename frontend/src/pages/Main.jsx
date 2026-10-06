@@ -391,7 +391,7 @@ export default function Main() {
           <section data-guide="today-status" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Today</h2>
         {todayStatus ? (
-          <div className="flex gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex gap-3 rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900">
             {todayStatus.photoUrl ? (
               <SafeImage
                 src={todayStatus.photoUrl}
@@ -418,7 +418,7 @@ export default function Main() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-center justify-center rounded-lg bg-neutral-50 p-4 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">No attendance status yet</p>
           </div>
         )}
@@ -426,7 +426,7 @@ export default function Main() {
 
       <section data-guide="activity" className="mt-6">
         <h2 className="mb-2 text-sm font-medium text-neutral dark:text-neutral-400">Activity</h2>
-        <div className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900">
           <ActivityHeatmap days={activity} showDetails={false} />
         </div>
       </section>
@@ -442,7 +442,7 @@ export default function Main() {
                 key={item.id}
                 type="button"
                 onClick={() => setDetailItem(item)}
-                className="block w-full cursor-pointer rounded-lg border border-neutral-200 bg-white p-3 text-left dark:border-neutral-700 dark:bg-neutral-900"
+                className="block w-full cursor-pointer rounded-lg bg-neutral-50 p-3 text-left dark:bg-neutral-900"
               >
                 <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
                   {formatCheckinHeader(item.timestamp)}
@@ -454,7 +454,7 @@ export default function Main() {
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-center justify-center rounded-lg bg-neutral-50 p-8 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">There is no attendance list</p>
           </div>
         )}
@@ -477,7 +477,7 @@ export default function Main() {
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center rounded-lg border border-neutral-200 bg-white p-8 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="flex items-center justify-center rounded-lg bg-neutral-50 p-8 dark:bg-neutral-900">
             <p className="text-sm text-neutral dark:text-neutral-400">There is no absence list</p>
           </div>
         )}

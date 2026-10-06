@@ -428,7 +428,6 @@ export default function Attendance() {
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
         <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
           <BackButton label="Attendance" />
-          <span className="h-8 w-8 shrink-0" />
         </header>
 
         <div className="flex flex-1 flex-col justify-center px-6 py-6">
@@ -449,7 +448,6 @@ export default function Attendance() {
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
         <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
           <BackButton label="Attendance" />
-          <span className="h-8 w-8 shrink-0" />
         </header>
 
         <div className="flex flex-1 flex-col items-center justify-center px-6 pb-[80px]">
@@ -468,7 +466,6 @@ export default function Attendance() {
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
         <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
           <BackButton label="Attendance" />
-          <span className="h-8 w-8 shrink-0" />
         </header>
 
         <div className="flex flex-1 flex-col justify-center px-6 py-6">
@@ -512,7 +509,6 @@ export default function Attendance() {
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
         <BackButton label="Attendance" />
-        <span className="h-8 w-8 shrink-0" />
       </header>
 
       <div className="flex flex-1 flex-col px-6 py-6 pb-[80px]">

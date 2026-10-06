@@ -100,7 +100,6 @@ export default function Photos() {
     <main className="mx-auto min-h-dvh w-full max-w-md">
       <header className="flex h-[60px] w-full items-center justify-between gap-3 px-4">
         <BackButton label="Photos" />
-        <span className="h-8 w-8 shrink-0" />
       </header>
 
       <div className="px-2">
