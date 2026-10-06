@@ -179,10 +179,10 @@ body {
 }
 @keyframes vt-slash {
   from {
-    clip-path: polygon(0 0, 0 0, 0 0);
+    clip-path: circle(0px at var(--tx, 50vw) var(--ty, 24px));
   }
   to {
-    clip-path: polygon(0 0, 200% 0, 0 200%);
+    clip-path: circle(var(--tr, 150vmax) at var(--tx, 50vw) var(--ty, 24px));
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -13,8 +13,8 @@ export default function ThemeToggle({ className = '', ...rest }) {
 
   function handleToggle(e) {
     const next = theme === 'dark' ? 'light' : 'dark'
-    const x = e.clientX ?? window.innerWidth - 24
-    const y = e.clientY ?? 24
+    const x = (e.clientX ?? window.innerWidth - 24) + window.scrollX
+    const y = (e.clientY ?? 24) + window.scrollY
     const r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
     const root = document.documentElement
     root.style.setProperty('--tx', `${x}px`)
