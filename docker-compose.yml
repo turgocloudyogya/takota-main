@@ -45,7 +45,7 @@ services:
       retries: 5
 
   app:
-    image: ghcr.io/turgocloudyogya/takota-main:latest
+    image: ghcr.io/turgocloudyogya/takota:latest
     restart: unless-stopped
     ports:
       - "80:80"

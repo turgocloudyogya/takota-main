@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Lowercase image name: ghcr.io/<owner>/<repo>
-  IMAGE_NAME: ${{ github.repository }}
+  # Image published as ghcr.io/turgocloudyogya/takota (short name, not the repo name)
+  IMAGE_NAME: turgocloudyogya/takota
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
 
       - name: Compute lowercase image reference
         run: |
-          echo "IMAGE=$(echo 'ghcr.io/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+          echo "IMAGE=$(echo 'ghcr.io/turgocloudyogya/takota' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: Read release version from .tagversioning
         run: |
