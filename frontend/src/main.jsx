@@ -1,6 +1,5 @@
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import { ViewTransition } from 'react'
 import { HeroUIProvider } from '@heroui/system'
 import './index.css'
 import App from './App.jsx'
