@@ -9,7 +9,9 @@ export default function AdminSecurity() {
           Two-factor authentication for your own admin account. It cannot be applied to other admins.
         </p>
       </div>
-      <SecuritySettings apiBase="/api/admin" />
+      <div data-guide="security-panel">
+        <SecuritySettings apiBase="/api/admin" />
+      </div>
     </div>
   )
 }

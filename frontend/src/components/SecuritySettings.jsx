@@ -32,11 +32,12 @@ function formatGeneratedAt(date) {
 
 function BackupCodesDisplay({ codes, generatedAt, onDone }) {
   const [saved, setSaved] = useState(false)
+  const [taken, setTaken] = useState(false)
   const generatedLabel = formatGeneratedAt(generatedAt || new Date())
 
   function copyAll() {
     navigator.clipboard.writeText(codes.join('\n')).then(
-      () => toast.success('Backup codes copied'),
+      () => { setTaken(true); toast.success('Backup codes copied') },
       () => toast.error('Copy failed, please copy manually'),
     )
   }
@@ -67,6 +68,7 @@ function BackupCodesDisplay({ codes, generatedAt, onDone }) {
     a.click()
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setTaken(true)
     toast.success('Backup codes downloaded (.txt)')
   }
 
@@ -91,6 +93,7 @@ function BackupCodesDisplay({ codes, generatedAt, onDone }) {
         y += 8
       })
       doc.save(`takota-backup-codes-${fileStamp()}.pdf`)
+      setTaken(true)
       toast.success('Backup codes downloaded (.pdf)')
     } catch {
       toast.error('PDF download failed')
@@ -107,16 +110,16 @@ function BackupCodesDisplay({ codes, generatedAt, onDone }) {
         (e.g. when you lose your phone). They will <strong>never be shown again</strong>.
         Generated: {generatedLabel}
       </p>
-      <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-neutral-100 p-3 font-mono text-sm dark:bg-neutral-800">
+      <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-neutral-100 p-3 font-codes text-sm dark:bg-neutral-800">
         {codes.map((code) => (
-          <span key={code} className="select-all text-neutral-900 dark:text-neutral-100">{code}</span>
+          <span key={code} className="select-all text-center text-neutral-900 dark:text-neutral-100">{code}</span>
         ))}
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2">
         <button
           type="button"
           onClick={copyAll}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-700"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
         >
           <Icon data={Copy} size={14} />
           Copy all
@@ -124,7 +127,7 @@ function BackupCodesDisplay({ codes, generatedAt, onDone }) {
         <button
           type="button"
           onClick={downloadTxt}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-700"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
         >
           <Icon data={FileArrowDown} size={14} />
           .txt
@@ -132,22 +135,27 @@ function BackupCodesDisplay({ codes, generatedAt, onDone }) {
         <button
           type="button"
           onClick={downloadPdf}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-700"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-100 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700"
         >
           <Icon data={FileArrowDown} size={14} />
           .pdf
         </button>
         <button
           type="button"
-          onClick={() => saved && onDone()}
-          disabled={!saved}
+          onClick={() => saved && taken && onDone()}
+          disabled={!saved || !taken}
           className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-95 disabled:opacity-50"
         >
           <Icon data={Check} size={14} />
           I saved them
         </button>
       </div>
-      <Checkbox isSelected={saved} onChange={setSaved}>
+      {!taken && (
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          Take your codes first via Copy all, .txt, or .pdf - then you can check the box below.
+        </p>
+      )}
+      <Checkbox isSelected={saved} onChange={setSaved} isDisabled={!taken}>
         <Checkbox.Content>
           <Checkbox.Control className="bg-neutral-50 border border-neutral-200 size-4 rounded-sm before:rounded-sm dark:bg-neutral-800 dark:border-neutral-700">
             <Checkbox.Indicator />
@@ -176,6 +184,9 @@ export default function SecuritySettings({ apiBase }) {
 
   const [disableMode, setDisableMode] = useState(false)
   const [regenMode, setRegenMode] = useState(false)
+  const [confirmDisable, setConfirmDisable] = useState(false)
+  const [confirmRegen, setConfirmRegen] = useState(false)
+  const [passkeyToDelete, setPasskeyToDelete] = useState(null)
 
   const [passkeys, setPasskeys] = useState([])
   const [passkeyName, setPasskeyName] = useState('')
@@ -328,6 +339,7 @@ export default function SecuritySettings({ apiBase }) {
     try {
       await api(apiBase, `/passkey/${encodeURIComponent(id)}`, { method: 'DELETE' })
       toast.success('Passkey removed')
+      setPasskeyToDelete(null)
       refresh()
     } catch (err) {
       toast.error(err.message)
@@ -397,7 +409,7 @@ export default function SecuritySettings({ apiBase }) {
           ) : (
             <button
               type="button"
-              onClick={() => { setDisableMode((v) => !v); setRegenMode(false); setSetup(null); setCode('') }}
+              onClick={() => { setConfirmDisable(true); setRegenMode(false); setSetup(null); setCode('') }}
               className="shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-red-700 active:scale-95"
             >
               Disable
@@ -475,7 +487,7 @@ export default function SecuritySettings({ apiBase }) {
             {!regenMode ? (
               <button
                 type="button"
-                onClick={() => { setRegenMode(true); setCode('') }}
+                onClick={() => { setConfirmRegen(true); setCode('') }}
                 className="text-xs font-semibold text-primary hover:underline"
               >
                 Regenerate backup codes ({status?.backupRemaining ?? 0} left)
@@ -560,7 +572,7 @@ export default function SecuritySettings({ apiBase }) {
                 </span>
                 <button
                   type="button"
-                  onClick={() => deletePasskey(pk.id)}
+                  onClick={() => setPasskeyToDelete(pk)}
                   aria-label={`Remove ${pk.name || 'passkey'}`}
                   className="rounded-lg p-1.5 text-danger transition hover:bg-danger/10"
                 >
@@ -590,6 +602,39 @@ export default function SecuritySettings({ apiBase }) {
         confirmLabel="Yes, continue"
         cancelLabel="Not now"
         onConfirm={addPasskey}
+      />
+
+      <ConfirmDialog
+        open={confirmDisable}
+        onOpenChange={setConfirmDisable}
+        title="Disable authenticator?"
+        description="Your authenticator app will stop working and the remaining backup codes for it stop working too. Your account will rely on your password (and passkeys, if any). You can re-enable it anytime."
+        confirmLabel="Yes, disable"
+        cancelLabel="Keep it"
+        danger
+        onConfirm={() => { setConfirmDisable(false); setDisableMode(true) }}
+      />
+
+      <ConfirmDialog
+        open={confirmRegen}
+        onOpenChange={setConfirmRegen}
+        title="Regenerate backup codes?"
+        description="A fresh set of codes is issued and every old, unused code stops working immediately. Save the new codes somewhere safe - they are shown only once."
+        confirmLabel="Yes, regenerate"
+        cancelLabel="Keep old codes"
+        danger
+        onConfirm={() => { setConfirmRegen(false); setRegenMode(true) }}
+      />
+
+      <ConfirmDialog
+        open={!!passkeyToDelete}
+        onOpenChange={(open) => { if (!open) setPasskeyToDelete(null) }}
+        title={`Remove passkey "${passkeyToDelete?.name || 'Passkey'}"?`}
+        description="This device or security key will no longer sign you in. If this is your only passkey, add another sign-in method first or keep your password and backup codes safe - otherwise a lost device can lock you out."
+        confirmLabel="Yes, remove"
+        cancelLabel="Keep it"
+        danger
+        onConfirm={() => passkeyToDelete && deletePasskey(passkeyToDelete.id)}
       />
     </div>
   )

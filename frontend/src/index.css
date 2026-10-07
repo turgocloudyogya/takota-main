@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Geist:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "@heroui/styles";
 @import "@fontsource/geist-sans/400.css";
 @import "@fontsource/geist-sans/500.css";
@@ -17,6 +17,7 @@ label.checkbox__content[data-selected] span.checkbox__control {
 
 @theme {
   --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Brand palette, exactly as specified */
   --color-success: #00bc7d;
@@ -199,6 +200,19 @@ body {
 .vt-lock *::after {
   animation-play-state: paused !important;
   transition: none !important;
+}
+
+/* Every interactive button gets a pointer cursor (Tailwind preflight
+   resets it to default). Disabled buttons keep the default cursor. */
+@layer base {
+  button:not(:disabled, [aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
+/* Backup codes: JetBrains Mono, centered per column. */
+.font-codes {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
 }
 
 /* Custom sizes for absence badge (h-13 = 3.25rem, w-15 = 3.75rem) */

@@ -259,6 +259,187 @@ func (ctrl *AdminController) GetAttendanceTrend(c *gin.Context) {
 	})
 }
 
+// TopActiveUser ranks users by total reports in the window: check-ins
+// plus leave-days (a multi-day leave counts every covered day).
+type TopActiveUser struct {
+	UserID     string `json:"user_id"`
+	Username   string `json:"username"`
+	Nickname   string `json:"nickname"`
+	Checkins   int64  `json:"checkins"`
+	LeaveDays  int64  `json:"leave_days"`
+	Total      int64  `json:"total"`
+}
+
+// PendingRequest is one not-yet-decided absence request for the panel.
+type PendingRequest struct {
+	ID        string `json:"id"`
+	UserID    string `json:"user_id"`
+	Username  string `json:"username"`
+	Nickname  string `json:"nickname"`
+	Option    string `json:"option"`
+	Reason    string `json:"reason"`
+	CreatedAt string `json:"created_at"`
+}
+
+// activeStats returns per-user check-ins and leave-days in [windowStart, now].
+func activeStats(db *gorm.DB, windowStart, now time.Time) (map[string]int64, map[string]int64) {
+	loc := utils.AppLocation()
+	fromKey := windowStart.Format("2006-01-02")
+	toKey := now.In(loc).Format("2006-01-02")
+
+	var checkins []struct {
+		UserID string
+		Count  int64
+	}
+	db.Model(&models.Attendance{}).
+		Select("user_id, COUNT(*) as count").
+		Where("type = ? AND created_at >= ?", "attendance", windowStart).
+		Group("user_id").
+		Scan(&checkins)
+	checkinByUser := map[string]int64{}
+	for _, row := range checkins {
+		checkinByUser[row.UserID] = row.Count
+	}
+
+	type absenceRow struct {
+		UserID    string
+		CreatedAt time.Time
+		Start     *time.Time
+		End       *time.Time
+		Sign      *string
+	}
+	var rows []absenceRow
+	db.Model(&models.Attendance{}).
+		Select("user_id, created_at, absence_start_date AS start, absence_end_date AS end, sign_status AS sign").
+		Where("type = ? AND (created_at >= ? OR absence_end_date >= ?)", "absence", windowStart, windowStart).
+		Find(&rows)
+
+	leaveDays := map[string]int64{}
+	for _, r := range rows {
+		if r.Sign != nil && strings.ToLower(*r.Sign) == "reject" {
+			continue
+		}
+		spanStart := r.CreatedAt
+		if r.Start != nil {
+			spanStart = *r.Start
+		}
+		spanEnd := spanStart
+		if r.End != nil && r.End.After(spanEnd) {
+			spanEnd = *r.End
+		}
+		startDay := spanStart.In(loc).Truncate(24 * time.Hour)
+		endDay := spanEnd.In(loc).Truncate(24 * time.Hour)
+		for d := startDay; !d.After(endDay); d = d.AddDate(0, 0, 1) {
+			k := d.Format("2006-01-02")
+			if k > toKey {
+				break
+			}
+			if k >= fromKey {
+				leaveDays[r.UserID]++
+			}
+		}
+	}
+	return checkinByUser, leaveDays
+}
+
+// GetTopActiveUsers returns up to 4 users with the most reports
+// (check-ins + leave-days) in the last 30 days, ranked by total.
+func (ctrl *AdminController) GetTopActiveUsers(c *gin.Context) {
+	loc := utils.AppLocation()
+	now := utils.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	windowStart := todayStart.AddDate(0, 0, -29)
+
+	var users []models.User
+	if err := ctrl.DB.Model(&models.User{}).Where("type = ?", "user").Find(&users).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to load users", "DB_ERROR")
+		return
+	}
+
+	checkins, leaves := activeStats(ctrl.DB, windowStart, now)
+	top := []TopActiveUser{}
+	for _, u := range users {
+		uid := u.ID.String()
+		total := checkins[uid] + leaves[uid]
+		if total == 0 {
+			continue
+		}
+		top = append(top, TopActiveUser{
+			UserID:   uid,
+			Username: u.Username,
+			Nickname: u.Nickname,
+			Checkins: checkins[uid],
+			LeaveDays: leaves[uid],
+			Total:    total,
+		})
+	}
+	sort.Slice(top, func(i, j int) bool {
+		if top[i].Total == top[j].Total {
+			return top[i].Username < top[j].Username
+		}
+		return top[i].Total > top[j].Total
+	})
+	if len(top) > 4 {
+		top = top[:4]
+	}
+	if top == nil {
+		top = []TopActiveUser{}
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"data": top,
+	})
+}
+
+// GetPendingRequests returns up to 4 not-yet-decided absence requests,
+// newest first, for the dashboard panel.
+func (ctrl *AdminController) GetPendingRequests(c *gin.Context) {
+	type row struct {
+		ID        string
+		UserID    string
+		Username  string
+		Nickname  string
+		Option    *string
+		Reason    *string
+		CreatedAt time.Time
+	}
+	var rows []row
+	if err := ctrl.DB.Model(&models.Attendance{}).
+		Select("attendance.id, attendance.user_id, users.username, users.nickname, attendance.option, attendance.reason, attendance.created_at").
+		Joins("JOIN users ON users.id = attendance.user_id").
+		Where("attendance.type = ? AND attendance.sign_status IS NULL", "absence").
+		Order("attendance.created_at DESC").
+		Limit(4).
+		Scan(&rows).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to load pending requests", "DB_ERROR")
+		return
+	}
+
+	out := []PendingRequest{}
+	for _, r := range rows {
+		opt, reason := "", ""
+		if r.Option != nil {
+			opt = *r.Option
+		}
+		if r.Reason != nil {
+			reason = *r.Reason
+		}
+		out = append(out, PendingRequest{
+			ID:        r.ID,
+			UserID:    r.UserID,
+			Username:  r.Username,
+			Nickname:  r.Nickname,
+			Option:    opt,
+			Reason:    reason,
+			CreatedAt: r.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"data": out,
+	})
+}
+
 // leaveDayCounts counts non-rejected absence rows covering each day in
 // [from, to] (app timezone day keys). Single-day absences count on their
 // start (or submission) day; multi-day absences count on every day of their

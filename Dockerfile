@@ -14,6 +14,9 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
+# Release version for the service-worker stamp (see scripts/sync-sw-version.js)
+COPY .tagversioning ../.tagversioning
+
 # Copy source and build
 COPY frontend/ .
 RUN npm run build

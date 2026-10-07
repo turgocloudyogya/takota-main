@@ -171,6 +171,8 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			// Dashboard
 			admin.GET("/dashboard/stats", adminCtrl.GetDashboardStats)
 			admin.GET("/dashboard/trend", adminCtrl.GetAttendanceTrend)
+			admin.GET("/dashboard/top-active", adminCtrl.GetTopActiveUsers)
+			admin.GET("/dashboard/pending-requests", adminCtrl.GetPendingRequests)
 			admin.GET("/dashboard/activity", adminCtrl.GetActivityHeatmap)
 
 			// Attendance & Absence management

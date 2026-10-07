@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Eye, EyeSlash, Shield, Fingerprint } from '@gravity-ui/icons'
-import { TextField, Input, Label } from '@heroui/react'
+import { Eye, EyeSlash, Shield, Fingerprint, Check } from '@gravity-ui/icons'
+import { TextField, Input, Label, Button, FieldError } from '@heroui/react'
 
 // Import API and session utilities from admin
 import { clearLegacyTokenStorage } from '../lib/cookies.js'
@@ -41,6 +41,11 @@ export default function Login() {
   const [methods, setMethods] = useState([])
   const [code, setCode] = useState('')
   const [verifying, setVerifying] = useState(false)
+  const [errors, setErrors] = useState({})
+
+  function setFieldError(field, message) {
+    setErrors((prev) => ({ ...prev, [field]: message || undefined }))
+  }
 
   function enterApp(data, name) {
     clearLegacyTokenStorage()
@@ -62,10 +67,11 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault()
 
-    if (!username.trim() || !password.trim()) {
-      toast.error('Username and password are required.')
-      return
-    }
+    const errs = {}
+    if (!username.trim()) errs.username = 'Username is required.'
+    if (!password) errs.password = 'Password is required.'
+    setErrors(errs)
+    if (Object.keys(errs).length > 0) return
 
     setSubmitting(true)
     try {
@@ -75,12 +81,13 @@ export default function Login() {
         setChallenge(data.challenge)
         setMethods(data.methods || [])
         setCode('')
+        setErrors({})
         toast.info('Enter your second-factor code to continue.')
         return
       }
       enterApp(data, username.trim())
     } catch (err) {
-      toast.error(err.message || 'Login failed. Check your connection or API address.')
+      setFieldError('password', err.message || 'Login failed. Check your username and password.')
     } finally {
       setSubmitting(false)
     }
@@ -89,7 +96,7 @@ export default function Login() {
   async function handleVerifyCode(e) {
     e?.preventDefault()
     if (!code.trim()) {
-      toast.error('Enter your 6-digit code or a backup code.')
+      setFieldError('code', 'Enter your 6-digit code or a backup code.')
       return
     }
     setVerifying(true)
@@ -97,7 +104,7 @@ export default function Login() {
       const data = await postJSON('/api/auth/2fa', { challenge, code: code.trim() })
       enterApp(data, username.trim())
     } catch (err) {
-      toast.error(err.message)
+      setFieldError('code', err.message || 'Verification failed.')
     } finally {
       setVerifying(false)
     }
@@ -106,7 +113,7 @@ export default function Login() {
   async function handlePasskeyLogin(withUsername) {
     const name = withUsername || username.trim()
     if (!name) {
-      toast.error('Enter your username first to use a passkey.')
+      setFieldError('username', 'Enter your username first to use a passkey.')
       return
     }
     if (!webauthnSupported()) {
@@ -142,7 +149,7 @@ export default function Login() {
   if (challenge) {
     const passkeyOffered = methods.includes('passkey')
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
+      <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-10">
         <div className="mb-8 flex flex-col items-center">
           <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
             <Icon data={Shield} size={36} className="text-primary" />
@@ -155,43 +162,49 @@ export default function Login() {
 
         <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <TextField fullWidth name="code" value={code} onChange={(v) => setCode(v.slice(0, 9))}>
+            <TextField fullWidth name="code" value={code} onChange={(v) => { setCode(v.slice(0, 9)); setFieldError('code') }} isInvalid={!!errors.code}>
               <Label className="sr-only">Verification code</Label>
               <Input
                 placeholder="000000 or XXXX-XXXX"
                 autoComplete="one-time-code"
                 className="bg-neutral-50 text-center font-mono tracking-widest shadow-none dark:bg-neutral-800/60"
               />
+              {errors.code && <FieldError className="text-xs text-danger">{errors.code}</FieldError>}
             </TextField>
           </div>
 
-          <button
+          <Button
+            fullWidth
+            variant="primary"
             type="submit"
-            disabled={verifying || !code.trim()}
-            className="mt-1 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
+            isDisabled={verifying || !code.trim()}
+            className="mt-1 cursor-pointer"
           >
+            <Icon data={Check} size={16} />
             {verifying ? 'Verifying…' : 'Verify'}
-          </button>
+          </Button>
 
           {passkeyOffered && (
-            <button
-              type="button"
-              onClick={() => handlePasskeyLogin(username.trim())}
-              disabled={verifying}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 active:scale-[0.98] disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-800"
+            <Button
+              fullWidth
+              variant="outline"
+              onPress={() => handlePasskeyLogin(username.trim())}
+              isDisabled={verifying}
+              className="cursor-pointer"
             >
               <Icon data={Fingerprint} size={16} />
               Use passkey instead
-            </button>
+            </Button>
           )}
 
-          <button
-            type="button"
-            onClick={() => { setChallenge(null); setMethods([]); setCode('') }}
-            className="text-sm font-medium text-neutral hover:underline dark:text-neutral-400"
+          <Button
+            fullWidth
+            variant="ghost"
+            onPress={() => { setChallenge(null); setMethods([]); setCode('') }}
+            className="cursor-pointer"
           >
             Back to login
-          </button>
+          </Button>
         </form>
       </main>
     )
@@ -199,10 +212,10 @@ export default function Login() {
 
   // ---- password step ------------------------------------------------------
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-10">
       <div className="mb-8 flex flex-col items-center">
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-neutral/15 dark:bg-white/10">
-          <img src="/takota-icon.svg" alt="Takota" className="h-12 w-12" />
+        <div className="mb-6 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-blue-200 dark:bg-blue-950">
+          <img src="/takota-chibi.png" alt="Takota" className="h-full w-full object-cover" />
         </div>
         <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Takota Login</h1>
         <p className="mt-2 max-w-[260px] text-center text-sm text-neutral dark:text-neutral-400">
@@ -212,18 +225,19 @@ export default function Login() {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <TextField fullWidth isRequired name="username" value={username} onChange={setUsername}>
+          <TextField fullWidth isRequired name="username" value={username} onChange={(v) => { setUsername(v); setFieldError('username') }} isInvalid={!!errors.username}>
             <Label className="sr-only">Username</Label>
             <Input
               placeholder="Username"
               autoComplete="username"
               className="bg-neutral-50 shadow-none dark:bg-neutral-800/60"
             />
+            {errors.username && <FieldError className="text-xs text-danger">{errors.username}</FieldError>}
           </TextField>
         </div>
 
         <div className="flex items-center gap-2">
-          <TextField fullWidth isRequired name="password" type={showPassword ? 'text' : 'password'} value={password} onChange={setPassword}>
+          <TextField fullWidth isRequired name="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(v) => { setPassword(v); setFieldError('password') }} isInvalid={!!errors.password}>
             <Label className="sr-only">Password</Label>
             <div className="relative">
               <Input
@@ -240,27 +254,31 @@ export default function Login() {
                 <Icon data={showPassword ? EyeSlash : Eye} size={16} />
               </button>
             </div>
+            {errors.password && <FieldError className="text-xs text-danger">{errors.password}</FieldError>}
           </TextField>
         </div>
 
 
-        <button
+        <Button
+          fullWidth
+          variant="primary"
           type="submit"
-          disabled={submitting}
-          className="mt-3 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white cursor-pointer transition active:scale-[0.98] disabled:opacity-60"
+          isDisabled={submitting}
+          className="mt-3 cursor-pointer"
         >
           {submitting ? 'Logging in…' : 'Login'}
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          onClick={() => handlePasskeyLogin()}
-          disabled={verifying || submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 py-3 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-100 active:scale-[0.98] disabled:opacity-60 dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-800"
+        <Button
+          fullWidth
+          variant="outline"
+          onPress={() => handlePasskeyLogin()}
+          isDisabled={verifying || submitting}
+          className="cursor-pointer"
         >
           <Icon data={Fingerprint} size={16} />
           {verifying ? 'Waiting for passkey…' : 'Sign in with passkey'}
-        </button>
+        </Button>
       </form>
     </main>
   )

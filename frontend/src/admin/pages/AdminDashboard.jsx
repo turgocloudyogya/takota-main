@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Persons, Check, FileCheck, TriangleExclamation, Clock } from '@gravity-ui/icons'
+import { Persons, Check, FileCheck, Clock } from '@gravity-ui/icons'
 import { ResponsiveBar } from '@nivo/bar'
 import { Label, ListBox, Select } from '@heroui/react'
 import { useTheme } from '../../lib/useTheme.js'
@@ -35,6 +35,8 @@ function Metric({ label, value, sub, icon }) {
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [trend, setTrend] = useState(null)
+  const [topActive, setTopActive] = useState(null)
+  const [pendingList, setPendingList] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [activity, setActivity] = useState(null)
@@ -99,6 +101,28 @@ export default function AdminDashboard() {
       if (!trendResponse.ok) throw new Error('Failed to load trend')
       const trendData = await trendResponse.json()
       setTrend(trendData.data)
+
+      const topResponse = await fetch('/api/admin/dashboard/top-active', {
+        credentials: 'include',
+        headers: {
+          'key-request': 'web-admin',
+        },
+      })
+
+      if (!topResponse.ok) throw new Error('Failed to load most active users')
+      const topData = await topResponse.json()
+      setTopActive(topData.data || [])
+
+      const pendingResponse = await fetch('/api/admin/dashboard/pending-requests', {
+        credentials: 'include',
+        headers: {
+          'key-request': 'web-admin',
+        },
+      })
+
+      if (!pendingResponse.ok) throw new Error('Failed to load pending requests')
+      const pendingData = await pendingResponse.json()
+      setPendingList(pendingData.data || [])
     } catch (err) {
       setLoadError(err.message || 'Failed to load dashboard data')
       toast.error('Failed to load dashboard data')
@@ -197,6 +221,9 @@ export default function AdminDashboard() {
     legends: {
       text: { fill: theme === 'dark' ? '#e5e5e5' : '#333333', fontSize: 12 },
     },
+    labels: {
+      text: { fill: '#ffffff', fontSize: 11, fontWeight: 600 },
+    },
     tooltip: {
       container: {
         fontSize: 12,
@@ -207,21 +234,6 @@ export default function AdminDashboard() {
     },
   }
 
-  function absenceRequestText() {
-    const names = Array.isArray(stats.pending_requesters) ? stats.pending_requesters : []
-    const total = stats.pending_approvals || 0
-    if (total <= 0) return null
-    if (names.length === 0) {
-      return `${total} absence request${total === 1 ? '' : 's'} awaiting review`
-    }
-    if (total === 1) return `${names[0]} has requested absence`
-    if (total === 2 && names.length >= 2) return `${names[0]} and ${names[1]} have requested absence`
-    const others = total - 2
-    return `${names[0]}, ${names[1]} and ${others} other${others === 1 ? '' : 's'} have requested absence`
-  }
-
-  const requestText = absenceRequestText()
-
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -231,35 +243,9 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* Primary: pending Leave & Sick requests. Hidden when there is nothing to review. */}
-      {requestText && (
-      <section aria-label="Absence requests awaiting review" className="rounded-xl bg-amber-50 p-4 sm:p-5 dark:bg-amber-500/10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white">
-              <Icon data={TriangleExclamation} size={20} />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                {requestText}
-              </h2>
-              <p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">
-                {stats.attendance_today} checked in today · {stats.absence_today} on leave today · {stats.total_alpha} unreported
-              </p>
-            </div>
-          </div>
-          <Link
-            to="/admin/absence"
-            className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.98] dark:border-neutral-600 dark:bg-black dark:text-white dark:hover:bg-neutral-900"
-          >
-            Review in Leave & Sick
-          </Link>
-        </div>
-      </section>
-      )}
 
       {/* Secondary: today at a glance */}
-      <section aria-label="Today at a glance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section data-guide="stat-cards" aria-label="Today at a glance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric
           label="Today's check-ins"
           value={stats.attendance_today}
@@ -298,9 +284,50 @@ export default function AdminDashboard() {
         />
       </section>
 
+      {/* Pending leave requests awaiting a decision. */}
+      {pendingList && pendingList.length > 0 && (
+        <section data-guide="pending-list" aria-label="Pending leave requests" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Pending requests</h2>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Not accepted or rejected yet
+              </p>
+            </div>
+            <Link
+              to="/admin/absence"
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-[0.98]"
+            >
+              Review in Leave & Sick
+            </Link>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            {pendingList.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 rounded-lg bg-white p-3 dark:bg-neutral-800"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  {(item.nickname || item.username || '?')[0].toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    {item.nickname || item.username}
+                    <span className="ml-2 font-normal text-neutral-500 dark:text-neutral-400">
+                      {item.option === 'sick' ? 'Sick' : 'Leave'}
+                    </span>
+                  </p>
+                  <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.reason}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Bars answer one question: on which active days did people report? */}
       {visibleDays.length > 0 ? (
-        <section aria-label="Check-ins and absences on active days" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+        <section data-guide="charts" aria-label="Check-ins and absences on active days" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
           <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Check-ins vs absences on active days ({visibleDays.length} days)</h2>
           <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
             {(() => {
@@ -323,20 +350,9 @@ export default function AdminDashboard() {
               colors={['#8e2bd9', '#3d6ce3']}
               labelSkipWidth={12}
               labelSkipHeight={12}
-              legends={[
-                {
-                  dataFrom: 'keys',
-                  anchor: 'bottom-right',
-                  direction: 'column',
-                  translateX: 120,
-                  itemsSpacing: 3,
-                  itemWidth: 100,
-                  itemHeight: 16,
-                },
-              ]}
               axisBottom={{ tickValues: [] }}
               axisLeft={null}
-              margin={{ top: 16, right: 130, bottom: 0, left: 0 }}
+              margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
               enableGridY={false}
               theme={chartTheme}
             />
@@ -351,8 +367,47 @@ export default function AdminDashboard() {
         </section>
       )}
 
+      {/* Most active users: ranking by check-ins + leave-days. */}
+      {topActive && topActive.length > 0 ? (
+        <section data-guide="top-active" aria-label="Most active users" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+          <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Most active users, last 30 days</h2>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            Ranked by check-ins plus leave-days — a multi-day leave counts every covered day
+          </p>
+          <div className="bar-rise mt-4 h-56 sm:h-64">
+            <ResponsiveBar
+              animate={false}
+              layout="horizontal"
+              data={[...topActive].reverse().map((u) => ({
+                username: u.nickname || u.username,
+                attendance: Number(u.checkins) || 0,
+                absence: Number(u.leave_days) || 0,
+              }))}
+              keys={['absence', 'attendance']}
+              indexBy="username"
+              colors={['#8e2bd9', '#3d6ce3']}
+              labelSkipWidth={12}
+              labelSkipHeight={12}
+              axisTop={null}
+              axisRight={null}
+              axisBottom={{ tickValues: [] }}
+              margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
+              enableGridX={false}
+              theme={chartTheme}
+            />
+          </div>
+        </section>
+      ) : (
+        <section aria-label="Most active users" className="rounded-xl bg-neutral-50 p-6 text-center dark:bg-neutral-900">
+          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No reports in the last 30 days</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500 dark:text-neutral-400">
+            This panel ranks up to 4 users once check-ins or leaves exist.
+          </p>
+        </section>
+      )}
+
       {/* Activity Heatmap */}
-      <section aria-label="Activity" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+      <section data-guide="activity-heatmap" aria-label="Activity" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Activity</h2>
