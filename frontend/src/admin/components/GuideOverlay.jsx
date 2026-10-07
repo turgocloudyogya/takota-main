@@ -7,16 +7,30 @@ import { markGuideDone } from '../lib/guide.js'
 const STEPS = [
   {
     page: '/admin/dashboard',
+    target: '[data-guide="review-panel"]',
+    title: 'Leave & Sick Reviews',
+    description: 'Pending absence requests land here with the requesters named. Nothing to review means this panel hides itself — tap through to Leave & Sick to decide.',
+    placement: 'bottom',
+  },
+  {
+    page: '/admin/dashboard',
     target: '[data-guide="stat-cards"]',
-    title: 'Dashboard Overview',
-    description: 'Key stats at a glance: total users, today\'s check-ins and absences, pending approvals, peak check-in time, and 7-day daily averages. Weekends follow your open-days setting and never count as alpha.',
+    title: 'Today at a Glance',
+    description: 'Today’s check-ins, users on leave, peak check-in time, and registered users. Totals live in the row below.',
     placement: 'bottom',
   },
   {
     page: '/admin/dashboard',
     target: '[data-guide="charts"]',
-    title: '7-Day Trend',
-    description: 'Check-ins vs absences over the last 7 days. Hover any date to compare both series, with totals listed below the chart.',
+    title: 'Active-Day Bars',
+    description: 'Check-ins vs absences, only on days with at least one report (30 days desktop, last 15 on mobile). Hover a bar for the date and counts.',
+    placement: 'bottom',
+  },
+  {
+    page: '/admin/dashboard',
+    target: '[data-guide="top-absent"]',
+    title: 'Most Absent Users',
+    description: 'Up to 4 users with the most leave-days in the last 30 days. A multi-day leave counts every covered day.',
     placement: 'bottom',
   },
   {
@@ -59,6 +73,20 @@ const STEPS = [
     target: '[data-guide="reports-export"]',
     title: 'Reports & Export',
     description: 'Download attendance reports as CSV or generate printable PDF recaps for documentation.',
+    placement: 'bottom',
+  },
+  {
+    page: '/admin/settings',
+    target: '[data-guide="settings-form"]',
+    title: 'Attendance Settings',
+    description: 'Danger zone: the time window and open days apply app-wide the moment you save - gates, countdowns, reminders, and reports all follow.',
+    placement: 'bottom',
+  },
+  {
+    page: '/admin/security',
+    target: '[data-guide="security-panel"]',
+    title: 'Your Security',
+    description: 'Two-factor authentication for your own admin account only. Back up your codes somewhere safe.',
     placement: 'bottom',
   },
 ]

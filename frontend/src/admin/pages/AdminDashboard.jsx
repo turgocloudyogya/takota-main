@@ -35,6 +35,7 @@ function Metric({ label, value, sub, icon }) {
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [trend, setTrend] = useState(null)
+  const [topAbsent, setTopAbsent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [activity, setActivity] = useState(null)
@@ -99,6 +100,17 @@ export default function AdminDashboard() {
       if (!trendResponse.ok) throw new Error('Failed to load trend')
       const trendData = await trendResponse.json()
       setTrend(trendData.data)
+
+      const topResponse = await fetch('/api/admin/dashboard/top-absent', {
+        credentials: 'include',
+        headers: {
+          'key-request': 'web-admin',
+        },
+      })
+
+      if (!topResponse.ok) throw new Error('Failed to load top absent users')
+      const topData = await topResponse.json()
+      setTopAbsent(topData.data || [])
     } catch (err) {
       setLoadError(err.message || 'Failed to load dashboard data')
       toast.error('Failed to load dashboard data')
@@ -233,7 +245,7 @@ export default function AdminDashboard() {
 
       {/* Primary: pending Leave & Sick requests. Hidden when there is nothing to review. */}
       {requestText && (
-      <section aria-label="Absence requests awaiting review" className="rounded-xl bg-amber-50 p-4 sm:p-5 dark:bg-amber-500/10">
+      <section data-guide="review-panel" aria-label="Absence requests awaiting review" className="rounded-xl bg-amber-50 p-4 sm:p-5 dark:bg-amber-500/10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white">
@@ -259,7 +271,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Secondary: today at a glance */}
-      <section aria-label="Today at a glance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section data-guide="stat-cards" aria-label="Today at a glance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric
           label="Today's check-ins"
           value={stats.attendance_today}
@@ -300,7 +312,7 @@ export default function AdminDashboard() {
 
       {/* Bars answer one question: on which active days did people report? */}
       {visibleDays.length > 0 ? (
-        <section aria-label="Check-ins and absences on active days" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+        <section data-guide="charts" aria-label="Check-ins and absences on active days" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
           <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Check-ins vs absences on active days ({visibleDays.length} days)</h2>
           <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
             {(() => {
@@ -351,8 +363,57 @@ export default function AdminDashboard() {
         </section>
       )}
 
+      {/* Most absent users: horizontal bars, usernames on the left. */}
+      {topAbsent && topAbsent.length > 0 ? (
+        <section data-guide="top-absent" aria-label="Users with the most absences" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+          <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Most absent users, last 30 days</h2>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            Leave-days per user — a multi-day leave counts every covered day
+          </p>
+          <div className="bar-rise mt-4 h-56 sm:h-64">
+            <ResponsiveBar
+              animate={false}
+              layout="horizontal"
+              data={topAbsent.map((u) => ({
+                username: u.nickname || u.username,
+                absence: Number(u.leave_days) || 0,
+              }))}
+              keys={['absence']}
+              indexBy="username"
+              colors={['#8e2bd9']}
+              labelSkipWidth={12}
+              labelSkipHeight={12}
+              legends={[
+                {
+                  dataFrom: 'keys',
+                  anchor: 'bottom-right',
+                  direction: 'column',
+                  translateX: 120,
+                  itemsSpacing: 3,
+                  itemWidth: 100,
+                  itemHeight: 16,
+                },
+              ]}
+              axisTop={null}
+              axisRight={null}
+              axisBottom={{ tickValues: [] }}
+              margin={{ top: 16, right: 130, bottom: 0, left: 0 }}
+              enableGridX={false}
+              theme={chartTheme}
+            />
+          </div>
+        </section>
+      ) : (
+        <section aria-label="Users with the most absences" className="rounded-xl bg-neutral-50 p-6 text-center dark:bg-neutral-900">
+          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No absences in the last 30 days</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500 dark:text-neutral-400">
+            This panel lists up to 4 users once leave requests exist.
+          </p>
+        </section>
+      )}
+
       {/* Activity Heatmap */}
-      <section aria-label="Activity" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+      <section data-guide="activity-heatmap" aria-label="Activity" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Activity</h2>

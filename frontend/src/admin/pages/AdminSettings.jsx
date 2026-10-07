@@ -189,7 +189,7 @@ export default function AdminSettings() {
         </p>
       </div>
 
-      <div className="space-y-6 rounded-lg bg-neutral-50 p-6 dark:bg-neutral-900">
+      <div data-guide="settings-form" className="space-y-6 rounded-lg bg-neutral-50 p-6 dark:bg-neutral-900">
         {/* Time Settings */}
         <div className="space-y-4">
           <TimeSetting

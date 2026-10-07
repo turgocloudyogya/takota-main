@@ -259,6 +259,118 @@ func (ctrl *AdminController) GetAttendanceTrend(c *gin.Context) {
 	})
 }
 
+// TopAbsentUser is one row of the most-absent-users panel: leave-days in
+// the window (multi-day leaves count every covered day), plus check-ins.
+type TopAbsentUser struct {
+	UserID       string `json:"user_id"`
+	Username     string `json:"username"`
+	Nickname     string `json:"nickname"`
+	LeaveDays    int64  `json:"leave_days"`
+	Checkins     int64  `json:"checkins"`
+}
+
+// GetTopAbsentUsers returns up to 4 users with the most leave-days in the
+// last 30 days (app timezone). Users without any leave are omitted, so the
+// panel shows 0-4 rows.
+func (ctrl *AdminController) GetTopAbsentUsers(c *gin.Context) {
+	loc := utils.AppLocation()
+	now := utils.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	windowStart := todayStart.AddDate(0, 0, -29)
+	fromKey := windowStart.Format("2006-01-02")
+	toKey := now.In(loc).Format("2006-01-02")
+
+	var users []models.User
+	if err := ctrl.DB.Model(&models.User{}).Where("type = ?", "user").Find(&users).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Failed to load users", "DB_ERROR")
+		return
+	}
+
+	type absenceRow struct {
+		UserID    string
+		CreatedAt time.Time
+		Start     *time.Time
+		End       *time.Time
+		Sign      *string
+	}
+	var rows []absenceRow
+	ctrl.DB.Model(&models.Attendance{}).
+		Select("user_id, created_at, absence_start_date AS start, absence_end_date AS end, sign_status AS sign").
+		Where("type = ? AND (created_at >= ? OR absence_end_date >= ?)", "absence", windowStart, windowStart).
+		Find(&rows)
+
+	leaveDays := map[string]int64{}
+	for _, r := range rows {
+		if r.Sign != nil && strings.ToLower(*r.Sign) == "reject" {
+			continue
+		}
+		spanStart := r.CreatedAt
+		if r.Start != nil {
+			spanStart = *r.Start
+		}
+		spanEnd := spanStart
+		if r.End != nil && r.End.After(spanEnd) {
+			spanEnd = *r.End
+		}
+		startDay := spanStart.In(loc).Truncate(24 * time.Hour)
+		endDay := spanEnd.In(loc).Truncate(24 * time.Hour)
+		for d := startDay; !d.After(endDay); d = d.AddDate(0, 0, 1) {
+			k := d.Format("2006-01-02")
+			if k > toKey {
+				break
+			}
+			if k >= fromKey {
+				leaveDays[r.UserID]++
+			}
+		}
+	}
+
+	var checkins []struct {
+		UserID string
+		Count  int64
+	}
+	ctrl.DB.Model(&models.Attendance{}).
+		Select("user_id, COUNT(*) as count").
+		Where("type = ? AND created_at >= ?", "attendance", windowStart).
+		Group("user_id").
+		Scan(&checkins)
+	checkinByUser := map[string]int64{}
+	for _, row := range checkins {
+		checkinByUser[row.UserID] = row.Count
+	}
+
+	top := []TopAbsentUser{}
+	for _, u := range users {
+		days := leaveDays[u.ID.String()]
+		if days == 0 {
+			continue
+		}
+		top = append(top, TopAbsentUser{
+			UserID:   u.ID.String(),
+			Username: u.Username,
+			Nickname: u.Nickname,
+			LeaveDays: days,
+			Checkins: checkinByUser[u.ID.String()],
+		})
+	}
+	sort.Slice(top, func(i, j int) bool {
+		if top[i].LeaveDays == top[j].LeaveDays {
+			return top[i].Username < top[j].Username
+		}
+		return top[i].LeaveDays > top[j].LeaveDays
+	})
+	if len(top) > 4 {
+		top = top[:4]
+	}
+	if top == nil {
+		top = []TopAbsentUser{}
+	}
+
+	utils.RespondSuccess(c, http.StatusOK, gin.H{
+		"data": top,
+	})
+}
+
 // leaveDayCounts counts non-rejected absence rows covering each day in
 // [from, to] (app timezone day keys). Single-day absences count on their
 // start (or submission) day; multi-day absences count on every day of their
