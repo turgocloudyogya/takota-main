@@ -60,7 +60,7 @@ func InitS3(appConfig *cfg.Config) error {
 
 	// Build readEndpoint for file preview URLs
 	// CRITICAL: Match Node.js logic exactly
-	// For non-AWS providers, bucket MUST be in the path when using path-style (Minio/R2)
+	// For non-AWS providers, bucket MUST be in the path when using path-style (RustFS/R2)
 	if isAWS {
 		// AWS S3 uses virtual-hosted style by default
 		if publicHost != "" {
@@ -71,7 +71,7 @@ func InitS3(appConfig *cfg.Config) error {
 			readEndpoint = fmt.Sprintf("https://%s.s3.%s.amazonaws.com/{{file}}", bucket, region)
 		}
 	} else {
-		// Non-AWS (R2, MinIO, rustfs) - path style follows its own flag so a
+		// Non-AWS (R2, RustFS, Supabase, custom) - path style follows its own flag so a
 		// virtual-hosted public host (CDN, path-style false) keeps working
 		// while the SDK endpoint stays path-style true.
 		publicHostTrimmed := strings.TrimSuffix(publicHost, "/")
@@ -326,7 +326,7 @@ func ReadFile(ctx context.Context, objectKey string) ([]byte, error) {
 }
 
 // GetSignedURL generates a presigned URL for accessing a file.
-// It works with private buckets (MinIO/R2/S3); the URL expires after expiry.
+// It works with private buckets (RustFS/R2/S3); the URL expires after expiry.
 // The signature is created against S3_PUBLIC_HOST when set (with
 // S3_USE_PATH_STYLE_PUBLIC_HOST), otherwise against S3_ENDPOINT.
 func GetSignedURL(ctx context.Context, objectKey string, expiry time.Duration) (string, error) {
