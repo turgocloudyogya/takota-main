@@ -28,9 +28,16 @@ const STEPS = [
   },
   {
     page: '/admin/dashboard',
-    target: '[data-guide="top-absent"]',
-    title: 'Most Absent Users',
-    description: 'Up to 4 users with the most leave-days in the last 30 days. A multi-day leave counts every covered day.',
+    target: '[data-guide="top-active"]',
+    title: 'Most Active Users',
+    description: 'Up to 4 users ranked by check-ins plus leave-days in the last 30 days. A multi-day leave counts every covered day.',
+    placement: 'bottom',
+  },
+  {
+    page: '/admin/dashboard',
+    target: '[data-guide="pending-list"]',
+    title: 'Pending Requests',
+    description: 'Leave requests still awaiting your decision, newest first — open Leave & Sick to accept or reject.',
     placement: 'bottom',
   },
   {

@@ -35,7 +35,8 @@ function Metric({ label, value, sub, icon }) {
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [trend, setTrend] = useState(null)
-  const [topAbsent, setTopAbsent] = useState(null)
+  const [topActive, setTopActive] = useState(null)
+  const [pendingList, setPendingList] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [activity, setActivity] = useState(null)
@@ -101,16 +102,27 @@ export default function AdminDashboard() {
       const trendData = await trendResponse.json()
       setTrend(trendData.data)
 
-      const topResponse = await fetch('/api/admin/dashboard/top-absent', {
+      const topResponse = await fetch('/api/admin/dashboard/top-active', {
         credentials: 'include',
         headers: {
           'key-request': 'web-admin',
         },
       })
 
-      if (!topResponse.ok) throw new Error('Failed to load top absent users')
+      if (!topResponse.ok) throw new Error('Failed to load most active users')
       const topData = await topResponse.json()
-      setTopAbsent(topData.data || [])
+      setTopActive(topData.data || [])
+
+      const pendingResponse = await fetch('/api/admin/dashboard/pending-requests', {
+        credentials: 'include',
+        headers: {
+          'key-request': 'web-admin',
+        },
+      })
+
+      if (!pendingResponse.ok) throw new Error('Failed to load pending requests')
+      const pendingData = await pendingResponse.json()
+      setPendingList(pendingData.data || [])
     } catch (err) {
       setLoadError(err.message || 'Failed to load dashboard data')
       toast.error('Failed to load dashboard data')
@@ -363,24 +375,25 @@ export default function AdminDashboard() {
         </section>
       )}
 
-      {/* Most absent users: horizontal bars, usernames on the left. */}
-      {topAbsent && topAbsent.length > 0 ? (
-        <section data-guide="top-absent" aria-label="Users with the most absences" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
-          <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Most absent users, last 30 days</h2>
+      {/* Most active users: ranking by check-ins + leave-days. */}
+      {topActive && topActive.length > 0 ? (
+        <section data-guide="top-active" aria-label="Most active users" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+          <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Most active users, last 30 days</h2>
           <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-            Leave-days per user — a multi-day leave counts every covered day
+            Ranked by check-ins plus leave-days — a multi-day leave counts every covered day
           </p>
           <div className="bar-rise mt-4 h-56 sm:h-64">
             <ResponsiveBar
               animate={false}
               layout="horizontal"
-              data={topAbsent.map((u) => ({
+              data={topActive.map((u) => ({
                 username: u.nickname || u.username,
+                attendance: Number(u.checkins) || 0,
                 absence: Number(u.leave_days) || 0,
               }))}
-              keys={['absence']}
+              keys={['absence', 'attendance']}
               indexBy="username"
-              colors={['#8e2bd9']}
+              colors={['#8e2bd9', '#3d6ce3']}
               labelSkipWidth={12}
               labelSkipHeight={12}
               legends={[
@@ -404,11 +417,52 @@ export default function AdminDashboard() {
           </div>
         </section>
       ) : (
-        <section aria-label="Users with the most absences" className="rounded-xl bg-neutral-50 p-6 text-center dark:bg-neutral-900">
-          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No absences in the last 30 days</p>
+        <section aria-label="Most active users" className="rounded-xl bg-neutral-50 p-6 text-center dark:bg-neutral-900">
+          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No reports in the last 30 days</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500 dark:text-neutral-400">
-            This panel lists up to 4 users once leave requests exist.
+            This panel ranks up to 4 users once check-ins or leaves exist.
           </p>
+        </section>
+      )}
+
+      {/* Pending leave requests awaiting a decision. */}
+      {pendingList && pendingList.length > 0 && (
+        <section data-guide="pending-list" aria-label="Pending leave requests" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Pending requests</h2>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Not accepted or rejected yet
+              </p>
+            </div>
+            <Link
+              to="/admin/absence"
+              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.98] dark:border-neutral-600 dark:bg-black dark:text-white dark:hover:bg-neutral-900"
+            >
+              Review in Leave & Sick
+            </Link>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            {pendingList.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 rounded-lg bg-white p-3 dark:bg-neutral-800"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  {(item.nickname || item.username || '?')[0].toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    {item.nickname || item.username}
+                    <span className="ml-2 font-normal text-neutral-500 dark:text-neutral-400">
+                      {item.option === 'sick' ? 'Sick' : 'Leave'}
+                    </span>
+                  </p>
+                  <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.reason}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

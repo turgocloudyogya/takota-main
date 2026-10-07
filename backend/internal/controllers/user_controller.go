@@ -337,9 +337,11 @@ func (ctrl *UserController) Absence(c *gin.Context) {
 		return
 	}
 
-	// VALIDATION 2: Check if user has pending absence verification
+	// VALIDATION 2: Check if user has pending absence verification.
+	// Pending means undecided (sign_status IS NULL), matching the admin
+	// lists and dashboard counts.
 	var pendingAbsence models.Attendance
-	err = ctrl.DB.Where("user_id = ? AND type = ? AND verify_by IS NULL", uid, "absence").
+	err = ctrl.DB.Where("user_id = ? AND type = ? AND sign_status IS NULL", uid, "absence").
 		First(&pendingAbsence).Error
 	if err == nil {
 		// User still has a pending absence that has not been verified
