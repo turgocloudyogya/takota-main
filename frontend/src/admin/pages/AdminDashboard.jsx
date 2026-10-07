@@ -378,7 +378,7 @@ export default function AdminDashboard() {
             <ResponsiveBar
               animate={false}
               layout="horizontal"
-              data={topActive.map((u) => ({
+              data={[...topActive].reverse().map((u) => ({
                 username: u.nickname || u.username,
                 attendance: Number(u.checkins) || 0,
                 absence: Number(u.leave_days) || 0,
