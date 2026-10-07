@@ -325,6 +325,47 @@ export default function AdminDashboard() {
         />
       </section>
 
+      {/* Pending leave requests awaiting a decision. */}
+      {pendingList && pendingList.length > 0 && (
+        <section data-guide="pending-list" aria-label="Pending leave requests" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Pending requests</h2>
+              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                Not accepted or rejected yet
+              </p>
+            </div>
+            <Link
+              to="/admin/absence"
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-[0.98]"
+            >
+              Review in Leave & Sick
+            </Link>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            {pendingList.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-3 rounded-lg bg-white p-3 dark:bg-neutral-800"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-amber-700 dark:text-amber-400">
+                  {(item.nickname || item.username || '?')[0].toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    {item.nickname || item.username}
+                    <span className="ml-2 font-normal text-neutral-500 dark:text-neutral-400">
+                      {item.option === 'sick' ? 'Sick' : 'Leave'}
+                    </span>
+                  </p>
+                  <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.reason}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Bars answer one question: on which active days did people report? */}
       {visibleDays.length > 0 ? (
         <section data-guide="charts" aria-label="Check-ins and absences on active days" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
@@ -403,47 +444,6 @@ export default function AdminDashboard() {
           <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500 dark:text-neutral-400">
             This panel ranks up to 4 users once check-ins or leaves exist.
           </p>
-        </section>
-      )}
-
-      {/* Pending leave requests awaiting a decision. */}
-      {pendingList && pendingList.length > 0 && (
-        <section data-guide="pending-list" aria-label="Pending leave requests" className="rounded-xl bg-neutral-50 p-4 sm:p-5 dark:bg-neutral-900">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">Pending requests</h2>
-              <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                Not accepted or rejected yet
-              </p>
-            </div>
-            <Link
-              to="/admin/absence"
-              className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-[0.98]"
-            >
-              Review in Leave & Sick
-            </Link>
-          </div>
-          <div className="mt-3 flex flex-col gap-2">
-            {pendingList.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 rounded-lg bg-white p-3 dark:bg-neutral-800"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-amber-700 dark:text-amber-400">
-                  {(item.nickname || item.username || '?')[0].toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                    {item.nickname || item.username}
-                    <span className="ml-2 font-normal text-neutral-500 dark:text-neutral-400">
-                      {item.option === 'sick' ? 'Sick' : 'Leave'}
-                    </span>
-                  </p>
-                  <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{item.reason}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </section>
       )}
 
