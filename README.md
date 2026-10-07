@@ -27,7 +27,7 @@ Backend:
 - Web framework: Gin
 - Database: PostgreSQL (GORM + pgx)
 - Cache: Redis (optional, falls back to PostgreSQL)
-- Storage: S3 compatible (MinIO, AWS S3, Supabase Storage)
+- Storage: S3 compatible (RustFS, AWS S3, Cloudflare R2, Supabase Storage, custom)
 - Auth: JWT with role-based access control + optional TOTP/passkey two-factor auth
 - Push: Web Push notifications (VAPID, RFC 8291 aes128gcm) with a built-in reminder scheduler
 
@@ -89,7 +89,7 @@ docker build -t takota:latest .
 
 ### 2. Run with a database
 
-The backend requires PostgreSQL and S3 compatible storage to start. For local development, spin up PostgreSQL and MinIO first:
+The backend requires PostgreSQL and S3 compatible storage to start. For local development, spin up PostgreSQL and RustFS first:
 
 ```bash
 # PostgreSQL
@@ -100,12 +100,13 @@ docker run -d --name takota-db \
   -p 5432:5432 \
   postgres:16-alpine
 
-# MinIO (S3 compatible storage)
-docker run -d --name takota-minio \
-  -e MINIO_ROOT_USER=minioadmin \
-  -e MINIO_ROOT_PASSWORD=minioadmin \
+# RustFS (S3 compatible storage)
+docker run -d --name takota-rustfs \
+  -e RUSTFS_ACCESS_KEY=minioadmin \
+  -e RUSTFS_SECRET_KEY=minioadmin \
+  -e RUSTFS_ADDRESS=:9000 \
   -p 9000:9000 \
-  minio/minio:latest server /data
+  rustfs/rustfs:latest
 ```
 
 ### 3. Run the application
@@ -178,12 +179,12 @@ services:
     volumes:
       - ./backend/migrations:/docker-entrypoint-initdb.d
 
-  minio:
-    image: minio/minio:latest
-    command: server /data
+  rustfs:
+    image: rustfs/rustfs:latest
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      RUSTFS_ACCESS_KEY: minioadmin
+      RUSTFS_SECRET_KEY: minioadmin
+      RUSTFS_ADDRESS: :9000
     ports:
       - "9000:9000"
 
@@ -194,7 +195,7 @@ services:
     restart: unless-stopped
     depends_on:
       - db
-      - minio
+      - rustfs
     environment:
       PORT: 8080
       DB_HOST: db
@@ -203,7 +204,7 @@ services:
       DB_PASSWORD: takota
       DB_NAME: takota_db
       DB_SSL_MODE: disable
-      S3_ENDPOINT: http://minio:9000
+      S3_ENDPOINT: http://rustfs:9000
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin
       S3_BUCKET_NAME: takota-bucket
@@ -310,4 +311,4 @@ Commits must never contain secrets (`.env` files, passwords, tokens). See `AGENT
 Two GitHub Actions workflows are included:
 
 - `pr-checks.yml`: runs on pull requests to `main`. Builds the frontend, builds the backend, and builds the Docker image.
-- `deploy.yml`: runs on pushes to `main`. Builds the image, tests it against PostgreSQL and MinIO, and publishes it to GitHub Container Registry (GHCR).
+- `deploy.yml`: runs on pushes to `main`. Builds the image, tests it against PostgreSQL and RustFS, and publishes it to GitHub Container Registry (GHCR).

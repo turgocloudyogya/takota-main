@@ -40,7 +40,7 @@ In production the built frontend and the Go backend run inside a single Nginx im
                       ▼              ▼              ▼
               ┌───────────┐  ┌───────────┐  ┌───────────────┐
               │ PostgreSQL│  │  Redis    │  │   S3 storage  │
-              │  (GORM)   │  │ (optional)│  │ MinIO / AWS / │
+              │  (GORM)   │  │ (optional)│  │ RustFS / AWS / │
               │           │  │           │  │ Cloudflare R2 │
               └───────────┘  └───────────┘  └───────────────┘
 ```

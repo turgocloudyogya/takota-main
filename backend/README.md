@@ -10,7 +10,7 @@ A Go backend for attendance and absence management, built with Gin, GORM, Postgr
 - **2FA**: TOTP (`github.com/pquerna/otp`), WebAuthn/passkey (`github.com/go-webauthn/webauthn`)
 - **Push**: Web Push sender written in-house on stdlib + `golang.org/x/crypto` (RFC 8291 aes128gcm + RFC 8292 VAPID, no extra dependency)
 - **Validation**: go-playground/validator/v10
-- **Storage**: AWS SDK v2 S3 client (S3-compatible: AWS, MinIO, Cloudflare R2)
+- **Storage**: AWS SDK v2 S3 client (S3-compatible: AWS, RustFS, Cloudflare R2, Supabase Storage, custom)
 - **UUID**: google/uuid (v6)
 - **Cache**: go-redis/v9 (optional, falls back to PostgreSQL)
 - **Compression**: pgx non-blocking shutdown
@@ -443,13 +443,14 @@ VAPID_SUBJECT=mailto:admin@example.com
 # WebAuthn extra origins (request origin is always allowed)
 WEBAUTHN_ORIGINS=
 
-# S3 (MinIO example)
+# S3 (RustFS example)
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY=minioadmin
 S3_SECRET_KEY=minioadmin
 S3_BUCKET_NAME=takota-bucket
 S3_USE_SSL=false
 S3_USE_PATH_STYLE_ENDPOINT=true
+S3_USE_PATH_STYLE_PUBLIC_HOST=true
 S3_REGION=us-east-1
 
 # Optional
