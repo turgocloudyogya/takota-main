@@ -11,6 +11,14 @@ import { ThemeProvider, ThemeViewTransition } from './lib/theme.jsx'
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').catch(() => {})
+    // A new SW version takes over on its own (skipWaiting + claim);
+    // reload once so the running page follows the deployed release.
+    let reloaded = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return
+      reloaded = true
+      window.location.reload()
+    })
   })
 }
 

@@ -1,5 +1,16 @@
+/* APP_VERSION: 1.9 */
 // No-op fetch handler so the app meets the PWA installability criteria.
 // Requests pass through to the network untouched.
+//
+// The first line is the release banner (see scripts/sync-sw-version.js):
+// its bytes change every release so deployed clients auto-update.
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
 self.addEventListener('fetch', () => {})
 
 /* global clients:readonly */

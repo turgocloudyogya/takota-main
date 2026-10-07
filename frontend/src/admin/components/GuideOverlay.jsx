@@ -7,13 +7,6 @@ import { markGuideDone } from '../lib/guide.js'
 const STEPS = [
   {
     page: '/admin/dashboard',
-    target: '[data-guide="review-panel"]',
-    title: 'Leave & Sick Reviews',
-    description: 'Pending absence requests land here with the requesters named. Nothing to review means this panel hides itself — tap through to Leave & Sick to decide.',
-    placement: 'bottom',
-  },
-  {
-    page: '/admin/dashboard',
     target: '[data-guide="stat-cards"]',
     title: 'Today at a Glance',
     description: 'Today’s check-ins, users on leave, peak check-in time, and registered users. Totals live in the row below.',

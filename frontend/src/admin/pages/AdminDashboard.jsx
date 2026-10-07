@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Icon } from '@gravity-ui/uikit'
-import { Persons, Check, FileCheck, TriangleExclamation, Clock } from '@gravity-ui/icons'
+import { Persons, Check, FileCheck, Clock } from '@gravity-ui/icons'
 import { ResponsiveBar } from '@nivo/bar'
 import { Label, ListBox, Select } from '@heroui/react'
 import { useTheme } from '../../lib/useTheme.js'
@@ -234,21 +234,6 @@ export default function AdminDashboard() {
     },
   }
 
-  function absenceRequestText() {
-    const names = Array.isArray(stats.pending_requesters) ? stats.pending_requesters : []
-    const total = stats.pending_approvals || 0
-    if (total <= 0) return null
-    if (names.length === 0) {
-      return `${total} absence request${total === 1 ? '' : 's'} awaiting review`
-    }
-    if (total === 1) return `${names[0]} has requested absence`
-    if (total === 2 && names.length >= 2) return `${names[0]} and ${names[1]} have requested absence`
-    const others = total - 2
-    return `${names[0]}, ${names[1]} and ${others} other${others === 1 ? '' : 's'} have requested absence`
-  }
-
-  const requestText = absenceRequestText()
-
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -258,32 +243,6 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* Primary: pending Leave & Sick requests. Hidden when there is nothing to review. */}
-      {requestText && (
-      <section data-guide="review-panel" aria-label="Absence requests awaiting review" className="rounded-xl bg-amber-50 p-4 sm:p-5 dark:bg-amber-500/10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white">
-              <Icon data={TriangleExclamation} size={20} />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-                {requestText}
-              </h2>
-              <p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">
-                {stats.attendance_today} checked in today · {stats.absence_today} on leave today · {stats.total_alpha} unreported
-              </p>
-            </div>
-          </div>
-          <Link
-            to="/admin/absence"
-            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 active:scale-[0.98]"
-          >
-            Review in Leave & Sick
-          </Link>
-        </div>
-      </section>
-      )}
 
       {/* Secondary: today at a glance */}
       <section data-guide="stat-cards" aria-label="Today at a glance" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

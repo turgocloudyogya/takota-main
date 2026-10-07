@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { checkAuth, clearSession } from './lib/authGate.js'
 import { useTheme } from './lib/useTheme.js'
+import BootScreen from './components/BootScreen.jsx'
 import Login from './pages/Login.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import Main from './pages/Main.jsx'
@@ -46,49 +47,58 @@ const PAGE_TITLES = {
 // only use the user pages (/main, /attendance, /absence, /photos).
 const USER_ONLY_PATHS = ['/main', '/main/2fa', '/attendance', '/absence', '/photos']
 
-function AuthGate() {
+function AuthGate({ onFirstCheckDone }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const firstCheckRef = useRef(true)
 
   useEffect(() => {
     let cancelled = false
 
     async function validateAndRoute() {
-      const cookieBefore = typeof document !== 'undefined' ? document.cookie : ''
-      const result = await checkAuth()
-      if (cancelled) return
+      try {
+        const cookieBefore = typeof document !== 'undefined' ? document.cookie : ''
+        const result = await checkAuth()
+        if (cancelled) return
 
-      // Invalid session: force logout and redirect to login.
-      // Skip the wipe if the session changed while we were checking
-      // (e.g. the user just logged in) so we never delete a fresh cookie.
-      if (result.valid === false) {
-        const cookieAfter = typeof document !== 'undefined' ? document.cookie : ''
-        if (cookieAfter === cookieBefore) {
-          clearSession()
-        }
-        if (location.pathname !== '/') {
-          toast.error("Session invalid, please login again")
-          navigate('/', { replace: true })
-        }
-        return
-      }
-
-      // Valid session
-      if (result.valid === true) {
-        const isAdmin = result.role === 'admin'
-        const onUserPage = USER_ONLY_PATHS.includes(location.pathname)
-        const onAdminPage = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
-
-        // Role mismatch: redirect to appropriate home
-        if ((isAdmin && onUserPage) || (!isAdmin && onAdminPage)) {
-          navigate(isAdmin ? '/admin/dashboard' : '/main', { replace: true })
+        // Invalid session: force logout and redirect to login.
+        // Skip the wipe if the session changed while we were checking
+        // (e.g. the user just logged in) so we never delete a fresh cookie.
+        if (result.valid === false) {
+          const cookieAfter = typeof document !== 'undefined' ? document.cookie : ''
+          if (cookieAfter === cookieBefore) {
+            clearSession()
+          }
+          if (location.pathname !== '/') {
+            toast.error("Session invalid, please login again")
+            navigate('/', { replace: true })
+          }
           return
         }
 
-        // On login page: redirect to home
-        if (location.pathname === '/') {
-          navigate(result.redirectHome, { replace: true })
-          return
+        // Valid session
+        if (result.valid === true) {
+          const isAdmin = result.role === 'admin'
+          const onUserPage = USER_ONLY_PATHS.includes(location.pathname)
+          const onAdminPage = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
+
+          // Role mismatch: redirect to appropriate home
+          if ((isAdmin && onUserPage) || (!isAdmin && onAdminPage)) {
+            navigate(isAdmin ? '/admin/dashboard' : '/main', { replace: true })
+            return
+          }
+
+          // On login page: redirect to home
+          if (location.pathname === '/') {
+            navigate(result.redirectHome, { replace: true })
+            return
+          }
+        }
+      } finally {
+        // First check settles the boot screen, whatever the outcome.
+        if (firstCheckRef.current) {
+          firstCheckRef.current = false
+          onFirstCheckDone?.()
         }
       }
     }
@@ -105,18 +115,32 @@ function AuthGate() {
 export default function App() {
   const { theme } = useTheme()
   const location = useLocation()
+  const [booted, setBooted] = useState(false)
+  const [bootGone, setBootGone] = useState(false)
 
   // Update browser tab title based on current route
   useEffect(() => {
     document.title = PAGE_TITLES[location.pathname] || 'Absensi'
   }, [location.pathname])
 
+  // Hand over from the static HTML splash to React, then fade out once
+  // the first session check settles (200ms disappear).
+  useEffect(() => {
+    document.getElementById('boot-splash')?.remove()
+  }, [])
+
+  function handleFirstCheckDone() {
+    setBooted(true)
+    setTimeout(() => setBootGone(true), 200)
+  }
+
   return (
     <>
       {/* Error / status messages, centered top, per spec */}
       <Toaster position="top-center" richColors closeButton theme={theme} />
 
-      <AuthGate />
+      <AuthGate onFirstCheckDone={handleFirstCheckDone} />
+      {!bootGone && <BootScreen leaving={booted} />}
 
       <Routes>
         <Route path="/" element={<Login />} />
