@@ -221,6 +221,9 @@ export default function AdminDashboard() {
     legends: {
       text: { fill: theme === 'dark' ? '#e5e5e5' : '#333333', fontSize: 12 },
     },
+    labels: {
+      text: { fill: '#ffffff', fontSize: 11, fontWeight: 600 },
+    },
     tooltip: {
       container: {
         fontSize: 12,
@@ -274,7 +277,7 @@ export default function AdminDashboard() {
           </div>
           <Link
             to="/admin/absence"
-            className="rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.98] dark:border-neutral-600 dark:bg-black dark:text-white dark:hover:bg-neutral-900"
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary/90 active:scale-[0.98]"
           >
             Review in Leave & Sick
           </Link>
@@ -347,20 +350,9 @@ export default function AdminDashboard() {
               colors={['#8e2bd9', '#3d6ce3']}
               labelSkipWidth={12}
               labelSkipHeight={12}
-              legends={[
-                {
-                  dataFrom: 'keys',
-                  anchor: 'bottom-right',
-                  direction: 'column',
-                  translateX: 120,
-                  itemsSpacing: 3,
-                  itemWidth: 100,
-                  itemHeight: 16,
-                },
-              ]}
               axisBottom={{ tickValues: [] }}
               axisLeft={null}
-              margin={{ top: 16, right: 130, bottom: 0, left: 0 }}
+              margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
               enableGridY={false}
               theme={chartTheme}
             />
@@ -396,21 +388,10 @@ export default function AdminDashboard() {
               colors={['#8e2bd9', '#3d6ce3']}
               labelSkipWidth={12}
               labelSkipHeight={12}
-              legends={[
-                {
-                  dataFrom: 'keys',
-                  anchor: 'bottom-right',
-                  direction: 'column',
-                  translateX: 120,
-                  itemsSpacing: 3,
-                  itemWidth: 100,
-                  itemHeight: 16,
-                },
-              ]}
               axisTop={null}
               axisRight={null}
               axisBottom={{ tickValues: [] }}
-              margin={{ top: 16, right: 130, bottom: 0, left: 0 }}
+              margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
               enableGridX={false}
               theme={chartTheme}
             />
@@ -437,7 +418,7 @@ export default function AdminDashboard() {
             </div>
             <Link
               to="/admin/absence"
-              className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.98] dark:border-neutral-600 dark:bg-black dark:text-white dark:hover:bg-neutral-900"
+              className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 active:scale-[0.98]"
             >
               Review in Leave & Sick
             </Link>
